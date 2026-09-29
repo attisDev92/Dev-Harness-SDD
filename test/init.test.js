@@ -259,3 +259,33 @@ test('invalid --tools and --mode values are rejected before anything is asked', 
   assert.equal((await run(['init', '--mode', 'shared'], { cwd: root })).code, 1);
   assert.ok(!exists(root, 'harness.config.yaml'));
 });
+
+test('repo vacío: la entrevista permite crear front y back como monorepo', async (t) => {
+  const root = tempDir(t);
+  write(root, { 'README.md': '# Nuevo\n' });
+  git(root, 'init');
+  const answers = {
+    topology: 'monorepo',
+    'componentPath:0': 'apps/web',
+    'componentKind:0': 'frontend',
+    'addComponent:0': true,
+    'componentPath:1': 'apps/api',
+    'componentKind:1': 'backend',
+    'addComponent:1': false,
+  };
+  const r = await run(['init'], { cwd: root, answers });
+  assert.equal(r.code, 0, r.stderr);
+  const c = readConfig(root);
+  assert.equal(c.topology, 'monorepo');
+  assert.deepEqual(Object.keys(c.components).sort(), ['api', 'web']);
+  assert.equal(c.components.web.kind, 'frontend');
+  assert.equal(c.components.api.kind, 'backend');
+});
+
+test('AGENTS.md indica dónde escribir tras /init y CLAUDE.md solo referencia AGENTS.md', async (t) => {
+  const root = FIXTURES.frontend(t);
+  const r = await run(['init', '--yes'], { cwd: root });
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /`\/init`.*`AGENTS\.md`/);
+  assert.match(fs.readFileSync(path.join(root, 'CLAUDE.local.md'), 'utf8') + (exists(root, 'CLAUDE.md') ? fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8') : ''), /@AGENTS\.md/);
+});

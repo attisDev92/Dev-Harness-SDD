@@ -40,10 +40,15 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
   // Components, stack, prefixes and verification commands (RF-INI-03, 05, 11).
   if (!comps.length) {
     p.say(t.q.noComponents);
-    const path = await p.text('componentPath', t.q.componentPath, { default: '.' });
-    const kind = await p.select('componentKind', t.q.kind(path), choices(COMPONENT_KINDS, t.kindLabels), { default: 'other' });
-    const stack = await p.text('componentStack', t.q.stack, { default: '' });
-    comps = [{ path, kind, stack, id: path === '.' ? 'app' : path.split('/').pop().toLowerCase().replace(/[^a-z0-9-]/g, '-'), id_prefix: 'APP', verify: {} }];
+    for (let n = 0; ; n += 1) {
+      const path = (await p.text(`componentPath:${n}`, t.q.componentPath, { default: n === 0 && topology !== 'monorepo' ? '.' : '' })).trim().replace(/\/+$/, '') || '.';
+      const kind = await p.select(`componentKind:${n}`, t.q.kind(path), choices(COMPONENT_KINDS, t.kindLabels), { default: 'other' });
+      const stack = await p.text(`componentStack:${n}`, t.q.stack, { default: '' });
+      const id = path === '.' ? 'app' : path.split('/').pop().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      comps.push({ path, kind, stack, id, id_prefix: id === 'app' ? 'APP' : id.slice(0, 3).toUpperCase().padEnd(2, 'X'), verify: {} });
+      // A single component at "." cannot coexist with others (overlapping paths).
+      if (path === '.' || !(await p.confirm(`addComponent:${n}`, t.q.addAnother, { default: topology === 'monorepo' && n === 0 }))) break;
+    }
   } else {
     p.say(t.q.componentsFound);
     for (const c of comps) p.say(`  - ${c.id}: ${c.path} · ${c.stack || '?'} · ${t.kindLabels[c.kind] ?? c.kind}`);

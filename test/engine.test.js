@@ -150,3 +150,11 @@ test('RF-INS-02: the writer refuses global tool directories', (t) => {
   const home = (process.env.USERPROFILE ?? process.env.HOME);
   assert.throws(() => applyChanges(root, [{ path: path.join(home, '.claude', 'x.json'), before: null, after: '{}' }]), { code: 'EHARNESS_GLOBAL' });
 });
+
+test('escritura: un rename bloqueado (EBUSY) se reintenta y el archivo queda escrito', (t) => {
+  const root = tempDir(t);
+  let fails = 2;
+  const busyFs = { ...fs, renameSync(a, b) { if (fails-- > 0) throw Object.assign(new Error('busy'), { code: 'EBUSY' }); return fs.renameSync(a, b); } };
+  applyChanges(root, [{ path: 'a.txt', before: null, after: 'hola' }], { fs: busyFs });
+  assert.equal(fs.readFileSync(path.join(root, 'a.txt'), 'utf8'), 'hola');
+});

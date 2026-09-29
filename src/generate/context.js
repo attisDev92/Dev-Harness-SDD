@@ -135,6 +135,9 @@ function verifyCell(v, t) {
  * @param {{ componentFiles: Record<string, string | null> }} ctx  where each
  *   component's context lives (null when it is covered by the root file)
  */
+// Spanish only, whatever the docs language (project rule: no English variants).
+const RULE_INIT = 'Si ejecutas `/init` o añades instrucciones del proyecto, escríbelas en `AGENTS.md` fuera de este bloque; `CLAUDE.md` solo debe referenciar `@AGENTS.md`.';
+
 export function rootContext(config, ctx) {
   const lang = config.language?.docs ?? 'en';
   const t = contextStrings(lang);
@@ -167,6 +170,7 @@ export function rootContext(config, ctx) {
     `- ${t.ruleDocs} ${whitelist.map((w) => `\`${w}\``).join(', ')}.`,
     `- ${t.ruleLanes}`,
     `- ${t.ruleHarness}`,
+    `- ${RULE_INIT}`,
     '',
     `## ${t.components}`,
     '',

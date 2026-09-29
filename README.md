@@ -321,6 +321,8 @@ Specs, contracts and docs are *your* project artifacts. `init` asks whether they
 | Single repo / monorepo | `specs/` at the root |
 | Multi-repo / workspace | **Each repo owns its specs.** IDs are prefixed (`API-004`, `WEB-007`) |
 
+In a brand-new empty monorepo, `init` asks for each component's path (e.g. `apps/web`, `apps/api`) and kind, and offers to add another. Each spec belongs to a single component, so a full-stack feature is one spec per component linked with `depends_on`.
+
 Cross-repo references use stable IDs (`depends_on: api#API-004`). The **provider owns the contract**, and consumers keep a snapshot with origin metadata:
 
 ```

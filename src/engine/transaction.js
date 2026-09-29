@@ -50,9 +50,7 @@ export function applyChanges(root, changes, options = {}) {
         continue;
       }
       ensureDir(path.dirname(abs));
-      const tmp = `${abs}.harness-${process.pid}.tmp`;
-      fs.writeFileSync(tmp, change.after);
-      fs.renameSync(tmp, abs);
+      writeFile(fs, abs, change.after);
       if (change.executable) {
         try {
           fs.chmodSync(abs, 0o755);
@@ -83,6 +81,32 @@ export function applyChanges(root, changes, options = {}) {
     }
   }
   return { createdDirs, removedDirs };
+}
+
+const BUSY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+// Windows rejects a rename over a file another process (e.g. an open Claude Code
+// session) is watching. Retry briefly, then write in place: the original is
+// already held in memory, so the rollback still works.
+function writeFile(fs, abs, content) {
+  const tmp = `${abs}.harness-${process.pid}.tmp`;
+  fs.writeFileSync(tmp, content);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(tmp, abs);
+      return;
+    } catch (error) {
+      if (!BUSY_CODES.has(error.code)) throw error;
+      if (attempt >= 4) break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (attempt + 1));
+    }
+  }
+  fs.writeFileSync(abs, content);
+  try {
+    fs.unlinkSync(tmp);
+  } catch {
+    // The rollback removes leftover temporary files.
+  }
 }
 
 function rollback(fs, done, createdDirs, configDone, gitConfig) {
