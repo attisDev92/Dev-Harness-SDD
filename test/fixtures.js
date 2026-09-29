@@ -30,18 +30,22 @@ export function initRepo(dir, { commit = true, messages = ['chore: initial commi
   }
 }
 
-/** Every file (including .git/info/exclude and .git/config) with its content. */
+/**
+ * Every file with its content. Inside .git only what the harness may touch
+ * (info/exclude and config) is compared: git writes the rest on its own,
+ * sometimes in the background (auto gc, info/refs).
+ */
 export function snapshot(root) {
   const out = {};
   const walk = (d) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, e.name);
       const rel = path.relative(root, full).split(path.sep).join('/');
+      const inGit = /(^|\/)\.git(\/|$)/.test(rel);
       if (e.isDirectory()) {
-        if (/(^|\/)\.git\/(objects|refs|logs|hooks)$/.test(rel) || rel.endsWith('.git/objects')) continue;
-        out[`${rel}/`] = 'dir';
+        if (!inGit) out[`${rel}/`] = 'dir';
         walk(full);
-      } else if (!/\.git\/(index|ORIG_HEAD|COMMIT_EDITMSG|FETCH_HEAD)$/.test(rel)) {
+      } else if (!inGit || /(^|\/)\.git\/(info\/exclude|config)$/.test(rel)) {
         out[rel] = readFileSync(full, 'utf8');
       }
     }
