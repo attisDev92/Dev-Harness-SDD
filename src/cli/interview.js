@@ -101,7 +101,11 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
   // Design, tracker, gates, mode and artifacts (RF-INI-06..10).
   const hasFrontend = Object.values(components).some((c) => c.kind === 'frontend');
   const design = hasFrontend ? await p.select('design', t.q.design, choices(DESIGN_SOURCES, t.designLabels), { default: 'none' }) : 'none';
-  const tracker = await p.select('tracker', t.q.tracker, choices(['none', ...TRACKERS], t.trackerLabels), { default: 'none' });
+  // Any tracker the user has: the list is only a shortcut; "other" asks its name.
+  let tracker = await p.select('tracker', t.q.tracker, choices(['none', ...TRACKERS, 'other'], { ...t.trackerLabels, other: 'otro (el que uses con su MCP)' }), { default: 'none' });
+  if (tracker === 'other') {
+    tracker = (await p.text('trackerName', 'Nombre del tracker (p. ej. asana, clickup, youtrack)', { default: '' })).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || 'none';
+  }
   const manual = await p.select('manualTest', t.q.manualTest, choices(['task', 'story', 'spec'], t.manualLabels), { default: 'task' });
   const mode = preset.mode ?? (await p.select('installMode', t.q.installMode, choices(['local', 'team'], t.modeLabels), { default: 'local' }));
   const artifacts = await p.select('artifacts', t.q.artifacts, choices(['versioned', 'local'], t.artifactLabels), { default: mode === 'team' ? 'versioned' : 'local' });

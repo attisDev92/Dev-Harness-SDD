@@ -18,6 +18,7 @@ export const CHANGES = {
   '0.3.0': ['Adaptador de Claude Code: subagentes, comandos /sdd:*, skills, permisos y hooks', 'Flujo SDD determinista con sdd.js, gates humanos y triage', 'Git hook pre-commit y plantilla de CI'],
   '0.4.0': ['MVP: mensajes en español, log de eventos y harness upgrade'],
   '0.5.0': ['Varios repos y workspace, dependencias entre specs y snapshots de contratos', 'Registro curado de skills con instalador verificado', 'Sincronización con GitHub Issues'],
+  '0.6.0': ['Cualquier tracker: GitHub desde la CLI y el resto desde el agente con su MCP (/sdd:tracker)'],
 };
 
 /**

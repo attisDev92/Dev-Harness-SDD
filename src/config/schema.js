@@ -59,7 +59,14 @@ export const schema = obj(
       { minEntries: 1, keyPattern: COMPONENT_ID },
     ),
     design: obj({ source: oneOf(DESIGN_SOURCES), mcp_url: str({ pattern: /^https?:\/\/\S+$/, hint: 'https://…' }) }),
-    tracker: obj({ enabled: bool(), provider: oneOf(TRACKERS), repo: str({ pattern: /^[\w.-]+\/[\w.-]+$/, hint: 'owner/repo' }) }),
+    // Any tracker: GitHub syncs from the CLI; the rest through the agent and
+    // the tracker's MCP. `project` identifies the board, team or project there.
+    tracker: obj({
+      enabled: bool(),
+      provider: str({ pattern: /^[a-z0-9][a-z0-9-]*$/, hint: 'github, linear, jira, asana, clickup…' }),
+      repo: str({ pattern: /^[\w.-]+\/[\w.-]+$/, hint: 'owner/repo' }),
+      project: str(),
+    }),
     gates: obj({
       manual_test: oneOf(['task', 'story', 'spec']),
       commits: oneOf(['human-only']),

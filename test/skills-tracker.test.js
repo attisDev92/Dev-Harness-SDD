@@ -6,7 +6,7 @@ import path from 'node:path';
 import { FIXTURES, run, snapshot } from './fixtures.js';
 import { main } from '../src/cli/main.js';
 import { treeHash, loadRegistry, ALLOWED_LICENSES } from '../src/skills/installer.js';
-import { planSync, linkedTasks, updateTaskLine } from '../src/tracker/sync.js';
+import { planSync, linkedTasks, updateTaskLine } from '../src/guards/tracker-sync.js';
 
 const read = (root, p) => fs.readFileSync(path.join(root, p), 'utf8');
 
@@ -93,6 +93,45 @@ test('tracker: pure sync plan in both directions with conflicts and proposals', 
   assert.deepEqual(plan.proposals.map((x) => x.title), ['Export CSV']);
   const line = updateTaskLine('- [ ] T4 New task · Component: web', 'T4', { link: 'github:o/r#10', done: true });
   assert.equal(line, '- [x] T4 New task · Component: web <!-- github:o/r#10 -->');
+});
+
+test('tracker: any tracker through the agent and its MCP (plan → user gate → apply)', async (t) => {
+  const { runSdd } = await import('../src/guards/sdd.js');
+  const { handleHook } = await import('../src/guards/hook.js');
+  const root = FIXTURES.frontend(t);
+  await run(['init', '--yes'], { cwd: root });
+  fs.writeFileSync(path.join(root, 'harness.config.yaml'), read(root, 'harness.config.yaml').replace('tracker:\n  enabled: false', 'tracker:\n  enabled: true\n  provider: youtrack\n  project: SHOP'));
+  assert.equal((await run(['sync', '--yes'], { cwd: root })).code, 0);
+  assert.match(read(root, '.claude/commands/sdd/tracker.md'), /Sincroniza tasks\.md con youtrack \(proyecto\/tablero: SHOP\)/);
+  assert.match((await cli(['tracker', 'sync'], root)).stdout, /"youtrack" se sincroniza desde tu agente con su MCP/);
+
+  const specDir = path.join(root, 'specs', 'SW-001-login');
+  fs.mkdirSync(specDir, { recursive: true });
+  fs.writeFileSync(path.join(specDir, 'tasks.md'), '- [ ] T1 Formulario · Component: shop-web\n');
+  const sdd = async (argv, input) => {
+    let stdout = '';
+    let stderr = '';
+    const code = await runSdd(argv, { stdout: { write: (s) => { stdout += s; } }, stderr: { write: (s) => { stderr += s; } }, cwd: root, env: {}, readStdin: async () => JSON.stringify(input ?? {}) });
+    return { code, stdout, stderr };
+  };
+
+  // What the agent read from the tracker through its MCP.
+  const plan = await sdd(['tracker', 'plan'], { 'SW-001-login': [{ key: 'SHOP-9', title: 'Exportar CSV', done: false }] });
+  assert.equal(plan.code, 0, plan.stderr);
+  assert.match(plan.stdout, /→ crear en el tracker: T1 Formulario\n {2}\? nueva en el tracker: SHOP-9 "Exportar CSV"/);
+  assert.match(plan.stdout, /gate request tracker/);
+
+  // RF-TRK-08: nothing is applied before the user approves.
+  assert.equal((await sdd(['tracker', 'apply'], {})).code, 2);
+  assert.equal((await sdd(['gate', 'request', 'tracker'])).code, 0);
+  handleHook('UserPromptSubmit', { cwd: root, session_id: 's', prompt: '/sdd:approve' }, { env: {} });
+  const apply = await sdd(['tracker', 'apply'], { 'SW-001-login': { links: { T1: 'SHOP-10' }, proposals: ['SHOP-9'] } });
+  assert.equal(apply.code, 0, apply.stderr);
+  assert.equal(read(root, 'specs/SW-001-login/tasks.md'), '- [ ] T1 Formulario · Component: shop-web <!-- youtrack:SHOP-10 -->\n- [ ] T2 Exportar CSV <!-- youtrack:SHOP-9 -->\n');
+
+  // Next round: both sides agree → nothing to do.
+  const again = await sdd(['tracker', 'plan'], { 'SW-001-login': [{ key: 'SHOP-10', title: 'T1 Formulario', done: false }, { key: 'SHOP-9', title: 'Exportar CSV', done: false }] });
+  assert.match(again.stdout, /Todo está sincronizado/);
 });
 
 test('tracker: GitHub sync end to end with a fake API; errors never touch tasks.md', async (t) => {

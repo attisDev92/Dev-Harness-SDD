@@ -213,7 +213,25 @@ es.contract = {
   noContract: (p) => `La spec ${p.spec} no tiene contratos en contracts/${p.files?.length ? ` (hay: ${p.files.join(', ')})` : ''}.`,
   imported: (f, s) => `Snapshot creado: ${f} (de ${s.repo}, spec ${s.spec}, commit ${s.commit ?? 'sin commits'}). Adaptarse a un cambio de este contrato requiere aprobación.`,
 };
-es.status.missingDependency = (ref) => `depende de ${ref}, que no existe`;
+es.gate.noTrackerPlan = () => 'Primero calcula los cambios: node .harness/scripts/sdd.js tracker plan';
+es.tracker = {
+  disabled: 'No hay tracker activado en harness.config.yaml (tracker.enabled y tracker.provider).',
+  badInput: (m) => `Entrada no válida: ${m}. Formato: {"<SPEC-ID>": [{"key": "ABC-1", "title": "T1 …", "done": false}]}`,
+  spec: (id) => `Spec ${id}:`,
+  create: (x) => `  → crear en el tracker: ${x.title}`,
+  push: (x) => `  → actualizar ${x.remote.key}: ${x.title} (${x.done ? 'cerrada' : 'abierta'})`,
+  pull: (x) => `  ← actualizar ${x.task.id} en tasks.md: ${x.title} (${x.done ? 'hecha' : 'pendiente'})`,
+  conflict: (x) => `  ! ${x.task.id} cambió en ambos lados: local "${x.task.title}" · tracker "${x.remote.title}". Pregunta al usuario cuál conservar.`,
+  missing: (x) => `  ! ${x.task.id} está vinculada a ${x.key}, que ya no existe en el tracker. No se borra nada: pregunta al usuario.`,
+  proposal: (x) => `  ? nueva en el tracker: ${x.remote.key} "${x.title}". Solo se añade a tasks.md si el usuario lo aprueba.`,
+  nothing: 'Todo está sincronizado.',
+  needsGate: (c, u) => `Hay que crear ${c} y actualizar ${u} elementos en el tracker. Pide aprobación antes de tocarlo: node .harness/scripts/sdd.js gate request tracker`,
+  localOnly: 'No hay nada que escribir en el tracker. Aplica los cambios locales: node .harness/scripts/sdd.js tracker apply',
+  noPlan: 'No hay plan de sincronización. Ejecuta antes: node .harness/scripts/sdd.js tracker plan',
+  notApproved: 'El usuario todavía no aprobó los cambios en el tracker (gate "tracker").',
+  applied: (n) => `tasks.md actualizado en ${n} spec${n === 1 ? '' : 's'}. La spec no se toca.`,
+};
+es.status.missingDependency =(ref) => `depende de ${ref}, que no existe`;
 
 // MVP: messages added after v0.3 exist only in Spanish; English falls back to them.
 function withFallback(base, over) {

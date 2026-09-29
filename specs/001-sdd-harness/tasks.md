@@ -49,7 +49,7 @@
 - [ ] T30 Adaptadores de opencode, Codex y Antigravity; modo degradado (RF-ADP para otras herramientas, RF-ORQ-11)
 - [x] T31 Registro curado de skills e instalador verificado (RF-SKL-02…15)
 - [x] T32 Sincronización con GitHub Issues (RF-TRK-*)
-- [ ] T35 Trackers Linear, Notion y Jira
+- [x] T35 Cualquier tracker: GitHub desde la CLI y el resto desde el agente con su MCP (`/sdd:tracker`, `sdd.js tracker plan|apply`, gate `tracker`)
 - [ ] T36 Resto de skills propias de RF-SKL-01
 - [ ] T37 Git hooks por repo en topología workspace
 - [ ] T33 Costo y tokens por tarea (RF-OBS-03)

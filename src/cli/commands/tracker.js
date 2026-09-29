@@ -7,7 +7,7 @@ import { CONFIG_FILE, findProjectRoot, loadGuardSettings } from '../../guards/pr
 import { listSpecs, specRoots } from '../../guards/tasks.js';
 import { loadConfigFile } from '../../config/load.js';
 import { githubClient, tokenFrom } from '../../tracker/github.js';
-import { linkedTasks, planSync, updateTaskLine, nextTaskId } from '../../tracker/sync.js';
+import { linkedTasks, planSync, updateTaskLine, nextTaskId } from '../../guards/tracker-sync.js';
 import { CancelledError, createLinePrompter, createScriptedPrompter } from '../prompt.js';
 
 const BASE_FILE = '.harness/state/tracker.json';
@@ -15,8 +15,8 @@ const BASE_FILE = '.harness/state/tracker.json';
 const M = {
   notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
   usage: 'Uso: harness tracker <connect|sync|status> [--dry-run] [--yes]',
-  disabled: 'No hay tracker activado. Añade en harness.config.yaml: tracker: {enabled: true, provider: github, repo: <owner>/<repo>}',
-  unsupported: (p) => `El tracker "${p}" todavía no está disponible; por ahora solo GitHub Issues.`,
+  disabled: 'No hay tracker activado. Añade en harness.config.yaml: tracker: {enabled: true, provider: <github|linear|jira|el tuyo>, project: <tablero o proyecto>} (con GitHub, además repo: <owner>/<repo>).',
+  viaAgent: (p) => `El tracker "${p}" se sincroniza desde tu agente con su MCP: abre Claude Code en el proyecto y ejecuta /sdd:tracker. El harness calcula los cambios, pide tu aprobación y actualiza tasks.md.`,
   noRepo: 'Falta tracker.repo (owner/repo) en harness.config.yaml.',
   noToken: 'Falta el token: define GITHUB_TOKEN o GH_TOKEN en el entorno. El harness nunca lo guarda en el proyecto.',
   connected: (r) => `Conectado a ${r.name}${r.canWrite ? '' : ' (solo lectura: no se podrán crear ni modificar issues)'}.`,
@@ -57,8 +57,8 @@ export async function trackerCommand(argv, { io }) {
   if (!['connect', 'sync', 'status'].includes(action)) { err(M.usage); return 1; }
   const tracker = loadConfigFile(path.join(root, CONFIG_FILE)).config?.tracker ?? {};
   if (!tracker.enabled) { err(M.disabled); return 1; }
-  if (tracker.provider !== 'github') { err(M.unsupported(tracker.provider)); return 1; }
-  if (!tracker.repo) { err(M.noRepo); return 1; }
+  const native = tracker.provider === 'github';
+  if (native && !tracker.repo && action !== 'status') { err(M.noRepo); return 1; }
 
   const settings = loadGuardSettings(root);
   const specs = listSpecs(root, specRoots(settings)).filter((s) => existsSync(path.join(root, s.dir, 'tasks.md')));
@@ -70,6 +70,12 @@ export async function trackerCommand(argv, { io }) {
       const tasks = linkedTasks(readFileSync(path.join(root, s.dir, 'tasks.md'), 'utf8'));
       out(M.status(s.id, tasks.filter((t) => t.link).length, tasks.length, base.at));
     }
+    return 0;
+  }
+
+  // Any other tracker syncs from the agent, through the tracker's own MCP.
+  if (!native) {
+    out(M.viaAgent(tracker.provider));
     return 0;
   }
 

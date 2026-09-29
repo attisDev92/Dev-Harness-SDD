@@ -5,7 +5,7 @@
 
 import { logEvent } from './state.js';
 
-export const GATE_KINDS = ['constitution', 'spec', 'clarify', 'plan', 'tasks', 'review', 'manual-test', 'protected', 'change', 'triage', 'lanes', 'validate'];
+export const GATE_KINDS = ['constitution', 'spec', 'clarify', 'plan', 'tasks', 'review', 'manual-test', 'protected', 'change', 'triage', 'lanes', 'validate', 'tracker'];
 
 const clone = (x) => structuredClone(x);
 
@@ -33,6 +33,7 @@ export function requestGate(state, { kind, files = [], adr, summary, option }) {
   if (kind === 'protected' && !adr) return { ok: false, code: 'adrRequired' };
   if (kind === 'change' && !spec.change) return { ok: false, code: 'noChange' };
   if (kind === 'triage' && !state.triage) return { ok: false, code: 'noTriage' };
+  if (kind === 'tracker' && !state.trackerPlan) return { ok: false, code: 'noTrackerPlan' };
   const next = clone(state);
   next.gate = { kind, spec: state.activeSpec, task: state.task?.id ?? null, files, adr, summary, option, requested: new Date().toISOString() };
   logEvent(next, 'gate-requested', { kind });
@@ -87,6 +88,8 @@ export function decide(state, { approved, text = '' }) {
         if (next.task) next.task.option = text;
         break;
       case 'validate': spec.phase = 'done'; break;
+      // RF-TRK-08: the agent may now create and update items in the tracker.
+      case 'tracker': if (next.trackerPlan) next.trackerPlan.approved = true; break;
       default: break;
     }
   } else if (gate.kind === 'manual-test' && next.task) {

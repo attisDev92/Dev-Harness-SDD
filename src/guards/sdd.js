@@ -16,11 +16,12 @@ import { loadFlow, saveFlow, logEvent } from './state.js';
 import { requestGate } from './flow.js';
 import { specDirOf } from './state.js';
 import { importContract } from './contracts.js';
-import { specsDirFor, specRoots, specDependencies, resolveSpecRef, nextSpecId, nextAdrFile, slugify, parseTasks, selectNextTask, markTaskDone, taskProblems, parseRequirements, lintSpec, lintTasks, lintConstitution } from './tasks.js';
+import { listSpecs, specsDirFor, specRoots, specDependencies, resolveSpecRef, nextSpecId, nextAdrFile, slugify, parseTasks, selectNextTask, markTaskDone, taskProblems, parseRequirements, lintSpec, lintTasks, lintConstitution } from './tasks.js';
 import { runVerify } from './verify.js';
 import { loadState as loadRetries, saveState as saveRetries, recordFailure, resetTask } from './retry.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
+import { linkedTasks, planSync, applyLocal } from './tracker-sync.js';
 
 const OK = 0;
 const USAGE = 1;
@@ -38,6 +39,8 @@ const USAGE_TEXT = `usage: sdd.js <command>
   triage start | change start
   validate [--json]               requirement → test coverage of the active spec
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
+  tracker plan [--file f]         items read from the tracker (JSON on stdin) → sync plan
+  tracker apply [--file f]        after the "tracker" gate: links, pulls and decisions into tasks.md
   commit-context                  changes per repository for /sdd:commit
   lint <spec|tasks|constitution> [file]`;
 
@@ -309,6 +312,88 @@ export async function runSdd(argv, io) {
       return OK;
     }
 
+    case 'tracker': {
+      // Any tracker: the agent reads and writes its items through the tracker's
+      // MCP; this script decides what changes and applies the local side.
+      const provider = settings.tracker?.provider;
+      if (!provider) return refuse(t.tracker.disabled);
+      const readInput = async () => {
+        const raw = flags.file ? readFileSync(path.resolve(io.cwd, flags.file), 'utf8') : await (io.readStdin?.() ?? '');
+        return JSON.parse(raw || '{}');
+      };
+      const baseFile = path.join(root, '.harness', 'state', 'tracker.json');
+      const base = (() => { try { return JSON.parse(readFileSync(baseFile, 'utf8')); } catch { return { specs: {}, at: null }; } })();
+      const specs = listSpecs(root, specRoots(settings)).filter((s) => existsSync(path.join(root, s.dir, 'tasks.md')));
+
+      if (rest[0] === 'plan') {
+        let remote;
+        try {
+          remote = await readInput();
+        } catch (e) {
+          return refuse(t.tracker.badInput(e.message));
+        }
+        const plans = {};
+        let creates = 0;
+        let updates = 0;
+        for (const s of specs) {
+          const tasks = linkedTasks(read(path.join(root, s.dir, 'tasks.md')));
+          const items = (Array.isArray(remote) ? (s.id === state.activeSpec ? remote : []) : remote[s.id] ?? []).map((r) => ({ key: String(r.key), title: String(r.title ?? ''), done: Boolean(r.done) }));
+          const plan = planSync({ tasks, remote: items, base: base.specs?.[s.id] ?? {} });
+          if (![plan.create, plan.push, plan.pull, plan.conflicts, plan.missing, plan.proposals].some((l) => l.length)) continue;
+          plans[s.id] = plan;
+          creates += plan.create.length;
+          updates += plan.push.length + plan.conflicts.length;
+          out(t.tracker.spec(s.id));
+          plan.create.forEach((x) => out(t.tracker.create(x)));
+          plan.push.forEach((x) => out(t.tracker.push(x)));
+          plan.pull.forEach((x) => out(t.tracker.pull(x)));
+          plan.conflicts.forEach((x) => out(t.tracker.conflict(x)));
+          plan.missing.forEach((x) => out(t.tracker.missing(x)));
+          plan.proposals.forEach((x) => out(t.tracker.proposal(x)));
+        }
+        if (!Object.keys(plans).length) {
+          state.trackerPlan = null;
+          save();
+          out(t.tracker.nothing);
+          return OK;
+        }
+        state.trackerPlan = { provider, specs: plans, remoteWrites: creates + updates, approved: false };
+        save();
+        out(creates + updates ? t.tracker.needsGate(creates, updates) : t.tracker.localOnly);
+        return OK;
+      }
+
+      if (rest[0] === 'apply') {
+        const tp = state.trackerPlan;
+        if (!tp) return refuse(t.tracker.noPlan);
+        // RF-TRK-08: nothing was written to the tracker without the user's approval.
+        if (tp.remoteWrites && !tp.approved) return refuse(t.tracker.notApproved);
+        let decisions;
+        try {
+          decisions = await readInput();
+        } catch (e) {
+          return refuse(t.tracker.badInput(e.message));
+        }
+        let changed = 0;
+        for (const s of specs.filter((x) => tp.specs[x.id])) {
+          const file = path.join(root, s.dir, 'tasks.md');
+          const text = read(file);
+          const r = applyLocal(text, tp.specs[s.id], { provider: tp.provider, ...(decisions[s.id] ?? {}), base: base.specs?.[s.id] ?? {} });
+          if (r.text !== text) { writeFileSync(file, r.text); changed += 1; }
+          base.specs = { ...base.specs, [s.id]: r.base };
+        }
+        base.at = new Date().toISOString();
+        mkdirSync(path.dirname(baseFile), { recursive: true });
+        writeFileSync(baseFile, JSON.stringify(base, null, 2) + '\n');
+        state.trackerPlan = null;
+        logEvent(state, 'tracker-synced', { provider: tp.provider });
+        save();
+        out(t.tracker.applied(changed));
+        return OK;
+      }
+      return refuse(USAGE_TEXT);
+    }
+
     case 'commit-context': {
       out(JSON.stringify(commitContext(root, settings, state), null, 2));
       return OK;
@@ -386,5 +471,13 @@ function commitContext(root, settings, state) {
 }
 
 if (isMainModule(import.meta.url)) {
-  runSdd(process.argv.slice(2), { stdout: process.stdout, stderr: process.stderr, cwd: process.cwd(), env: process.env }).then((code) => { process.exitCode = code; });
+  const readStdin = () => new Promise((resolve, reject) => {
+    if (process.stdin.isTTY) return resolve('');
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (c) => { data += c; });
+    process.stdin.on('end', () => resolve(data));
+    process.stdin.on('error', reject);
+  });
+  runSdd(process.argv.slice(2), { stdout: process.stdout, stderr: process.stderr, cwd: process.cwd(), env: process.env, readStdin }).then((code) => { process.exitCode = code; });
 }

@@ -26,7 +26,7 @@ export const TOOL_CONTEXT_LIMITS = { codex: 32768, 'claude-code': 40000, opencod
 
 const GUARD_SOURCES = [
   'args.js', 'bash-guard.js', 'checks.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'git-guard.js', 'glob.js', 'hook.js',
-  'messages.js', 'project.js', 'contracts.js', 'retry.js', 'runtime-messages.js', 'sdd.js', 'shell.js', 'state.js', 'tasks.js', 'verify.js',
+  'messages.js', 'project.js', 'contracts.js', 'retry.js', 'runtime-messages.js', 'sdd.js', 'shell.js', 'state.js', 'tasks.js', 'tracker-sync.js', 'verify.js',
   ['cli.js', 'guard.js'],
 ];
 const GUARDS_DIR = path.dirname(fileURLToPath(new URL('../guards/cli.js', import.meta.url)));
@@ -185,6 +185,7 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
         docs_language: config.language?.docs ?? 'en',
         commits: { convention: config.conventions?.commits ?? 'conventional', language: config.language?.commits ?? 'en', note: config.conventions?.commits_note },
         topology: config.topology,
+        tracker: config.tracker?.enabled && config.tracker.provider ? { provider: config.tracker.provider, project: config.tracker.project ?? null, repo: config.tracker.repo ?? null } : null,
       },
       null,
       2,

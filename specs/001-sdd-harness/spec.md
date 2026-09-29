@@ -102,7 +102,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-INI-04:** EL SISTEMA preguntará qué herramientas de agentes se usarán y generará configuración solo para esas herramientas.
 - **RF-INI-05:** EL SISTEMA preguntará el prefijo de ID de specs para cada repo (por ejemplo `API`, `WEB`) y propondrá uno derivado del nombre del componente.
 - **RF-INI-06:** EL SISTEMA preguntará la fuente de diseño (`none`, `tokens-in-code`, `penpot`, `figma`) cuando exista un componente de frontend.
-- **RF-INI-07:** EL SISTEMA preguntará si se activa un tracker y cuál (`linear`, `notion`, `github`, `jira`), con la opción "ninguno" como valor por defecto.
+- **RF-INI-07:** EL SISTEMA preguntará si se activa un tracker y cuál: cualquiera que use el desarrollador (atajos para `github`, `linear`, `notion`, `jira`, o el nombre de otro), con la opción "ninguno" como valor por defecto.
 - **RF-INI-08:** EL SISTEMA preguntará la granularidad del gate de prueba manual (`task`, `story`, `spec`), con `task` como valor por defecto.
 - **RF-INI-09:** EL SISTEMA preguntará el modo de instalación (`local` o `team`), con `local` como valor por defecto.
 - **RF-INI-10:** EL SISTEMA preguntará si los artefactos (specs, contratos, ADRs, docs) se versionan o se mantienen locales.
@@ -422,7 +422,8 @@ Los hitos originales (v0.1–v1.0) se unificaron en un **MVP** centrado en Claud
 | **v0.5** | TOP (varios repos, workspace, dependencias entre specs, snapshots de contratos), SKL (registro curado, instalador verificado, asignación por rol, MCP de Figma/Penpot), TRK con GitHub Issues | Implementado |
 | Pendiente | ADP para opencode, Codex y Antigravity; modo degradado (ORQ-11); RF-ADP-04 completo; RF-MRG-02 para TOML | Pendiente |
 | Pendiente | Resto de skills propias de SKL-01 (`clean-code`, `design-system`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`, `testing-strategy`, `docs-writer`) y skill `penpot-mcp` (ya no existe en su origen) | Pendiente |
-| Pendiente | TRK: Linear, Notion y Jira (GitHub Issues ya está); git hooks por repo en workspace | Pendiente |
+| **v0.6** | TRK con cualquier tracker: GitHub Issues desde la CLI; el resto (Linear, Jira, Notion, Asana, ClickUp…) desde el agente con el MCP del tracker, con plan determinista y aprobación antes de escribir | Implementado |
+| Pendiente | Git hooks por repo en topología workspace | Pendiente |
 | Pendiente | OBS-03: costo y tokens por tarea desde la herramienta | Pendiente |
 | Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP), RNF-18 (guías completas) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
 

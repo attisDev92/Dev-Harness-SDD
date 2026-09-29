@@ -375,7 +375,7 @@ my-project/
 - [x] Multi-repo and workspace topologies, cross-spec dependencies and contract snapshots
 - [ ] opencode, Codex and Antigravity adapters, and degraded mode
 - [x] Skills registry and verified installer
-- [x] Two-way sync with GitHub Issues (Linear, Notion and Jira pending)
+- [x] Two-way sync with any tracker: GitHub from the CLI, the rest from the agent through its MCP
 - [x] Cross-platform CI matrix (Windows, macOS, Linux · Node 20, 22, 24)
 - [ ] Cost per task, English messages and first stable release
 

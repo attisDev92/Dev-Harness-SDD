@@ -375,7 +375,7 @@ mi-proyecto/
 - [x] Topologías de varios repos y workspace, dependencias entre specs y snapshots de contratos
 - [ ] Adaptadores de opencode, Codex y Antigravity, y modo degradado
 - [x] Registro de skills e instalador verificado
-- [x] Sincronización bidireccional con GitHub Issues (Linear, Notion y Jira pendientes)
+- [x] Sincronización bidireccional con cualquier tracker: GitHub desde la CLI, el resto desde el agente con su MCP
 - [x] Matriz de CI multiplataforma (Windows, macOS, Linux · Node 20, 22, 24)
 - [ ] Costo por tarea, mensajes en inglés y primera versión estable
 

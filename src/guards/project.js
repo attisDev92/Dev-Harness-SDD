@@ -56,5 +56,6 @@ export function loadGuardSettings(root) {
     docsLanguage: data.docs_language === 'es' ? 'es' : 'en',
     commits: data.commits ?? { convention: 'conventional' },
     topology: data.topology ?? 'single',
+    tracker: data.tracker ?? null,
   };
 }
