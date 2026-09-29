@@ -1,5 +1,22 @@
 // Tiny argv parser shared by the CLI and the standalone guard runner.
 
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * True when the module at `metaUrl` is the script Node was started with.
+ * Compares real paths: temp folders are aliased on macOS (/var → /private/var)
+ * and Windows (8.3 short names).
+ */
+export function isMainModule(metaUrl) {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(metaUrl));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {string[]} argv
  * @param {{ boolean?: string[], string?: string[], alias?: Record<string,string> }} spec

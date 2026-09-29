@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs } from './args.js';
+import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
 import { loadFlow, saveFlow, logEvent } from './state.js';
 import { requestGate } from './flow.js';
@@ -385,6 +385,6 @@ function commitContext(root, settings, state) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (isMainModule(import.meta.url)) {
   runSdd(process.argv.slice(2), { stdout: process.stdout, stderr: process.stderr, cwd: process.cwd(), env: process.env }).then((code) => { process.exitCode = code; });
 }

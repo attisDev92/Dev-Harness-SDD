@@ -486,7 +486,8 @@ function analyzeStartProcess(args, ctx, depth) {
 
 function scanFile(file, ctx, depth, codeOnly = false) {
   if (depth > MAX_DEPTH) return block('tooDeep', file);
-  const abs = path.resolve(ctx.cwd, file);
+  // `.\deploy.ps1` is a PowerShell path: normalise it so it resolves on every OS.
+  const abs = path.resolve(ctx.cwd, String(file).replace(/\\/g, '/'));
   if (ctx.visited.has(abs) || ctx.trusted?.(abs)) return null;
   ctx.visited.add(abs);
   const text = ctx.readFile(abs);

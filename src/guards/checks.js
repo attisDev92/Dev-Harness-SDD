@@ -7,7 +7,7 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs } from './args.js';
+import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
 import { matchesAny } from './glob.js';
 import { componentOf } from './files-guard.js';
@@ -104,6 +104,6 @@ async function main() {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (isMainModule(import.meta.url)) {
   main().then((code) => { process.exitCode = code; });
 }

@@ -8,6 +8,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findProjectRoot, loadGuardSettings } from './project.js';
+import { isMainModule } from './args.js';
 import { loadFlow, saveFlow, touchLock, releaseLock, logEvent } from './state.js';
 import { checkShell } from './bash-guard.js';
 import { checkWrite, componentOf } from './files-guard.js';
@@ -181,4 +182,4 @@ async function main() {
   process.exitCode = result.code;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main();
+if (isMainModule(import.meta.url)) main();

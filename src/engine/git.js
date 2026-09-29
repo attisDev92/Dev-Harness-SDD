@@ -24,17 +24,12 @@ export function isRepoRoot(dir) {
 
 /** Tracked (or staged) files, as posix paths relative to `root`. */
 export function trackedFiles(root) {
-  if (!gitTopLevel(root)) return new Set();
-  const r = run(root, ['ls-files', '-z', '--full-name']);
+  // Without --full-name git prints paths relative to `root` itself, so no
+  // path arithmetic is needed (temp dirs are aliased on macOS and Windows:
+  // /var → /private/var, RUNNER~1 → runneradmin).
+  const r = run(root, ['ls-files', '-z']);
   if (!r.ok) return new Set();
-  const top = gitTopLevel(root);
-  const prefix = posix(path.relative(top, root));
-  const files = r.out.split('\0').filter(Boolean);
-  return new Set(
-    files
-      .filter((f) => !prefix || f.startsWith(prefix + '/'))
-      .map((f) => (prefix ? f.slice(prefix.length + 1) : f)),
-  );
+  return new Set(r.out.split('\0').filter(Boolean).map(posix));
 }
 
 /** Path of a file inside the git directory (handles worktrees), relative to root. */
