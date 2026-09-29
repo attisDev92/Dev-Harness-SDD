@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "updated": "2026-09-29",
+  "note": "Registro curado (RF-SKL-02). Cada entrada fija un commit y el hash del contenido; añadir o cambiar entradas requiere revisión de código.",
+  "skills": [
+    {
+      "name": "frontend-design",
+      "repo": "anthropics/skills",
+      "path": "skills/frontend-design",
+      "sha": "8a1541c4a3ffa5a20a5a91de0dcf3f0bab1d1ef4",
+      "hash": "89a6e59de80320a32e8b4c597a329ef3c503f624a2e68874bb0475dfb66dbf4b",
+      "license": "Apache-2.0",
+      "when": { "kind": "frontend" },
+      "roles": ["frontend-dev"]
+    },
+    {
+      "name": "webapp-testing",
+      "repo": "anthropics/skills",
+      "path": "skills/webapp-testing",
+      "sha": "8a1541c4a3ffa5a20a5a91de0dcf3f0bab1d1ef4",
+      "hash": "7dd9eedc497fbf8b5634a293190b11f93cf4b80f7cd6c1a775def12deadeebb9",
+      "license": "Apache-2.0",
+      "when": { "kind": "frontend" },
+      "roles": ["qa-tester"]
+    },
+    {
+      "name": "web-design-guidelines",
+      "repo": "vercel-labs/agent-skills",
+      "path": "skills/web-design-guidelines",
+      "sha": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "hash": "f910cd9c88f04e87d03b2b7829b56fcf50b3be4582965f12bc163e3f6b5b59d2",
+      "license": null,
+      "when": { "kind": "frontend" },
+      "roles": ["frontend-dev", "reviewer"]
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "repo": "vercel-labs/agent-skills",
+      "path": "skills/react-best-practices",
+      "sha": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "hash": "741c320ab924f3d033c763574c1a166e4318454937dce6e10015f0230830a6bf",
+      "license": "MIT",
+      "when": { "stack": ["react", "next"] },
+      "roles": ["frontend-dev", "reviewer"]
+    },
+    {
+      "name": "vercel-composition-patterns",
+      "repo": "vercel-labs/agent-skills",
+      "path": "skills/composition-patterns",
+      "sha": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "hash": "8b67145fc3996d42af07ddf710c9900eb80b7bcad3aaecf008127782509006e1",
+      "license": "MIT",
+      "when": { "stack": ["react", "next"] },
+      "roles": ["frontend-dev"]
+    },
+    {
+      "name": "supabase-postgres-best-practices",
+      "repo": "supabase/agent-skills",
+      "path": "skills/supabase-postgres-best-practices",
+      "sha": "544bfc56c89afe2b87b20017a59b2c6e9502a1fb",
+      "hash": "3b406baac943593ad8526bc9b841c76b79e26cdc7e10b07fd30755350b59f9ff",
+      "license": "MIT",
+      "when": { "stack": ["postgres", "supabase"] },
+      "roles": ["backend-dev", "architect"]
+    },
+    {
+      "name": "test-driven-development",
+      "repo": "obra/superpowers",
+      "path": "skills/test-driven-development",
+      "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+      "hash": "acf361b1743f444028ed8123f1ccf2df6e1d4dcca65b3f982aedb42f4f68ec44",
+      "license": "MIT",
+      "when": { "always": true },
+      "roles": ["frontend-dev", "backend-dev", "qa-tester"]
+    },
+    {
+      "name": "systematic-debugging",
+      "repo": "obra/superpowers",
+      "path": "skills/systematic-debugging",
+      "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+      "hash": "13653b6c20c732666c136d4b2d5dcb508db4da9b4a0d364bfcf1ada01c0a5a2a",
+      "license": "MIT",
+      "when": { "always": true },
+      "roles": ["debugger"]
+    },
+    {
+      "name": "verification-before-completion",
+      "repo": "obra/superpowers",
+      "path": "skills/verification-before-completion",
+      "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+      "hash": "29d4bd654fdc57679501bf73b2821abf4ce035c536054a3e8e90ed7ed38644c7",
+      "license": "MIT",
+      "when": { "always": true },
+      "roles": ["frontend-dev", "backend-dev", "reviewer"]
+    }
+  ]
+}

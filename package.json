@@ -1,0 +1,33 @@
+{
+  "name": "sdd-harness",
+  "version": "0.5.0",
+  "description": "Portable, human-in-the-loop harness for Spec-Driven Development with AI coding agents.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/attisDev92/Dev-Harness-SDD.git"
+  },
+  "homepage": "https://github.com/attisDev92/Dev-Harness-SDD#readme",
+  "bugs": {
+    "url": "https://github.com/attisDev92/Dev-Harness-SDD/issues"
+  },
+  "type": "module",
+  "bin": {
+    "harness": "bin/harness.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "README.es.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  }
+}
