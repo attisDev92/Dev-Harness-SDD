@@ -14,11 +14,12 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci
-      - run: npm test
+      # Spec output in the log, and one annotation per failing test.
+      - run: node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/gh-reporter.mjs --test-reporter-destination=stdout
         env:
           HARNESS_TEST_INSTALL: '1'
