@@ -376,7 +376,8 @@ mi-proyecto/
 - [ ] Adaptadores de opencode, Codex y Antigravity, y modo degradado
 - [x] Registro de skills e instalador verificado
 - [x] Sincronización bidireccional con GitHub Issues (Linear, Notion y Jira pendientes)
-- [ ] Costo por tarea, mensajes en inglés, matriz de CI multiplataforma y primera versión estable
+- [x] Matriz de CI multiplataforma (Windows, macOS, Linux · Node 20, 22, 24)
+- [ ] Costo por tarea, mensajes en inglés y primera versión estable
 
 ---
 

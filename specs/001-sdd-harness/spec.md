@@ -424,7 +424,7 @@ Los hitos originales (v0.1–v1.0) se unificaron en un **MVP** centrado en Claud
 | Pendiente | Resto de skills propias de SKL-01 (`clean-code`, `design-system`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`, `testing-strategy`, `docs-writer`) y skill `penpot-mcp` (ya no existe en su origen) | Pendiente |
 | Pendiente | TRK: Linear, Notion y Jira (GitHub Issues ya está); git hooks por repo en workspace | Pendiente |
 | Pendiente | OBS-03: costo y tokens por tarea desde la herramienta | Pendiente |
-| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP), RNF-16 (matriz de CI ejecutada), RNF-18 (guías completas) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
+| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP), RNF-18 (guías completas) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
 
 ## 11. Dudas abiertas
 

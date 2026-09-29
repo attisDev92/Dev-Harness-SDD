@@ -42,7 +42,7 @@
 
 ## Pendiente (post-MVP)
 
-- [ ] T9 CI multiplataforma ejecutada (RNF-16)
+- [x] T9 CI multiplataforma ejecutada (RNF-16): verde en Windows, macOS y Linux con Node 20, 22 y 24
 - [ ] T18 Fusión TOML (RF-MRG-02)
 - [ ] T25 Demo del flujo completo con Claude Code real (criterio 4)
 - [x] T29 Topologías de varios repos y workspace, depends_on y snapshots de contratos (RF-TOP-*)

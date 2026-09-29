@@ -376,7 +376,8 @@ my-project/
 - [ ] opencode, Codex and Antigravity adapters, and degraded mode
 - [x] Skills registry and verified installer
 - [x] Two-way sync with GitHub Issues (Linear, Notion and Jira pending)
-- [ ] Cost per task, English messages, cross-platform CI matrix and first stable release
+- [x] Cross-platform CI matrix (Windows, macOS, Linux · Node 20, 22, 24)
+- [ ] Cost per task, English messages and first stable release
 
 ---
 
