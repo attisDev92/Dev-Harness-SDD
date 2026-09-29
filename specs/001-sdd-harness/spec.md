@@ -424,7 +424,7 @@ Los hitos originales (v0.1–v1.0) se unificaron en un **MVP** centrado en Claud
 | **v0.6** | TRK con cualquier tracker: GitHub Issues desde la CLI; el resto (Linear, Jira, Notion, Asana, ClickUp…) desde el agente con el MCP del tracker, con plan determinista y aprobación antes de escribir | Implementado |
 | **v0.7** | Resto de skills propias de SKL-01 (`clean-code`, `design-system`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`, `testing-strategy`, `docs-writer`), git hooks por repo en workspace, `LICENSE` y `NOTICE`, guías en español e inglés (RNF-18), nombre definitivo del comando | Implementado |
 | Pendiente | OBS-03: costo y tokens por tarea desde la herramienta | Pendiente |
-| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
+| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP) | Pendiente |
 
 La skill `penpot-mcp` ya no existe en su origen: con `design.source: penpot` se configura el servidor MCP de Penpot (RF-SKL-13).
 
@@ -437,8 +437,8 @@ Resueltas:
 - **Licencias permitidas en el registro:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause e ISC (propuesta adoptada).
 - **Gestores de paquetes de RF-GAT-05:** npm, pnpm, yarn, bun, pip, uv, poetry, pipenv, cargo, go, composer, dotnet, gem y bundler (propuesta adoptada).
 - **CI:** solo GitHub Actions; GitLab CI no se cubre.
+- **Versión mínima de Node.js:** la última LTS, hoy Node 24.
 
 Abiertas:
 
-- [NECESITA ACLARACIÓN: versión mínima de Node.js. Hoy es 20, que ya no tiene soporte; la propuesta era la LTS activa más antigua a la fecha de v1.0]
 - [NECESITA ACLARACIÓN: capacidades actuales de subagentes y hooks en Antigravity y de los hooks de Codex; se verificarán al retomar esos adaptadores]

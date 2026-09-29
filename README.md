@@ -10,7 +10,7 @@ Specs first. Sub-agents for frontend and backend. Deterministic guardrails. You 
 
 ![Status](https://img.shields.io/badge/status-alpha%20·%20WIP-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=for-the-badge)
-![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Node](https://img.shields.io/badge/node-%E2%89%A524-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Platforms](https://img.shields.io/badge/Windows%20|%20macOS%20|%20Linux-0078D6?style=for-the-badge)
 
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white)
@@ -94,7 +94,7 @@ flowchart LR
 
 ## ⚡ Quick start
 
-**Requirements:** Node.js ≥ 20, Git, and at least one supported agent tool.
+**Requirements:** Node.js ≥ 24 (LTS), Git, and at least one supported agent tool.
 
 ```bash
 # 1. Install the CLI once (global, nothing else is installed globally)
@@ -376,7 +376,7 @@ my-project/
 - [ ] opencode, Codex and Antigravity adapters, and degraded mode
 - [x] Skills registry and verified installer
 - [x] Two-way sync with any tracker: GitHub from the CLI, the rest from the agent through its MCP
-- [x] Cross-platform CI matrix (Windows, macOS, Linux · Node 20, 22, 24)
+- [x] Cross-platform CI matrix (Windows, macOS, Linux · Node 24 LTS)
 - [ ] Cost per task, English messages and first stable release
 
 ---

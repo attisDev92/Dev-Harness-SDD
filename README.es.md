@@ -10,7 +10,7 @@ Primero la spec. Subagentes para frontend y backend. Guardarraíles determinista
 
 ![Estado](https://img.shields.io/badge/estado-alpha%20·%20en%20desarrollo-orange?style=for-the-badge)
 ![Licencia](https://img.shields.io/badge/licencia-Apache--2.0-blue?style=for-the-badge)
-![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Node](https://img.shields.io/badge/node-%E2%89%A524-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Plataformas](https://img.shields.io/badge/Windows%20|%20macOS%20|%20Linux-0078D6?style=for-the-badge)
 
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-D97757?style=for-the-badge&logo=claude&logoColor=white)
@@ -94,7 +94,7 @@ flowchart LR
 
 ## ⚡ Inicio rápido
 
-**Requisitos:** Node.js ≥ 20, Git y al menos una herramienta de agentes compatible.
+**Requisitos:** Node.js ≥ 24 (LTS), Git y al menos una herramienta de agentes compatible.
 
 ```bash
 # 1. Instala la CLI una vez (global; no se instala nada más de forma global)
@@ -376,7 +376,7 @@ mi-proyecto/
 - [ ] Adaptadores de opencode, Codex y Antigravity, y modo degradado
 - [x] Registro de skills e instalador verificado
 - [x] Sincronización bidireccional con cualquier tracker: GitHub desde la CLI, el resto desde el agente con su MCP
-- [x] Matriz de CI multiplataforma (Windows, macOS, Linux · Node 20, 22, 24)
+- [x] Matriz de CI multiplataforma (Windows, macOS, Linux · Node 24 LTS)
 - [ ] Costo por tarea, mensajes en inglés y primera versión estable
 
 ---

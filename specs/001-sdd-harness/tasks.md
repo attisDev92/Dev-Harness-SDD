@@ -44,7 +44,7 @@
 
 - [x] T9 CI multiplataforma ejecutada (RNF-16): verde en Windows, macOS y Linux con Node 20, 22 y 24
 - [ ] T18 Fusión TOML (RF-MRG-02)
-- [ ] T25 Demo del flujo completo con Claude Code real (criterio 4)
+- [x] T25 Demo del flujo completo con Claude Code real (criterio 4): hecha el 29-09-2026
 - [x] T29 Topologías de varios repos y workspace, depends_on y snapshots de contratos (RF-TOP-*)
 - [ ] T30 Adaptadores de opencode, Codex y Antigravity; modo degradado (RF-ADP para otras herramientas, RF-ORQ-11)
 - [x] T31 Registro curado de skills e instalador verificado (RF-SKL-02…15)

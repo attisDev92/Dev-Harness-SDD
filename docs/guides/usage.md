@@ -9,7 +9,7 @@ npm install -g github:attisDev92/Dev-Harness-SDD
 sdd-harness --version
 ```
 
-Requirements: Node.js 20 or newer and Git. Nothing else is installed globally and `~/.claude` is never touched.
+Requirements: Node.js 24 (LTS) or newer and Git. Nothing else is installed globally and `~/.claude` is never touched.
 
 ## 2. Activate a project
 

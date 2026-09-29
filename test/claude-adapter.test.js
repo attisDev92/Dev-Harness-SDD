@@ -109,7 +109,8 @@ test('RF-ADP-06: adapters are registered without touching the core', () => {
 test('RF-VER-03/04: the pre-commit hook blocks secrets, stray docs and failing checks; the user can still commit', async (t) => {
   const root = FIXTURES.frontend(t);
   // Quick checks run lint and typecheck: make them real commands for the test.
-  write(root, { 'package.json': { name: 'shop-web', scripts: { lint: 'node -e "process.exit(require(\'fs\').existsSync(\'lint.fail\') ? 1 : 0)"', test: 'node -e ""' } } });
+  // "type": "module" as in many real projects: the extensionless hook must still run (found in the real Claude Code test).
+  write(root, { 'package.json': { name: 'shop-web', type: 'module', scripts: { lint: 'node -e "process.exit(require(\'fs\').existsSync(\'lint.fail\') ? 1 : 0)"', test: 'node -e ""' } } });
   git(root, 'add', '-A');
   git(root, 'commit', '-qm', 'chore: scripts');
   assert.equal((await run(['init', '--yes'], { cwd: root })).code, 0);

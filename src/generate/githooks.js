@@ -46,7 +46,12 @@ export function generateGitHooks(config, env) {
       out.notices.push({ code: 'hooksChainManual', params: { manager: repo.dir ? `${manager.name} (${repo.dir})` : manager.name, line } });
     }
   }
-  if (needsHook) out.entries.push({ kind: 'file', path: `${HOOKS_DIR}/pre-commit`, content: PRE_COMMIT, executable: true, generator: 'githooks' });
+  if (needsHook) {
+    out.entries.push({ kind: 'file', path: `${HOOKS_DIR}/pre-commit`, content: PRE_COMMIT, executable: true, generator: 'githooks' });
+    // The hook has no extension: without this, a project with "type": "module"
+    // would make Node load it as ESM and `require` would not exist.
+    out.entries.push({ kind: 'file', path: `${HOOKS_DIR}/package.json`, content: '{\n  "type": "commonjs"\n}\n', generator: 'githooks' });
+  }
   return out;
 }
 
@@ -86,7 +91,7 @@ export function generateCi(config) {
     '          fetch-depth: 0',
     '      - uses: actions/setup-node@v4',
     '        with:',
-    "          node-version: '22'",
+    "          node-version: '24'",
     ...installStep(config),
     '      - name: Hook checks (docs whitelist, secrets, verification)',
     '        run: node .harness/scripts/checks.js ci --range "${{ github.event.pull_request.base.sha || github.event.before }}...${{ github.sha }}"',

@@ -4,7 +4,7 @@ Fecha: 2026-09-29 · Versión: 0.7.0 · Alcance acordado: MVP para Claude Code c
 
 Leyenda: ✔ cumplido con evidencia · ◐ cumplido en parte o solo por instrucción al agente · ✖ pendiente.
 
-La evidencia es el archivo de test (en `test/`) que nombra el requisito, o una nota cuando el requisito se cumple por instrucción. La suite completa pasa en la matriz de CI (Windows, macOS y Linux con Node 20, 22 y 24).
+La evidencia es el archivo de test (en `test/`) que nombra el requisito, o una nota cuando el requisito se cumple por instrucción. La suite completa pasa en la matriz de CI (Windows, macOS y Linux con Node 24 LTS).
 
 ## Resumen
 
@@ -311,7 +311,7 @@ La evidencia es el archivo de test (en `test/`) que nombra el requisito, o una n
 | Requisito | Estado | Evidencia |
 |---|---|---|
 | RNF-01 Plataformas | ✔ | CI en Windows, macOS y Linux; sin bash, WSL ni symlinks |
-| RNF-02 Runtime | ✔ | Node.js ≥ 20 y Git; la versión mínima sigue abierta (§11) |
+| RNF-02 Runtime | ✔ | Node.js ≥ 24 (la LTS más reciente) y Git |
 | RNF-03 Cero dependencias en el proyecto | ✔ | Los scripts copiados no tienen dependencias |
 | RNF-04 Rutas | ✔ | Los tests usan rutas con espacios y "ñandú"; CI con rutas cortas de Windows y `/private/var` de macOS |
 | RNF-05 Saltos de línea | ✔ | `config`, `engine` |
@@ -336,7 +336,7 @@ La evidencia es el archivo de test (en `test/`) que nombra el requisito, o una n
 | 1. Cada RF con al menos un test | ◐ Ver tabla: los ◐ por instrucción y los ✖ no tienen test propio |
 | 2. Matriz de CI en verde | ✔ |
 | 3. Fixtures con init, sync, doctor y remove | ✔ `remove` (criterio 6) recorre las cinco fixtures |
-| 4. Demo manual con Claude Code | ✖ Pendiente |
+| 4. Demo manual con Claude Code | ✔ Sesiones reales con Claude Code 2.1.284 (29-09-2026): comandos `/sdd:*`, 5 bloqueos de guardianes, spec → cambio → plan → tareas → T1 con subagentes, verificación, revisión, prueba manual y `/sdd:commit`. Destapó y corrigió un bug del pre-commit con `"type": "module"` |
 | 5. `doctor` con el nivel de enforcement correcto | ◐ Correcto para Claude Code; el resto de herramientas figura como "solo instrucción" |
 | 6. `remove` deja cada fixture idéntica | ✔ |
 | 7. README, guías y NOTICE | ✔ |
@@ -344,4 +344,4 @@ La evidencia es el archivo de test (en `test/`) que nombra el requisito, o una n
 
 ## Veredicto
 
-**Spec cumplida para el alcance acordado del MVP (Claude Code, mensajes en español), con excepciones.** 173 de 186 requisitos funcionales están cumplidos con evidencia y 11 lo están en parte o por instrucción al agente. Quedan pendientes, por decisión de alcance: el modo degradado y los adaptadores de otras herramientas (RF-ORQ-11, parte de RF-ADP), el costo por tarea (RF-OBS-03), la fusión TOML (parte de RF-MRG-02), los mensajes en inglés de lo nuevo (RNF-12) y la demo con Claude Code real (criterio 4). Para la v1.0 completa falta esa lista.
+**Spec cumplida para el alcance acordado del MVP (Claude Code, mensajes en español), con excepciones.** 173 de 186 requisitos funcionales están cumplidos con evidencia y 11 lo están en parte o por instrucción al agente. Quedan pendientes, por decisión de alcance: el modo degradado y los adaptadores de otras herramientas (RF-ORQ-11, parte de RF-ADP), el costo por tarea (RF-OBS-03), la fusión TOML (parte de RF-MRG-02) y los mensajes en inglés de lo nuevo (RNF-12). Para la v1.0 completa falta esa lista.
