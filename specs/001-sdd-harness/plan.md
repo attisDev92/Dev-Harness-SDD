@@ -25,7 +25,7 @@ Cubre: RF-INS-01…07, RF-GEN-12, RF-GAT-01/02, RF-MD-01/02, RF-RET-01/02/03/06/
 | `src/guards/git-guard.js` | GAT-01, GAT-02, caso límite 10 |
 | `src/guards/docs-guard.js`, `glob.js` | MD-01, MD-02 |
 | `src/guards/retry.js` | RET-01/02/03/06/07 |
-| `src/guards/cli.js` | Punto de entrada de los hooks: `harness guard <git\|docs\|retry>` o `node .harness/scripts/guard.js` |
+| `src/guards/cli.js` | Punto de entrada de los hooks: `sdd-harness guard <git\|docs\|retry>` o `node .harness/scripts/guard.js` |
 
 ## Interfaz de los guardianes
 

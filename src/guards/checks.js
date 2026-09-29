@@ -5,6 +5,7 @@
 // Exit 0 when everything passes, 1 otherwise. Dependency-free.
 
 import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, isMainModule } from './args.js';
@@ -60,9 +61,14 @@ export function findSecrets(lines) {
  * @param {{ root: string, settings: object, mode: 'staged' | 'range', range?: string, full?: boolean, run?: Function }} opts
  * @returns {{ ok: boolean, problems: string[] }}
  */
-export function runChecks({ root, settings, mode, range, full = false, run }) {
+export function runChecks({ root, settings, mode, range, full = false, run, repo = root }) {
+  // The commit may happen in a component repository of a workspace: ask that
+  // repo, and turn its paths into project paths (RF-TOP-02).
+  const real = (p) => { try { return realpathSync(p); } catch { return path.resolve(p); } };
+  const prefix = path.relative(real(root), real(repo)).split(path.sep).join('/');
+  const toProject = (f) => (prefix ? `${prefix}/${f}` : f);
   const diffArgs = mode === 'staged' ? ['diff', '--cached'] : ['diff', range];
-  const names = (filter) => git(root, [...diffArgs, '--name-only', `--diff-filter=${filter}`, '-z']).split('\0').filter(Boolean);
+  const names = (filter) => git(repo, [...diffArgs, '--name-only', `--diff-filter=${filter}`, '-z']).split('\0').filter(Boolean).map(toProject);
   const changed = names('ACMR');
   const added = names('A');
   const problems = [];
@@ -73,7 +79,7 @@ export function runChecks({ root, settings, mode, range, full = false, run }) {
   }
   // Secrets (RF-OBS-02 spirit, RNF-11).
   for (const f of changed.filter((x) => ENV_FILE.test(x))) problems.push(`secrets: ${f} must not be committed`);
-  for (const hit of findSecrets(addedLines(git(root, [...diffArgs, '-U0', '--no-color'])))) problems.push(`secrets: possible ${hit.kind} in ${hit.file}`);
+  for (const hit of findSecrets(addedLines(git(repo, [...diffArgs, '-U0', '--no-color'])))) problems.push(`secrets: possible ${hit.kind} in ${toProject(hit.file)}`);
 
   // Quick verification of the components with changes (full suite in CI).
   const touched = new Set(changed.map((f) => componentOf(f, settings.components)?.id).filter(Boolean));
@@ -95,7 +101,8 @@ async function main() {
     process.stderr.write('usage: checks.js ci --range <base>...<head> [--full]\n');
     return 1;
   }
-  const { ok, problems } = runChecks({ root, settings, mode, range: flags.range, full: flags.full });
+  const repo = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim() || root;
+  const { ok, problems } = runChecks({ root, settings, mode, range: flags.range, full: flags.full, repo });
   if (!ok) {
     process.stderr.write(`sdd-harness checks failed:\n${problems.map((p) => `  ✖ ${p}`).join('\n')}\n`);
     return 1;

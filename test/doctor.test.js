@@ -1,4 +1,4 @@
-// harness doctor (RF-DOC-01..06, RF-ADP-03/04 base, edge cases 7, 8, 23, 25).
+// sdd-harness doctor (RF-DOC-01..06, RF-ADP-03/04 base, edge cases 7, 8, 23, 25).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -73,7 +73,7 @@ test('RF-VER-03: git hooks switched off by hand are an error', async (t) => {
   git(root, 'config', '--unset', 'core.hooksPath');
   const r = await run(['doctor'], { cwd: root, env: { PATH: fakePath(t, ['claude']) } });
   assert.equal(r.code, 1);
-  assert.match(r.stdout, /\[ERROR\] Git hooks are enabled but the pre-commit checks are not active\n {4}fix: Run "harness sync"\./);
+  assert.match(r.stdout, /\[ERROR\] Git hooks are enabled but the pre-commit checks are not active\n {4}fix: Run "sdd-harness sync"\./);
 });
 
 test('RF-DOC-03: invocation syntax for each enabled tool', async (t) => {
@@ -89,12 +89,12 @@ test('RF-DOC-04/05: problems come with cause and fix; errors exit 1, warnings do
   edit(root, '.harness/templates/spec.md', (s) => s + 'x');
   let r = await run(['doctor'], { cwd: root, env });
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /\[WARNING\] \.harness\/templates\/spec\.md was modified by hand\n {4}cause: .+\n {4}fix: .+harness sync/);
+  assert.match(r.stdout, /\[WARNING\] \.harness\/templates\/spec\.md was modified by hand\n {4}cause: .+\n {4}fix: .+sdd-harness sync/);
 
   fs.rmSync(path.join(root, '.harness/scripts/guard.js'));
   r = await run(['doctor'], { cwd: root, env });
   assert.equal(r.code, 1);
-  assert.match(r.stdout, /\[ERROR\] \.harness\/scripts\/guard\.js is missing\n {4}fix: Run "harness sync"\./);
+  assert.match(r.stdout, /\[ERROR\] \.harness\/scripts\/guard\.js is missing\n {4}fix: Run "sdd-harness sync"\./);
 
   edit(root, 'AGENTS.md', (s) => s.replace('<!-- harness:end -->', ''));
   r = await run(['doctor'], { cwd: root, env });
@@ -102,7 +102,7 @@ test('RF-DOC-04/05: problems come with cause and fix; errors exit 1, warnings do
 
   edit(root, 'harness.config.yaml', (s) => s.replace('topology: single', 'topology: star'));
   r = await run(['doctor'], { cwd: root, env });
-  assert.match(r.stdout, /\[ERROR\] Configuration has 1 invalid field\n {4}fix: Run "harness config validate"/);
+  assert.match(r.stdout, /\[ERROR\] Configuration has 1 invalid field\n {4}fix: Run "sdd-harness config validate"/);
 });
 
 test('RF-DOC-01: manifest and git exclusion checks (edge case 8)', async (t) => {
@@ -113,7 +113,7 @@ test('RF-DOC-01: manifest and git exclusion checks (edge case 8)', async (t) => 
   assert.match(r.stdout, /The harness block in \.git\/info\/exclude is missing/);
   fs.rmSync(path.join(root, '.harness/manifest.lock'));
   r = await run(['doctor'], { cwd: root });
-  assert.match(r.stdout, /\[ERROR\] Manifest is missing\n {4}fix: Run "harness sync": it rebuilds the manifest\./);
+  assert.match(r.stdout, /\[ERROR\] Manifest is missing\n {4}fix: Run "sdd-harness sync": it rebuilds the manifest\./);
 });
 
 test('local mode: generated files committed by someone are reported', async (t) => {

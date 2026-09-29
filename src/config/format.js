@@ -22,7 +22,7 @@ export function issueLines(issues, t, shown) {
   return describeIssues(issues, t).map((i) => `  ${i.line ? `${shown}:${i.line}:${i.col}` : shown}  ${i.path}: ${i.message}`);
 }
 
-const HEADER = '# sdd-harness configuration. Edit it and run "harness sync" to apply the changes.\n# Reference: README.md → Configuration.\n';
+const HEADER = '# sdd-harness configuration. Edit it and run "sdd-harness sync" to apply the changes.\n# Reference: README.md → Configuration.\n';
 
 /** RF-INI-14: the configuration as written by init (LF, stable key order). */
 export function serializeConfig(config) {

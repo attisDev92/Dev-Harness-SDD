@@ -1,6 +1,13 @@
-// The harness's own skills needed by the SDD flow (RF-SKL-01, partial: the
-// rest of the list arrives with the registry in v0.7). Canonical copies go to
-// .agents/skills/ (RF-GEN-05); tools that need another path get copies.
+// The harness's own skills (RF-SKL-01): the flow skills here and the practice
+// skills in skills-practice.js. Canonical copies go to .agents/skills/
+// (RF-GEN-05); tools that need another path get copies.
+
+import { practiceSkills } from './skills-practice.js';
+
+/** Every own skill this project needs (RF-SKL-12: only the relevant ones). */
+export function ownSkills(config) {
+  return { ...flowSkills(config), ...practiceSkills(config) };
+}
 
 const S = (lang) => ({
   talk: lang.cli === 'es' ? 'Spanish' : 'English',
@@ -8,7 +15,7 @@ const S = (lang) => ({
   docs: lang.docs === 'es' ? 'Spanish' : 'English',
 });
 
-export function ownSkills(config) {
+function flowSkills(config) {
   const l = S({ cli: config.cli?.language ?? config.language?.docs, specs: config.language?.specs, docs: config.language?.docs });
   return {
     'sdd-orchestrator': `---

@@ -1,4 +1,4 @@
-// The `harness init` interview (RF-INI-01..12, RF-CNV-02, RF-CNV-03). It only
+// The `sdd-harness-init` interview (RF-INI-01..12, RF-CNV-02, RF-CNV-03). It only
 // builds a configuration object; nothing is written here.
 
 import { TOOLS, TOPOLOGIES, DESIGN_SOURCES, TRACKERS, COMPONENT_KINDS } from '../config/schema.js';

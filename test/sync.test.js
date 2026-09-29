@@ -1,4 +1,4 @@
-// harness sync (RF-GEN-09..13, RF-MOD-06, RF-UPG-02, edge cases 7, 8, 24, 25).
+// sdd-harness sync (RF-GEN-09..13, RF-MOD-06, RF-UPG-02, edge cases 7, 8, 24, 25).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -155,7 +155,7 @@ test('RF-UPG-02 / edge case 25: version differences are reported, nothing is upg
   assert.match(read(root, 'harness.config.yaml'), /harness_version: 9\.0\.0/);
   edit(root, 'harness.config.yaml', (s) => s.replace(/harness_version: .*/, 'harness_version: 0.0.1'));
   r = await run(['sync', '--yes'], { cwd: root });
-  assert.match(r.stderr, /activated with harness 0\.0\.1.*harness upgrade/);
+  assert.match(r.stderr, /activated with harness 0\.0\.1.*sdd-harness upgrade/);
   assert.match(read(root, 'harness.config.yaml'), /harness_version: 0\.0\.1/);
 });
 

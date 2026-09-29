@@ -1,4 +1,4 @@
-// harness init (RF-INI-01..18).
+// sdd-harness-init (RF-INI-01..18).
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -103,7 +103,7 @@ export async function initCommand(argv, { io, t, tc, lang, version, presetTopolo
     out(`  + ${CONFIG_FILE}  (${tc.action.create})`);
     renderReport(plan.report, tc).forEach(out);
     out(`  + ${MANIFEST_FILE}  (${tc.action.create})`);
-    for (const c of git.changes) out(`  ~ ${tc.gitConfig(c.key, c.after)}`);
+    for (const c of git.changes) out(`  ~ ${c.repo ? `${c.repo}: ` : ""}${tc.gitConfig(c.key, c.after)}`);
     if (notices.length || plan.errors.length) {
       out(tc.init.notices);
       renderNotices(notices, tc).forEach(out);

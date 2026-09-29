@@ -99,6 +99,6 @@ test('RF-RET-07 + RF-INS-07: no state is written in a project that is not activa
   const dir = tempDir(t);
   const r = runCli(['guard', 'retry', 'record', '--task', 'T1', '--error', 'x'], { cwd: dir });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /harness init/);
+  assert.match(r.stderr, /sdd-harness-init/);
   assert.equal(existsSync(path.join(dir, '.harness')), false);
 });

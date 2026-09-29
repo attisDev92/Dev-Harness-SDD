@@ -19,10 +19,10 @@ import { contractsCommand } from './commands/contracts.js';
 import { skillsCommand } from './commands/skills.js';
 import { trackerCommand } from './commands/tracker.js';
 
-/** RF-TOP-03: `harness workspace init` is init with the workspace topology. */
+/** RF-TOP-03: `sdd-harness workspace init` is init with the workspace topology. */
 async function workspaceCommand(argv, ctx) {
   if (argv[0] !== 'init') {
-    ctx.io.stderr.write('Uso: harness workspace init [opciones de init]\n');
+    ctx.io.stderr.write('Uso: sdd-harness workspace init [opciones de init]\n');
     return 1;
   }
   return initCommand(argv.slice(1), { ...ctx, presetTopology: 'workspace' });

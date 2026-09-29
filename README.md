@@ -102,10 +102,10 @@ npm install -g github:attisDev92/Dev-Harness-SDD
 
 # 2. Enable it in a project
 cd my-project
-harness init        # short interview → generates config for THIS project only
+sdd-harness-init        # short interview → generates config for THIS project only
 
 # 3. Check everything is wired
-harness doctor
+sdd-harness doctor
 ```
 
 Then open your agent tool in the project and start with:
@@ -118,7 +118,7 @@ Then open your agent tool in the project and start with:
 To remove it from a project:
 
 ```bash
-harness remove      # deletes only generated, unmodified files. Never touches specs/ or docs/
+sdd-harness remove      # deletes only generated, unmodified files. Never touches specs/ or docs/
 ```
 
 ---
@@ -127,15 +127,15 @@ harness remove      # deletes only generated, unmodified files. Never touches sp
 
 | Command | Description |
 |---|---|
-| `harness init` | Interview and install into the current project: tools, topology, stack, conventions, design source, tracker, gates |
-| `harness sync` | Regenerate tool configs from `harness.config.yaml`, showing a diff first |
-| `harness doctor` | Health check, plus the **real enforcement level** for each enabled tool |
-| `harness skills list \| install \| update \| verify` | Manage the required skills and plugins (pinned, verified) |
-| `harness contracts sync` | Refresh API contract snapshots from provider repos |
-| `harness tracker connect \| sync \| status` | Two-way sync between `tasks.md` and your tracker |
-| `harness workspace init` | Set up a local workspace over several repos |
-| `harness upgrade` | Move to a newer harness version, with a diff and confirmation |
-| `harness remove` | Clean uninstall driven by `.harness/manifest.lock` |
+| `sdd-harness-init` | Interview and install into the current project: tools, topology, stack, conventions, design source, tracker, gates |
+| `sdd-harness sync` | Regenerate tool configs from `harness.config.yaml`, showing a diff first |
+| `sdd-harness doctor` | Health check, plus the **real enforcement level** for each enabled tool |
+| `sdd-harness skills list \| install \| update \| verify` | Manage the required skills and plugins (pinned, verified) |
+| `sdd-harness contracts sync` | Refresh API contract snapshots from provider repos |
+| `sdd-harness tracker connect \| sync \| status` | Two-way sync between `tasks.md` and your tracker |
+| `sdd-harness workspace init` | Set up a local workspace over several repos |
+| `sdd-harness upgrade` | Move to a newer harness version, with a diff and confirmation |
+| `sdd-harness remove` | Clean uninstall driven by `.harness/manifest.lock` |
 
 ## 💬 Workflow commands (inside your agent)
 
@@ -154,7 +154,7 @@ harness remove      # deletes only generated, unmodified files. Never touches sp
 | `/sdd:approve` · `/sdd:reject <reason>` | Your answer to a pending decision (for manual tests you can also reply `OK` / `KO <what failed>`) | — |
 
 > [!NOTE]
-> Invocation syntax varies by tool. For example, Codex invokes skills as `$name`, and Antigravity exposes these as workflows under `/`. `harness doctor` prints the right syntax for your setup.
+> Invocation syntax varies by tool. For example, Codex invokes skills as `$name`, and Antigravity exposes these as workflows under `/`. `sdd-harness doctor` prints the right syntax for your setup.
 
 ---
 
@@ -189,7 +189,7 @@ The harness bundles its own skills and installs curated third-party skills **on 
 | Skill | Used by | Purpose |
 |---|---|---|
 | `sdd-orchestrator` | main session | Pipeline state machine, gates, retries, `progress.md` |
-| `spec-generator` | spec phase | Requirements interview and EARS spec (adapted from [hello-sdd](https://github.com/mouredev/hello-sdd), Apache-2.0) |
+| `spec-generator` | spec phase | Requirements interview and EARS spec (inspired by [hello-sdd](https://github.com/mouredev/hello-sdd)) |
 | `clean-code` | frontend, backend | Naming, small units, KISS/YAGNI/DRY, no premature abstraction. **Project conventions win** |
 | `design-system` | frontend | Tokens, component API, variants, states. Adapts to the chosen design source |
 | `backend-architecture` | backend, architect | Layers, boundaries, dependency direction, error handling, validation at the edges |
@@ -207,12 +207,12 @@ The harness bundles its own skills and installs curated third-party skills **on 
 |---|---|---|
 | `frontend-design` | anthropics | a frontend component exists |
 | `webapp-testing` | anthropics | a web frontend exists (Playwright) |
-| `web-design-guidelines` | vercel-labs | a frontend component exists |
-| `react-best-practices`, `composition-patterns` | vercel-labs | React detected |
-| `next-best-practices` | vercel-labs | Next.js detected |
-| `postgres-best-practices` | supabase | PostgreSQL detected |
+| `web-design-guidelines` | vercel-labs | listed but blocked: it declares no license (RF-SKL-15) |
+| `vercel-react-best-practices`, `vercel-composition-patterns` | vercel-labs | React or Next.js detected |
+| `supabase-postgres-best-practices` | supabase | PostgreSQL detected |
 | `test-driven-development`, `systematic-debugging`, `verification-before-completion` | obra/superpowers | always (these individual skills only, not the whole plugin) |
-| `penpot-mcp` + Penpot MCP | penpot | `design.source: penpot` |
+
+With `design.source: figma` or `penpot` the harness configures the design tool's MCP server in `.mcp.json` instead of a skill. To propose a skill for the registry, see [docs/guides/skills-registry.md](docs/guides/skills-registry.md).
 
 > [!CAUTION]
 > Published skills can contain malicious hooks or scripts. The installer **only** installs skills from the curated registry. Each one is pinned to a commit SHA, verified by hash and license, and listed for your confirmation **before** installation. It never installs anything globally. New registry entries go through code review.
@@ -243,13 +243,13 @@ The harness bundles its own skills and installs curated third-party skills **on 
 | Codex | `AGENTS.md` | ✅ | ✅ | hooks (beta) + approval policy | 🟡 medium |
 | Antigravity | `AGENTS.md` | ✅ | degraded mode | terminal allow/deny list | 🟠 weak → git hooks + CI |
 
-Run `harness doctor` to see what is actually enforced in your project.
+Run `sdd-harness doctor` to see what is actually enforced in your project.
 
 ---
 
 ## ⚙️ Configuration
 
-`harness init` writes `harness.config.yaml`. Here is an example for a workspace with two repos:
+`sdd-harness-init` writes `harness.config.yaml`. Here is an example for a workspace with two repos:
 
 ```yaml
 harness_version: 1.0.0
@@ -310,7 +310,7 @@ Specs, contracts and docs are *your* project artifacts. `init` asks whether they
 
 `init` reads what the project already declares: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `.editorconfig`, linters. It shows what it detected and asks you to confirm. The precedence is:
 
-**constitution → project conventions → harness skills → third-party skills**
+**constitution → project conventions → sdd-harness skills → third-party skills**
 
 ---
 
@@ -328,7 +328,7 @@ api/specs/API-004-auth/contracts/openapi.yaml          ← source of truth
 web/specs/WEB-007-login/contracts/external/api-openapi.yaml   ← snapshot (repo, spec, commit)
 ```
 
-`harness doctor` warns when a snapshot has drifted from its provider. Adapting to a changed contract always goes through a gate.
+`sdd-harness doctor` warns when a snapshot has drifted from its provider. Adapting to a changed contract always goes through a gate.
 
 ### Generated project layout
 
@@ -387,12 +387,15 @@ Contributions are welcome, especially new **adapters**, **tracker connectors** a
 
 1. Fork and create a branch.
 2. This repo is built **with its own method**: open a spec in `specs/` before writing code.
-3. New third-party skills need a registry entry (source, pinned SHA, license, hash) and code review.
-4. PRs must pass the Windows, macOS and Linux CI matrix.
+3. New third-party skills need a registry entry (source, pinned SHA, license, hash) and code review: [guide](docs/guides/skills-registry.md).
+4. New agent tools: [adapter guide](docs/guides/adapters.md).
+5. PRs must pass the Windows, macOS and Linux CI matrix.
+
+Full usage guide: [docs/guides/usage.md](docs/guides/usage.md).
 
 ## 🙏 Credits and inspiration
 
-- [**hello-sdd**](https://github.com/mouredev/hello-sdd) by MoureDev: SDD flow, EARS specs, and the `spec-generator` skill (Apache-2.0)
+- [**hello-sdd**](https://github.com/mouredev/hello-sdd) by MoureDev: SDD flow, EARS specs, and the idea of the `spec-generator` skill (Apache-2.0). See [NOTICE](NOTICE)
 - [**GitHub Spec Kit**](https://github.com/github/spec-kit): the constitution/specify/plan/tasks flow
 - [**anthropics/skills**](https://github.com/anthropics/skills): `frontend-design`, `webapp-testing`, `skill-creator`
 - [**obra/superpowers**](https://github.com/obra/superpowers): TDD, systematic debugging, verification before completion

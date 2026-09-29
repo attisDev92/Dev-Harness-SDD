@@ -24,6 +24,18 @@ test('workspace: specs per repo, cross-repo dependency and contract snapshot', a
   assert.equal(read(root, 'harness.workspace.yaml').split('\n').slice(1).join('\n'), 'repos:\n  - api\n  - web\n');
   assert.match(read(root, 'api/.git/info/exclude'), /# harness:begin\n\/AGENTS\.md/);
 
+  // Git hooks in every repository of the workspace (RF-VER-03, RF-TOP-02).
+  const { spawnSync } = await import('node:child_process');
+  const gitIn = (dir, ...args) => spawnSync('git', ['-c', 'user.email=a@b.c', '-c', 'user.name=U', ...args], { cwd: path.join(root, dir), encoding: 'utf8' });
+  assert.equal(gitIn('api', 'config', 'core.hooksPath').stdout.trim(), '../.harness/githooks');
+  write(root, { 'api/secret.go': `package main\nconst token = "${'gh' + 'p_'}${'a'.repeat(36)}"\n` });
+  gitIn('api', 'add', 'secret.go');
+  const blocked = gitIn('api', 'commit', '-qm', 'feat: x');
+  assert.notEqual(blocked.status, 0);
+  assert.match(blocked.stderr, /secrets: possible GitHub token in api\/secret\.go/);
+  gitIn('api', 'reset', '-q', 'secret.go');
+  fs.rmSync(path.join(root, 'api/secret.go'));
+
   // RF-TOP-02: each repo owns its specs.
   assert.match((await sdd(root, 'new-spec', 'auth', '--component', 'api')).stdout, /api\/specs\/API-001-auth\/spec\.md/);
   write(root, { 'api/specs/API-001-auth/contracts/openapi.yaml': 'openapi: 3.1.0\npaths: {}\n' });

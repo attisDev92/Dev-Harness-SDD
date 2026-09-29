@@ -1,4 +1,4 @@
-// harness remove (RF-REM-01..08, RNF-06, completion criterion 6).
+// sdd-harness remove (RF-REM-01..08, RNF-06, completion criterion 6).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';

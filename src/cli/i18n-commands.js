@@ -80,20 +80,20 @@ const en = {
     invalidJson: (p, m) => `${p}: cannot be parsed (${m}). The file was not touched.`,
   },
   init: {
-    already: 'This project is already activated. Use "harness sync" to regenerate or "harness upgrade" to update.',
+    already: 'This project is already activated. Use "sdd-harness sync" to regenerate or "sdd-harness upgrade" to update.',
     noGit: 'This folder is not a git repository and contains no repositories. Run "git init" first, or run init in a folder that contains your repositories (workspace).',
     cancelled: 'Cancelled. Nothing was written.',
     summary: 'Files to write:',
     notices: 'Notes:',
     confirm: 'Write these files?',
     done: (n) => `Done: ${n} file${n === 1 ? '' : 's'} written. The harness is active in this project.`,
-    next: 'Next: run "harness doctor", then open your agent tool and start with /sdd:constitution.',
+    next: 'Next: run "sdd-harness doctor", then open your agent tool and start with /sdd:constitution.',
     dryRun: 'Dry run: nothing was written.',
     failed: (m) => `Writing failed (${m}). Every change was rolled back; the project is as it was.`,
     badConfig: (f) => `${f} is not a valid configuration:`,
   },
   sync: {
-    notActivated: 'This project is not activated. Run "harness init" first.',
+    notActivated: 'This project is not activated. Run "sdd-harness-init" first.',
     rebuild: (s) => `The manifest is ${s === 'missing' ? 'missing' : 'damaged'}: it will be rebuilt by comparing the files with the expected output.`,
     nothing: 'Everything is up to date. Nothing to change.',
     changes: 'Changes:',
@@ -103,7 +103,7 @@ const en = {
     aborted: 'Nothing was written.',
     locked: (s) => `An agent session (${s}) is running tasks in this project.`,
     waitLock: 'Wait until it finishes?',
-    versionMismatch: (p, c) => `The project was activated with harness ${p} and the CLI is ${c}. Nothing is upgraded automatically: run "harness upgrade" when you want to.`,
+    versionMismatch: (p, c) => `The project was activated with harness ${p} and the CLI is ${c}. Nothing is upgraded automatically: run "sdd-harness upgrade" when you want to.`,
     projectNewer: (p, c) => `The project uses harness ${p}, newer than this CLI (${c}). Update the CLI; the configuration is not downgraded.`,
     failed: (m) => `Writing failed (${m}). Every change was rolled back.`,
   },
@@ -119,22 +119,22 @@ const en = {
     failed: (m) => `Removal failed (${m}). Every change was rolled back.`,
   },
   doctor: {
-    title: 'harness doctor',
+    title: 'sdd-harness doctor',
     ok: 'OK', warn: 'WARNING', error: 'ERROR', info: 'INFO',
     cause: 'cause', action: 'fix',
     notActivated: 'This project is not activated.',
-    initAction: 'Run "harness init".',
+    initAction: 'Run "sdd-harness-init".',
     configValid: 'Configuration is valid',
     configInvalid: (n) => `Configuration has ${n} invalid field${n === 1 ? '' : 's'}`,
-    configAction: 'Run "harness config validate" and fix the fields it lists.',
+    configAction: 'Run "sdd-harness config validate" and fix the fields it lists.',
     manifestOk: (n) => `Manifest lists ${n} generated item${n === 1 ? '' : 's'}`,
     manifestBad: (s) => `Manifest is ${s === 'missing' ? 'missing' : 'damaged'}`,
-    manifestAction: 'Run "harness sync": it rebuilds the manifest.',
+    manifestAction: 'Run "sdd-harness sync": it rebuilds the manifest.',
     missing: (p) => `${p} is missing`,
-    missingAction: 'Run "harness sync".',
+    missingAction: 'Run "sdd-harness sync".',
     modified: (p) => `${p} was modified by hand`,
     modifiedCause: 'Hand edits are overwritten only if you choose so.',
-    modifiedAction: 'Move the change to harness.config.yaml, then run "harness sync" and choose overwrite.',
+    modifiedAction: 'Move the change to harness.config.yaml, then run "sdd-harness sync" and choose overwrite.',
     blockMissing: (p) => `The harness block in ${p} is missing`,
     hooksRemoved: (p) => `The harness permissions or hooks were removed from ${p}`,
     blockBroken: (p) => `The harness block in ${p} is damaged`,
@@ -143,7 +143,7 @@ const en = {
     trackedAction: 'Stop tracking it ("git rm --cached") or switch to install_mode: team.',
     excludeMissing: 'Generated files are not hidden from git (.git/info/exclude)',
     versionMismatch: (p, c) => `Project activated with ${p}, CLI is ${c}`,
-    versionAction: 'Run "harness upgrade" when you want to update.',
+    versionAction: 'Run "sdd-harness upgrade" when you want to update.',
     projectNewer: (p, c) => `Project uses ${p}, newer than the CLI (${c})`,
     projectNewerAction: 'Update the CLI: npm install -g github:attisDev92/Dev-Harness-SDD',
     toolMissing: (tool, bin) => `${tool} is enabled but "${bin}" was not found on PATH`,
@@ -155,7 +155,7 @@ const en = {
     hooksPath: (v) => (v ? `git core.hooksPath = ${v}` : 'git core.hooksPath: not set'),
     hooksOk: 'Git pre-commit checks are active',
     hooksMissing: 'Git hooks are enabled but the pre-commit checks are not active',
-    hooksAction: 'Run "harness sync".',
+    hooksAction: 'Run "sdd-harness sync".',
     hooksChained: (m) => `Git hooks: ${m} is in use; check that its pre-commit runs node .harness/scripts/checks.js pre-commit`,
     enforcement: 'Enforcement per tool',
     potential: 'potential',
@@ -248,20 +248,20 @@ const es = {
     invalidJson: (p, m) => `${p}: no se puede analizar (${m}). El archivo no se tocó.`,
   },
   init: {
-    already: 'Este proyecto ya está activado. Usa "harness sync" para regenerar o "harness upgrade" para actualizar.',
+    already: 'Este proyecto ya está activado. Usa "sdd-harness sync" para regenerar o "sdd-harness upgrade" para actualizar.',
     noGit: 'Esta carpeta no es un repositorio git ni contiene repositorios. Ejecuta antes "git init", o lanza init en una carpeta que contenga tus repositorios (workspace).',
     cancelled: 'Cancelado. No se escribió nada.',
     summary: 'Archivos a escribir:',
     notices: 'Notas:',
     confirm: '¿Escribo estos archivos?',
     done: (n) => `Listo: ${n} archivo${n === 1 ? '' : 's'} escrito${n === 1 ? '' : 's'}. El harness está activo en este proyecto.`,
-    next: 'Siguiente paso: ejecuta "harness doctor", abre tu herramienta de agentes y empieza con /sdd:constitution.',
+    next: 'Siguiente paso: ejecuta "sdd-harness doctor", abre tu herramienta de agentes y empieza con /sdd:constitution.',
     dryRun: 'Simulación: no se escribió nada.',
     failed: (m) => `La escritura falló (${m}). Se revirtieron todos los cambios; el proyecto está como estaba.`,
     badConfig: (f) => `${f} no es una configuración válida:`,
   },
   sync: {
-    notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
+    notActivated: 'Este proyecto no está activado. Ejecuta primero "sdd-harness-init".',
     rebuild: (s) => `El manifiesto ${s === 'missing' ? 'no existe' : 'está dañado'}: se reconstruirá comparando los archivos con la salida esperada.`,
     nothing: 'Todo está al día. No hay nada que cambiar.',
     changes: 'Cambios:',
@@ -271,7 +271,7 @@ const es = {
     aborted: 'No se escribió nada.',
     locked: (s) => `Una sesión de agente (${s}) está ejecutando tareas en este proyecto.`,
     waitLock: '¿Espero a que termine?',
-    versionMismatch: (p, c) => `El proyecto se activó con el harness ${p} y la CLI es la ${c}. No se actualiza nada automáticamente: ejecuta "harness upgrade" cuando quieras.`,
+    versionMismatch: (p, c) => `El proyecto se activó con el harness ${p} y la CLI es la ${c}. No se actualiza nada automáticamente: ejecuta "sdd-harness upgrade" cuando quieras.`,
     projectNewer: (p, c) => `El proyecto usa el harness ${p}, más nuevo que esta CLI (${c}). Actualiza la CLI; la configuración no se degrada.`,
     failed: (m) => `La escritura falló (${m}). Se revirtieron todos los cambios.`,
   },
@@ -287,22 +287,22 @@ const es = {
     failed: (m) => `La desinstalación falló (${m}). Se revirtieron todos los cambios.`,
   },
   doctor: {
-    title: 'harness doctor',
+    title: 'sdd-harness doctor',
     ok: 'OK', warn: 'AVISO', error: 'ERROR', info: 'INFO',
     cause: 'causa', action: 'solución',
     notActivated: 'Este proyecto no está activado.',
-    initAction: 'Ejecuta "harness init".',
+    initAction: 'Ejecuta "sdd-harness-init".',
     configValid: 'La configuración es válida',
     configInvalid: (n) => `La configuración tiene ${n} campo${n === 1 ? '' : 's'} inválido${n === 1 ? '' : 's'}`,
-    configAction: 'Ejecuta "harness config validate" y corrige los campos que indica.',
+    configAction: 'Ejecuta "sdd-harness config validate" y corrige los campos que indica.',
     manifestOk: (n) => `El manifiesto registra ${n} elemento${n === 1 ? '' : 's'} generado${n === 1 ? '' : 's'}`,
     manifestBad: (s) => `El manifiesto ${s === 'missing' ? 'no existe' : 'está dañado'}`,
-    manifestAction: 'Ejecuta "harness sync": reconstruye el manifiesto.',
+    manifestAction: 'Ejecuta "sdd-harness sync": reconstruye el manifiesto.',
     missing: (p) => `Falta ${p}`,
-    missingAction: 'Ejecuta "harness sync".',
+    missingAction: 'Ejecuta "sdd-harness sync".',
     modified: (p) => `${p} se modificó a mano`,
     modifiedCause: 'Los cambios a mano solo se sobrescriben si tú lo eliges.',
-    modifiedAction: 'Lleva el cambio a harness.config.yaml, ejecuta "harness sync" y elige sobrescribir.',
+    modifiedAction: 'Lleva el cambio a harness.config.yaml, ejecuta "sdd-harness sync" y elige sobrescribir.',
     blockMissing: (p) => `Falta el bloque del harness en ${p}`,
     hooksRemoved: (p) => `Se quitaron de ${p} los permisos o hooks del harness`,
     blockBroken: (p) => `El bloque del harness en ${p} está dañado`,
@@ -311,7 +311,7 @@ const es = {
     trackedAction: 'Deja de versionarlo ("git rm --cached") o cambia a install_mode: team.',
     excludeMissing: 'Los archivos generados no están ocultos para git (.git/info/exclude)',
     versionMismatch: (p, c) => `Proyecto activado con ${p}, la CLI es ${c}`,
-    versionAction: 'Ejecuta "harness upgrade" cuando quieras actualizar.',
+    versionAction: 'Ejecuta "sdd-harness upgrade" cuando quieras actualizar.',
     projectNewer: (p, c) => `El proyecto usa ${p}, más nuevo que la CLI (${c})`,
     projectNewerAction: 'Actualiza la CLI: npm install -g github:attisDev92/Dev-Harness-SDD',
     toolMissing: (tool, bin) => `${tool} está activada pero "${bin}" no está en el PATH`,
@@ -323,7 +323,7 @@ const es = {
     hooksPath: (v) => (v ? `git core.hooksPath = ${v}` : 'git core.hooksPath: sin configurar'),
     hooksOk: 'Los checks de git pre-commit están activos',
     hooksMissing: 'Los git hooks están activados pero los checks de pre-commit no están activos',
-    hooksAction: 'Ejecuta "harness sync".',
+    hooksAction: 'Ejecuta "sdd-harness sync".',
     hooksChained: (m) => `Git hooks: se usa ${m}; comprueba que su pre-commit ejecuta node .harness/scripts/checks.js pre-commit`,
     enforcement: 'Enforcement por herramienta',
     potential: 'potencial',
@@ -339,7 +339,7 @@ const es = {
 };
 
 es.upgrade = {
-  notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
+  notActivated: 'Este proyecto no está activado. Ejecuta primero "sdd-harness-init".',
   upToDate: (v) => `El proyecto ya usa la versión ${v} del harness. No hay nada que actualizar.`,
   projectNewer: (p, c) => `El proyecto usa el harness ${p}, más nuevo que esta CLI (${c}). Actualiza la CLI: npm install -g github:attisDev92/Dev-Harness-SDD`,
   title: (from, to) => `Actualización del harness: ${from} → ${to}`,
@@ -348,7 +348,7 @@ es.upgrade = {
 };
 
 es.contracts = {
-  notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
+  notActivated: 'Este proyecto no está activado. Ejecuta primero "sdd-harness-init".',
   none: 'No hay snapshots de contratos en este proyecto.',
   upToDate: (n) => `${n} snapshot${n === 1 ? '' : 's'} al día.`,
   unavailable: (s) => `${s.snapshot}: el repo proveedor (${s.source?.repo ?? '?'}) no está disponible localmente; se mantiene el snapshot actual sin verificar.`,
@@ -356,18 +356,18 @@ es.contracts = {
   confirm: (s) => `¿Actualizo ${s.snapshot}?`,
   updated: (s) => `Actualizado: ${s.snapshot}. Adaptar el consumidor a este cambio requiere aprobación (gate "protected" con ADR).`,
   kept: (s) => `Sin cambios: ${s.snapshot}.`,
-  usage: 'Uso: harness contracts sync [--dry-run] [--yes]',
+  usage: 'Uso: sdd-harness contracts sync [--dry-run] [--yes]',
 };
 es.notice.penpotUrl = () => 'design.source es penpot, pero falta design.mcp_url (la URL de tu servidor MCP de Penpot): el MCP no se configura hasta que la añadas.';
 es.doctor.skillsPending = (list) => `Skills requeridas sin instalar: ${list.join(', ')}`;
-es.doctor.skillsPendingAction = 'Ejecuta "harness skills install".';
+es.doctor.skillsPendingAction = 'Ejecuta "sdd-harness skills install".';
 es.doctor.skillsModified = (n) => `${n} archivo${n === 1 ? '' : 's'} de skills no coincide${n === 1 ? '' : 'n'} con .harness/skills.lock`;
-es.doctor.skillsModifiedAction = 'Revisa los cambios o reinstala con "harness skills install <nombre>".';
+es.doctor.skillsModifiedAction = 'Revisa los cambios o reinstala con "sdd-harness skills install <nombre>".';
 es.doctor.skillsOk = (n) => `Skills de terceros: ${n} instalada${n === 1 ? '' : 's'} y verificada${n === 1 ? '' : 's'}`;
 es.doctor.missingDependency =(spec, ref) => `La spec ${spec} depende de ${ref}, que no existe`;
 es.doctor.missingDependencyAction = 'Corrige la referencia (repo#ID-NNN) o crea la spec proveedora.';
 es.doctor.staleContract = (f, p) => `El snapshot ${f} está desactualizado respecto a ${p}`;
-es.doctor.staleContractAction = 'Ejecuta "harness contracts sync".';
+es.doctor.staleContractAction = 'Ejecuta "sdd-harness contracts sync".';
 es.doctor.unavailableContract = (f, r) => `No se pudo verificar ${f}: el repo ${r} no está disponible localmente`;
 es.doctor.contractsOk = (n) => `Snapshots de contratos: ${n} al día`;
 

@@ -180,7 +180,7 @@ export function verifySkills(root) {
   return { skills: Object.keys(lock.skills), problems };
 }
 
-/** Removes installed skills (harness remove). Modified files are kept. */
+/** Removes installed skills (sdd-harness remove). Modified files are kept. */
 export function uninstallSkills(root) {
   const lock = readLock(root);
   const kept = [];

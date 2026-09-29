@@ -1,4 +1,4 @@
-// MVP additions: harness upgrade (RF-UPG-01..04) and the event log (RF-OBS-01/02/05).
+// MVP additions: sdd-harness upgrade (RF-UPG-01..04) and the event log (RF-OBS-01/02/05).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';

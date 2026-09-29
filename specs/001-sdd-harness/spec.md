@@ -39,7 +39,7 @@ Funciona con varias herramientas de agentes (Claude Code, opencode, Codex y Anti
 
 | Término | Definición |
 |---|---|
-| **Proyecto activado** | Proyecto donde se ejecutó `harness init` con éxito y existe `harness.config.yaml` |
+| **Proyecto activado** | Proyecto donde se ejecutó `sdd-harness-init` con éxito y existe `harness.config.yaml` |
 | **Herramienta** | Herramienta de agentes soportada: `claude-code`, `opencode`, `codex`, `antigravity` |
 | **Adaptador** | Parte del sistema que traduce la configuración neutral al formato de una herramienta |
 | **Componente** | Parte del proyecto con stack propio: frontend (`web`), backend (`api`), base de datos (`db`) u otros |
@@ -89,14 +89,14 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-INS-01:** CUANDO el usuario ejecute `npm install -g github:<owner>/<repo>`, EL SISTEMA quedará instalado con el comando `harness` disponible en la terminal.
 - **RF-INS-02:** EL SISTEMA no escribirá en los directorios de configuración globales de ninguna herramienta de agentes (`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.gemini` y equivalentes).
 - **RF-INS-03:** EL SISTEMA podrá usar un único directorio de caché propio en el perfil del usuario, que se podrá borrar sin afectar a ningún proyecto.
-- **RF-INS-04:** CUANDO el usuario ejecute `harness --version`, EL SISTEMA mostrará la versión instalada.
-- **RF-INS-05:** CUANDO el usuario ejecute `harness --help` o `harness <comando> --help`, EL SISTEMA mostrará la ayuda en el idioma configurado para la CLI.
+- **RF-INS-04:** CUANDO el usuario ejecute `sdd-harness --version`, EL SISTEMA mostrará la versión instalada.
+- **RF-INS-05:** CUANDO el usuario ejecute `sdd-harness --help` o `sdd-harness <comando> --help`, EL SISTEMA mostrará la ayuda en el idioma configurado para la CLI.
 - **RF-INS-06:** SI la versión de Node.js es inferior a la mínima soportada, ENTONCES EL SISTEMA terminará con código 1 indicando la versión requerida.
-- **RF-INS-07:** MIENTRAS un proyecto no esté activado, EL SISTEMA no creará ni modificará ningún archivo en él, salvo cuando se ejecute `harness init`.
+- **RF-INS-07:** MIENTRAS un proyecto no esté activado, EL SISTEMA no creará ni modificará ningún archivo en él, salvo cuando se ejecute `sdd-harness-init`.
 
 ### 5.2 Activación del proyecto (INI)
 
-- **RF-INI-01:** CUANDO el usuario ejecute `harness init` en un directorio, EL SISTEMA iniciará una entrevista interactiva para configurar ese proyecto.
+- **RF-INI-01:** CUANDO el usuario ejecute `sdd-harness-init` en un directorio, EL SISTEMA iniciará una entrevista interactiva para configurar ese proyecto.
 - **RF-INI-02:** EL SISTEMA detectará la topología (repo git, monorepo o carpeta con varios repos git hijos) y la propondrá para que el usuario la confirme o la corrija.
 - **RF-INI-03:** EL SISTEMA detectará los componentes y su stack a partir de los manifiestos existentes (por ejemplo `package.json`, `pyproject.toml`, `go.mod`, `composer.json`, `*.csproj`) y los propondrá para confirmación.
 - **RF-INI-04:** EL SISTEMA preguntará qué herramientas de agentes se usarán y generará configuración solo para esas herramientas.
@@ -110,8 +110,8 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-INI-12:** EL SISTEMA propondrá una lista de zonas protegidas según el stack detectado y permitirá editarla antes de confirmar.
 - **RF-INI-13:** CUANDO el usuario confirme la entrevista, EL SISTEMA mostrará un resumen de todos los archivos a crear o modificar y pedirá una confirmación final antes de escribir nada.
 - **RF-INI-14:** CUANDO se confirme la instalación, EL SISTEMA creará `harness.config.yaml` con todas las respuestas.
-- **RF-INI-15:** CUANDO se ejecute `harness init --config <archivo> --yes`, EL SISTEMA se configurará sin entrevista usando ese archivo.
-- **RF-INI-16:** SI el proyecto ya está activado, ENTONCES EL SISTEMA no reinstalará e indicará que se usen `harness sync` o `harness upgrade`.
+- **RF-INI-15:** CUANDO se ejecute `sdd-harness-init --config <archivo> --yes`, EL SISTEMA se configurará sin entrevista usando ese archivo.
+- **RF-INI-16:** SI el proyecto ya está activado, ENTONCES EL SISTEMA no reinstalará e indicará que se usen `sdd-harness sync` o `sdd-harness upgrade`.
 - **RF-INI-17:** SI el usuario cancela la entrevista en cualquier punto, ENTONCES EL SISTEMA terminará sin haber escrito ningún archivo.
 - **RF-INI-18:** SI la escritura falla a mitad de la instalación, ENTONCES EL SISTEMA revertirá los archivos creados o modificados en esa ejecución y dejará el proyecto como estaba.
 
@@ -134,11 +134,11 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-GEN-06:** DONDE una herramienta activada requiera las skills en otra ruta, EL SISTEMA las copiará allí (sin symlinks) y registrará su hash.
 - **RF-GEN-07:** EL SISTEMA marcará cada archivo generado que admita comentarios con una cabecera que indique que lo generó el harness y que no debe editarse a mano.
 - **RF-GEN-08:** EL SISTEMA registrará cada archivo generado en `.harness/manifest.lock`, con su ruta, su hash y el componente del sistema que lo generó.
-- **RF-GEN-09:** CUANDO el usuario ejecute `harness sync`, EL SISTEMA regenerará la configuración a partir de `harness.config.yaml` y mostrará el diff antes de aplicarlo.
-- **RF-GEN-10:** CUANDO se ejecute `harness sync --dry-run`, EL SISTEMA mostrará el diff sin escribir ningún archivo.
+- **RF-GEN-09:** CUANDO el usuario ejecute `sdd-harness sync`, EL SISTEMA regenerará la configuración a partir de `harness.config.yaml` y mostrará el diff antes de aplicarlo.
+- **RF-GEN-10:** CUANDO se ejecute `sdd-harness sync --dry-run`, EL SISTEMA mostrará el diff sin escribir ningún archivo.
 - **RF-GEN-11:** SI un archivo generado fue modificado manualmente, ENTONCES EL SISTEMA no lo sobrescribirá sin preguntar y ofrecerá tres opciones: conservar, sobrescribir o ver el diff.
 - **RF-GEN-12:** SI `harness.config.yaml` no cumple el esquema, ENTONCES EL SISTEMA terminará con código 1 indicando cada campo inválido y su ubicación.
-- **RF-GEN-13:** EL SISTEMA producirá la misma salida al ejecutar `harness sync` dos veces seguidas sin cambios en la configuración.
+- **RF-GEN-13:** EL SISTEMA producirá la misma salida al ejecutar `sdd-harness sync` dos veces seguidas sin cambios en la configuración.
 - **RF-GEN-14:** EL SISTEMA mantendrá el `AGENTS.md` raíz por debajo del límite de caracteres más restrictivo de las herramientas activadas y moverá el detalle a skills o docs.
 
 ### 5.5 Coexistencia con archivos existentes (MRG)
@@ -156,11 +156,11 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-MOD-03:** MIENTRAS el modo sea `local`, EL SISTEMA usará los archivos de configuración locales de cada herramienta cuando existan (por ejemplo `CLAUDE.local.md` o `settings.local.json`).
 - **RF-MOD-04:** SI en modo `local` una herramienta solo puede configurarse modificando un archivo versionado, ENTONCES EL SISTEMA no la configurará, lo explicará y sugerirá el modo `team` para esa herramienta.
 - **RF-MOD-05:** MIENTRAS el modo sea `team`, EL SISTEMA dejará los archivos generados como candidatos a versionar y usará bloques gestionados en los archivos existentes.
-- **RF-MOD-06:** CUANDO el usuario cambie el modo en la configuración y ejecute `harness sync`, EL SISTEMA migrará los archivos al nuevo modo mostrando el diff.
+- **RF-MOD-06:** CUANDO el usuario cambie el modo en la configuración y ejecute `sdd-harness sync`, EL SISTEMA migrará los archivos al nuevo modo mostrando el diff.
 
 ### 5.7 Desinstalación (REM)
 
-- **RF-REM-01:** CUANDO el usuario ejecute `harness remove`, EL SISTEMA mostrará la lista de cambios a revertir y pedirá confirmación.
+- **RF-REM-01:** CUANDO el usuario ejecute `sdd-harness remove`, EL SISTEMA mostrará la lista de cambios a revertir y pedirá confirmación.
 - **RF-REM-02:** EL SISTEMA eliminará los archivos generados cuyo hash coincida con el de `.harness/manifest.lock`.
 - **RF-REM-03:** SI un archivo generado fue modificado, ENTONCES EL SISTEMA preguntará si eliminarlo o conservarlo.
 - **RF-REM-04:** EL SISTEMA eliminará los bloques gestionados y revertirá las claves fusionadas, conservando el resto del contenido de esos archivos.
@@ -173,17 +173,17 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 
 - **RF-UPG-01:** EL SISTEMA registrará en `harness.config.yaml` la versión del harness con la que se activó el proyecto.
 - **RF-UPG-02:** SI la versión de la CLI instalada difiere de la versión del proyecto, ENTONCES EL SISTEMA lo avisará sin actualizar nada automáticamente.
-- **RF-UPG-03:** CUANDO el usuario ejecute `harness upgrade`, EL SISTEMA mostrará las novedades entre ambas versiones y el diff de archivos, y pedirá confirmación antes de aplicarlos.
+- **RF-UPG-03:** CUANDO el usuario ejecute `sdd-harness upgrade`, EL SISTEMA mostrará las novedades entre ambas versiones y el diff de archivos, y pedirá confirmación antes de aplicarlos.
 - **RF-UPG-04:** SI una versión nueva cambia el esquema de configuración, ENTONCES EL SISTEMA migrará `harness.config.yaml` y mostrará el diff de la migración.
 
 ### 5.9 Diagnóstico (DOC)
 
-- **RF-DOC-01:** CUANDO el usuario ejecute `harness doctor`, EL SISTEMA verificará la validez de la configuración, la integridad de los archivos generados, la de `skills.lock`, la configuración de git hooks y la vigencia de los snapshots de contratos.
+- **RF-DOC-01:** CUANDO el usuario ejecute `sdd-harness doctor`, EL SISTEMA verificará la validez de la configuración, la integridad de los archivos generados, la de `skills.lock`, la configuración de git hooks y la vigencia de los snapshots de contratos.
 - **RF-DOC-02:** EL SISTEMA mostrará, por cada herramienta activada, el nivel de enforcement real y qué reglas se aplican de forma determinista y cuáles solo por instrucción.
 - **RF-DOC-03:** EL SISTEMA mostrará la sintaxis de invocación de los comandos del flujo en cada herramienta activada.
 - **RF-DOC-04:** SI se detecta un problema, ENTONCES EL SISTEMA indicará su causa y la acción para corregirlo.
 - **RF-DOC-05:** EL SISTEMA terminará con código 0 cuando no haya errores y con código 1 cuando haya al menos uno. Las advertencias no cambian el código de salida.
-- **RF-DOC-06:** CUANDO se ejecute `harness doctor --json`, EL SISTEMA emitirá el resultado en JSON.
+- **RF-DOC-06:** CUANDO se ejecute `sdd-harness doctor --json`, EL SISTEMA emitirá el resultado en JSON.
 
 ### 5.10 Flujo SDD (SDD)
 
@@ -279,7 +279,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-TOP-04:** EL SISTEMA permitirá declarar dependencias entre specs mediante IDs estables (`depends_on: api#API-004`).
 - **RF-TOP-05:** SI una spec depende de otra inexistente, ENTONCES EL SISTEMA lo advertirá en `doctor` y en `/sdd:status`.
 - **RF-TOP-06:** EL SISTEMA guardará en el repo consumidor un snapshot del contrato del proveedor, con metadatos de repo, spec, commit y hash de origen.
-- **RF-TOP-07:** CUANDO el usuario ejecute `harness contracts sync`, EL SISTEMA actualizará los snapshots desde sus proveedores mostrando el diff y pidiendo confirmación.
+- **RF-TOP-07:** CUANDO el usuario ejecute `sdd-harness contracts sync`, EL SISTEMA actualizará los snapshots desde sus proveedores mostrando el diff y pidiendo confirmación.
 - **RF-TOP-08:** SI el hash del contrato del proveedor difiere del snapshot, ENTONCES EL SISTEMA marcará el snapshot como desactualizado en `doctor`.
 - **RF-TOP-09:** SI el repo proveedor no está disponible localmente, ENTONCES EL SISTEMA mantendrá el snapshot actual e informará de que no pudo verificarlo.
 - **RF-TOP-10:** CUANDO se detecte que un contrato cambió, EL SISTEMA tratará la adaptación del consumidor como un cambio que requiere aprobación.
@@ -296,8 +296,8 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-SKL-07:** EL SISTEMA no ejecutará ningún script incluido en una skill durante su instalación.
 - **RF-SKL-08:** SI una skill de terceros contiene scripts o hooks, ENTONCES EL SISTEMA lo indicará al usuario antes de instalarla.
 - **RF-SKL-09:** EL SISTEMA registrará las skills instaladas en `.harness/skills.lock`.
-- **RF-SKL-10:** CUANDO el usuario ejecute `harness skills verify`, EL SISTEMA comprobará que el contenido instalado coincide con `skills.lock`.
-- **RF-SKL-11:** CUANDO el usuario ejecute `harness skills update`, EL SISTEMA mostrará el diff entre la versión instalada y la del registro, y pedirá confirmación.
+- **RF-SKL-10:** CUANDO el usuario ejecute `sdd-harness skills verify`, EL SISTEMA comprobará que el contenido instalado coincide con `skills.lock`.
+- **RF-SKL-11:** CUANDO el usuario ejecute `sdd-harness skills update`, EL SISTEMA mostrará el diff entre la versión instalada y la del registro, y pedirá confirmación.
 - **RF-SKL-12:** EL SISTEMA asignará a cada rol solo las skills pertinentes a su función y al stack detectado.
 - **RF-SKL-13:** DONDE `design.source` sea `penpot` o `figma`, EL SISTEMA configurará el servidor MCP correspondiente en las herramientas activadas, con aprobación del usuario.
 - **RF-SKL-14:** EL SISTEMA conservará los avisos de licencia y atribución de las skills adaptadas de terceros.
@@ -306,14 +306,14 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 ### 5.19 Tracker (TRK)
 
 - **RF-TRK-01:** DONDE haya un tracker activado, EL SISTEMA vinculará cada tarea de `tasks.md` con su elemento en el tracker mediante un comentario invisible (`<!-- linear:ABC-123 -->` o equivalente).
-- **RF-TRK-02:** CUANDO el usuario ejecute `harness tracker connect`, EL SISTEMA verificará la conexión usando un token leído de una variable de entorno.
+- **RF-TRK-02:** CUANDO el usuario ejecute `sdd-harness tracker connect`, EL SISTEMA verificará la conexión usando un token leído de una variable de entorno.
 - **RF-TRK-03:** EL SISTEMA no guardará tokens del tracker en ningún archivo del proyecto.
-- **RF-TRK-04:** CUANDO el usuario ejecute `harness tracker sync`, EL SISTEMA sincronizará en ambos sentidos solo el estado, el título y la creación de tareas.
+- **RF-TRK-04:** CUANDO el usuario ejecute `sdd-harness tracker sync`, EL SISTEMA sincronizará en ambos sentidos solo el estado, el título y la creación de tareas.
 - **RF-TRK-05:** EL SISTEMA no modificará la spec a partir de datos del tracker.
 - **RF-TRK-06:** CUANDO el tracker tenga una tarea nueva de la spec activa, EL SISTEMA la presentará como propuesta y no la añadirá a `tasks.md` sin aprobación.
 - **RF-TRK-07:** SI una tarea cambió en ambos lados desde la última sincronización, ENTONCES EL SISTEMA mostrará ambas versiones y preguntará cuál conservar.
 - **RF-TRK-08:** EL SISTEMA pedirá confirmación antes de crear o modificar elementos en el tracker.
-- **RF-TRK-09:** CUANDO se ejecute `harness tracker sync --dry-run`, EL SISTEMA mostrará los cambios en ambos sentidos sin aplicarlos.
+- **RF-TRK-09:** CUANDO se ejecute `sdd-harness tracker sync --dry-run`, EL SISTEMA mostrará los cambios en ambos sentidos sin aplicarlos.
 - **RF-TRK-10:** SI el tracker no responde o el token es inválido, ENTONCES EL SISTEMA informará del error sin modificar `tasks.md`.
 
 ### 5.20 Observabilidad (OBS)
@@ -407,8 +407,8 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 2. La matriz de CI (Windows, macOS, Linux) está en verde.
 3. Existen fixtures de proyecto y pasan `init`, `sync`, `doctor` y `remove` en cada uno: solo frontend, monorepo fullstack, workspace con dos repos, varios repos y proyecto con configuración previa de agentes y git hooks.
 4. Demo manual del flujo completo (`/sdd:constitution` hasta `/sdd:commit`) con Claude Code en el fixture de workspace, incluyendo un fallo en alcance, un fallo en zona protegida con su triage y una prueba manual con KO.
-5. `harness doctor` muestra el nivel de enforcement correcto en las cuatro herramientas.
-6. `harness remove` deja cada fixture idéntico a su estado previo a `init`, salvo los artefactos.
+5. `sdd-harness doctor` muestra el nivel de enforcement correcto en las cuatro herramientas.
+6. `sdd-harness remove` deja cada fixture idéntico a su estado previo a `init`, salvo los artefactos.
 7. README (en inglés y español), guía de adaptadores, guía de contribución al registro y NOTICE publicados.
 8. Recorrido de validación RF por RF documentado, con veredicto "spec cumplida".
 
@@ -421,18 +421,24 @@ Los hitos originales (v0.1–v1.0) se unificaron en un **MVP** centrado en Claud
 | **MVP (v0.4)** | INS, INI, CNV, GEN, MRG (JSON), MOD, REM, UPG, DOC, SDD, ORQ (salvo ORQ-11), GAT, RET, MD, DOM, VER, ADP para Claude Code, OBS-01/02/04/05, skills propias del flujo (`sdd-orchestrator`, `spec-generator`, `triage-report`, `adr`) | Implementado |
 | **v0.5** | TOP (varios repos, workspace, dependencias entre specs, snapshots de contratos), SKL (registro curado, instalador verificado, asignación por rol, MCP de Figma/Penpot), TRK con GitHub Issues | Implementado |
 | Pendiente | ADP para opencode, Codex y Antigravity; modo degradado (ORQ-11); RF-ADP-04 completo; RF-MRG-02 para TOML | Pendiente |
-| Pendiente | Resto de skills propias de SKL-01 (`clean-code`, `design-system`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`, `testing-strategy`, `docs-writer`) y skill `penpot-mcp` (ya no existe en su origen) | Pendiente |
 | **v0.6** | TRK con cualquier tracker: GitHub Issues desde la CLI; el resto (Linear, Jira, Notion, Asana, ClickUp…) desde el agente con el MCP del tracker, con plan determinista y aprobación antes de escribir | Implementado |
-| Pendiente | Git hooks por repo en topología workspace | Pendiente |
+| **v0.7** | Resto de skills propias de SKL-01 (`clean-code`, `design-system`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`, `testing-strategy`, `docs-writer`), git hooks por repo en workspace, `LICENSE` y `NOTICE`, guías en español e inglés (RNF-18), nombre definitivo del comando | Implementado |
 | Pendiente | OBS-03: costo y tokens por tarea desde la herramienta | Pendiente |
-| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP), RNF-18 (guías completas) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
+| Pendiente | RNF-12 (mensajes en inglés para lo añadido en el MVP) y criterio de finalización 4 (demo con Claude Code real) | Pendiente |
+
+La skill `penpot-mcp` ya no existe en su origen: con `design.source: penpot` se configura el servidor MCP de Penpot (RF-SKL-13).
 
 ## 11. Dudas abiertas
 
-- [NECESITA ACLARACIÓN: nombre definitivo del proyecto, del paquete y del comando (`sdd-harness` / `harness` son provisionales)]
-- [NECESITA ACLARACIÓN: versión mínima de Node.js (propuesta: la LTS activa más antigua a la fecha de v1.0)]
-- [NECESITA ACLARACIÓN: primer tracker a implementar en v0.8 (Linear, Notion, GitHub Issues o Jira)]
-- [NECESITA ACLARACIÓN: lista de licencias permitidas en el registro de skills (propuesta: MIT, Apache-2.0, BSD-2/3, ISC)]
-- [NECESITA ACLARACIÓN: lista inicial de gestores de paquetes soportados en RF-GAT-05 (propuesta: npm, pnpm, yarn, bun, pip, uv, poetry, cargo, go, composer, dotnet, gem)]
-- [NECESITA ACLARACIÓN: ¿la plantilla de CI de v1.0 cubre solo GitHub Actions o también GitLab CI?]
-- [NECESITA ACLARACIÓN: capacidades actuales de subagentes y hooks en Antigravity y de los hooks de Codex (en beta), a verificar contra la documentación oficial al iniciar v0.5 y v0.6]
+Resueltas:
+
+- **Nombre:** el proyecto se llama como el repositorio, Dev-Harness-SDD; el paquete es `dev-harness-sdd`; el comando es `sdd-harness`, con `sdd-harness-init` como atajo de `sdd-harness init`.
+- **Tracker:** cualquiera que use el desarrollador (ver v0.6).
+- **Licencias permitidas en el registro:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause e ISC (propuesta adoptada).
+- **Gestores de paquetes de RF-GAT-05:** npm, pnpm, yarn, bun, pip, uv, poetry, pipenv, cargo, go, composer, dotnet, gem y bundler (propuesta adoptada).
+- **CI:** solo GitHub Actions; GitLab CI no se cubre.
+
+Abiertas:
+
+- [NECESITA ACLARACIÓN: versión mínima de Node.js. Hoy es 20, que ya no tiene soporte; la propuesta era la LTS activa más antigua a la fecha de v1.0]
+- [NECESITA ACLARACIÓN: capacidades actuales de subagentes y hooks en Antigravity y de los hooks de Codex; se verificarán al retomar esos adaptadores]

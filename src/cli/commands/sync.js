@@ -1,4 +1,4 @@
-// harness sync (RF-GEN-09..13, RF-MOD-06, edge cases 7, 8, 24, 25).
+// sdd-harness sync (RF-GEN-09..13, RF-MOD-06, edge cases 7, 8, 24, 25).
 
 import path from 'node:path';
 import { parseArgs } from '../../guards/args.js';
@@ -26,7 +26,7 @@ export async function syncCommand(argv, { io, t, tc, version, override }) {
     return 1;
   }
   // RF-GEN-12: an invalid configuration stops everything.
-  // `harness upgrade` passes the migrated configuration, written in the same transaction.
+  // `sdd-harness upgrade` passes the migrated configuration, written in the same transaction.
   const loaded = override ?? loadConfigFile(path.join(root, CONFIG_FILE));
   if (!loaded.ok) {
     err(tc.init.badConfig(CONFIG_FILE));
@@ -103,7 +103,7 @@ export async function syncCommand(argv, { io, t, tc, version, override }) {
     // RF-GEN-09 / RF-GEN-10: the diff always comes first.
     out(tc.sync.changes);
     renderReport(plan.report, tc).forEach(out);
-    for (const c of git.changes) out(`  ~ ${tc.gitConfig(c.key, c.after)}`);
+    for (const c of git.changes) out(`  ~ ${c.repo ? `${c.repo}: ` : ""}${tc.gitConfig(c.key, c.after)}`);
     out('');
     out(renderDiffs(visible));
     if (dryRun) {

@@ -32,7 +32,7 @@ export function readManifest(root) {
 }
 
 export function entryKey(e) {
-  return e.kind === 'git-config' ? `git-config:${e.key}` : `${e.kind}:${e.path}`;
+  return e.kind === 'git-config' ? `git-config:${e.repo ?? ''}:${e.key}` : `${e.kind}:${e.path}`;
 }
 
 /** Stable serialisation: sync without changes rewrites identical bytes (RF-GEN-13). */

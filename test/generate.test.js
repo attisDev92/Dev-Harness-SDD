@@ -57,7 +57,7 @@ test('RF-GEN-04: only the roles the project needs', () => {
 test('RF-CNV-05: precedence order and declared convention sources', () => {
   const { entries } = generateCore(base({ conventions: { sources: ['CONTRIBUTING.md', '.editorconfig'], commits: 'custom', commits_note: 'CONTRIBUTING.md' } }), env());
   const root = byPath(entries)['AGENTS.md'].content;
-  assert.match(root, /1\) `docs\/constitution\.md`; 2\) project conventions: the rest of this file and `CONTRIBUTING\.md`, `\.editorconfig`; 3\) harness skills; 4\) third-party skills/);
+  assert.match(root, /1\) `docs\/constitution\.md`; 2\) project conventions: the rest of this file and `CONTRIBUTING\.md`, `\.editorconfig`; 3\) sdd-harness skills; 4\) third-party skills/);
   // RF-CNV-06
   assert.match(root, /Commit messages: follow the project convention in `CONTRIBUTING\.md`/);
   assert.match(byPath(generateCore(base(), env()).entries)['AGENTS.md'].content, /Commit messages: Conventional Commits/);
@@ -179,4 +179,17 @@ test('single-component projects at the root get no extra component file', () => 
   const cfg = base({ topology: 'single', components: { app: { path: '.', kind: 'frontend' } } });
   const e = generateCore(cfg, env()).entries;
   assert.equal(e.filter((x) => x.path.endsWith('AGENTS.md')).length, 1);
+});
+
+test('RF-SKL-01/12: own skills follow the components, and design-system the design source', async () => {
+  const { ownSkills } = await import('../src/generate/skills.js');
+  const front = Object.keys(ownSkills({ components: { web: { path: '.', kind: 'frontend', stack: 'react' } }, design: { source: 'figma' } }));
+  assert.ok(front.includes('design-system') && front.includes('clean-code') && front.includes('testing-strategy'));
+  assert.ok(!front.includes('backend-architecture') && !front.includes('db-migrations'));
+  assert.match(ownSkills({ components: { web: { path: '.', kind: 'frontend' } }, design: { source: 'figma' } })['design-system'], /fuente de verdad es Figma/);
+  const back = Object.keys(ownSkills({ components: { api: { path: '.', kind: 'backend', stack: 'nestjs+prisma+postgres' } } }));
+  for (const s of ['backend-architecture', 'api-design', 'secure-coding', 'db-migrations', 'docs-writer']) assert.ok(back.includes(s), s);
+  assert.ok(!back.includes('design-system'));
+  const { entries } = generateCore(base(), env());
+  assert.match(byPath(entries)['.claude/agents/backend-dev.md'].content, /load these skills: `clean-code`, `backend-architecture`, `api-design`, `secure-coding`, `db-migrations`/);
 });

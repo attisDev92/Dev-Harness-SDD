@@ -1,6 +1,6 @@
 {
-  "name": "sdd-harness",
-  "version": "0.6.0",
+  "name": "dev-harness-sdd",
+  "version": "0.7.0",
   "description": "Portable, human-in-the-loop harness for Spec-Driven Development with AI coding agents.",
   "license": "Apache-2.0",
   "repository": {
@@ -13,7 +13,8 @@
   },
   "type": "module",
   "bin": {
-    "harness": "bin/harness.cjs"
+    "sdd-harness": "bin/harness.cjs",
+    "sdd-harness-init": "bin/init.cjs"
   },
   "engines": {
     "node": ">=20"
@@ -22,7 +23,10 @@
     "bin/",
     "src/",
     "README.md",
-    "README.es.md"
+    "README.es.md",
+    "LICENSE",
+    "NOTICE",
+    "docs/"
   ],
   "scripts": {
     "test": "node --test"

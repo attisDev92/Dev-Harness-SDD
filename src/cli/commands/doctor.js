@@ -1,4 +1,4 @@
-// harness doctor (RF-DOC-01..06, RF-ADP-03/04 base, edge cases 23 and 25).
+// sdd-harness doctor (RF-DOC-01..06, RF-ADP-03/04 base, edge cases 23 and 25).
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -125,20 +125,17 @@ export function runChecks(root, { version, env = process.env }) {
   if (!installedNames.length && !pendingSkills.length) add('info', 'skills', ['skills']);
   else if (installedNames.length && !skillProblems.length) add('ok', 'skills', ['skillsOk', installedNames.length]);
   // RF-VER-03/05: the universal safety net.
-  if (config.git_hooks?.enabled && inRepo) {
-    const own = manifest?.entries.find((e) => e.kind === 'git-config' && e.key === 'core.hooksPath');
-    const chainedBlock = manifest?.entries.find((e) => e.generator === 'githooks' && e.kind === 'block');
-    const manual = (manifest?.notices ?? []).find((n) => n.code === 'hooksChainManual');
-    if (own) {
-      if (getConfig(root, 'core.hooksPath') === '.harness/githooks') add('ok', 'hooks', ['hooksOk']);
-      else add('error', 'hooks', ['hooksMissing'], { action: ['hooksAction'] });
-    } else if (chainedBlock) {
-      add(broken.has(chainedBlock.path) ? 'error' : 'ok', 'hooks', ['hooksOk']);
-    } else if (manual) {
-      add('warn', 'hooks', ['hooksChained', manual.params.manager]);
-    } else {
-      add('error', 'hooks', ['hooksMissing'], { action: ['hooksAction'] });
-    }
+  const own = (manifest?.entries ?? []).filter((e) => e.kind === 'git-config' && e.key === 'core.hooksPath');
+  const chained = (manifest?.entries ?? []).filter((e) => e.generator === 'githooks' && e.kind === 'block');
+  const manual = (manifest?.notices ?? []).filter((n) => n.code === 'hooksChainManual');
+  if (config.git_hooks?.enabled && (own.length || chained.length || manual.length || inRepo)) {
+    // One check per repository (RF-TOP-02): its own hooksPath, a chained block or a manual note.
+    const failing = own.filter((e) => !String(getConfig(path.join(root, e.repo ?? ''), 'core.hooksPath') ?? '').replace(/\\/g, '/').endsWith('.harness/githooks'));
+    for (const e of failing) add('error', 'hooks', ['hooksMissing'], { action: ['hooksAction'], repo: e.repo ?? '' });
+    for (const b of chained.filter((x) => broken.has(x.path))) add('error', 'hooks', ['hooksMissing'], { action: ['hooksAction'], repo: b.path });
+    for (const n of manual) add('warn', 'hooks', ['hooksChained', n.params.manager]);
+    if (!own.length && !chained.length && !manual.length) add('error', 'hooks', ['hooksMissing'], { action: ['hooksAction'] });
+    else if (!failing.length && (own.length || chained.length)) add('ok', 'hooks', ['hooksOk']);
   } else {
     add('info', 'hooks', ['hooksPath', inRepo ? getConfig(root, 'core.hooksPath') : null]);
   }

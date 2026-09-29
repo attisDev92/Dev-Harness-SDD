@@ -1,0 +1,34 @@
+Dev-Harness-SDD (sdd-harness)
+Copyright 2026 attisDev92 and contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product was inspired by the following works. No source code from them
+is included in this repository; the ideas and workflows they describe were
+reimplemented:
+
+- hello-sdd, by MoureDev (https://github.com/mouredev/hello-sdd),
+  Apache License 2.0: the SDD flow, EARS specs and the idea of a
+  spec-generator skill.
+- GitHub Spec Kit (https://github.com/github/spec-kit), MIT License:
+  the constitution / specify / plan / tasks flow.
+
+Third-party skills
+------------------
+The curated skills listed in src/skills/registry.json are NOT bundled with
+this product. They are downloaded on request from their original
+repositories, at a pinned commit, and keep their own licenses:
+
+- anthropics/skills (Apache License 2.0): frontend-design, webapp-testing
+- vercel-labs/agent-skills (MIT License): vercel-react-best-practices,
+  vercel-composition-patterns
+- supabase/agent-skills (MIT License): supabase-postgres-best-practices
+- obra/superpowers (MIT License): test-driven-development,
+  systematic-debugging, verification-before-completion
+
+When a skill is installed, its license text and a NOTICE.harness.md with its
+origin are written next to it.
+
+Runtime dependency
+------------------
+- yaml (https://github.com/eemeli/yaml), ISC License.

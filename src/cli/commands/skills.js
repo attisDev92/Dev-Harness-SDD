@@ -1,4 +1,4 @@
-// harness skills list | install | update | verify (RF-SKL-03..15).
+// sdd-harness skills list | install | update | verify (RF-SKL-03..15).
 
 import path from 'node:path';
 import { parseArgs } from '../../guards/args.js';
@@ -11,8 +11,8 @@ import { CancelledError, createLinePrompter, createScriptedPrompter } from '../p
 import { syncCommand } from './sync.js';
 
 const M = {
-  notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
-  usage: 'Uso: harness skills <list|install|update|verify> [nombres] [--yes]',
+  notActivated: 'Este proyecto no está activado. Ejecuta primero "sdd-harness-init".',
+  usage: 'Uso: sdd-harness skills <list|install|update|verify> [nombres] [--yes]',
   header: 'Skills curadas que necesita este proyecto:',
   none: 'Este proyecto no necesita skills de terceros.',
   row: (s, status) => `  ${status.padEnd(12)} ${s.name}  (${s.repo}@${s.sha.slice(0, 7)} · ${s.license})`,

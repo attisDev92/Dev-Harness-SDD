@@ -36,7 +36,7 @@ Register it in `ADAPTERS` in `src/generate/index.js`.
 | `block` | `path`, `content`, `style?` (`html` or `hash`) | A managed block inside a file the user owns |
 | `json` | `path`, `values` (dotted keys), `appends` (dotted key → items) | Settings merged key by key; `appends` adds items to arrays without touching the user's items |
 
-Every entry carries `tool: id`. The entry that wires the guards into the tool also carries `enforces: RULES`: `harness doctor` counts a rule as deterministic only while that entry is intact on disk.
+Every entry carries `tool: id`. The entry that wires the guards into the tool also carries `enforces: RULES`: `sdd-harness doctor` counts a rule as deterministic only while that entry is intact on disk.
 
 ### Rules
 

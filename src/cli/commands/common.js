@@ -25,7 +25,8 @@ export function detectHooksManager(root) {
   if (existsSync(path.join(root, '.husky'))) {
     return { name: 'husky', hookFile: existsSync(path.join(root, '.husky', 'pre-commit')) ? '.husky/pre-commit' : undefined };
   }
-  if (current && current !== HOOKS_DIR) return { name: 'core.hooksPath', path: current };
+  // Our own value (".harness/githooks", or "../.harness/githooks" from a child repo) is not a foreign manager.
+  if (current && !posix(current).endsWith(HOOKS_DIR)) return { name: 'core.hooksPath', path: current };
   for (const [file, name] of [['lefthook.yml', 'lefthook'], ['lefthook.yaml', 'lefthook'], ['.lefthook.yml', 'lefthook'], ['.pre-commit-config.yaml', 'pre-commit']]) {
     if (existsSync(path.join(root, file))) return { name };
   }
@@ -55,6 +56,7 @@ export function detectRepos(root, config) {
       if (exclude) repos.push({ dir, abs, excludePath: `${dir}/${exclude}` });
     }
   }
+  for (const r of repos) r.hooksManager = detectHooksManager(r.abs);
   return repos;
 }
 
@@ -81,24 +83,29 @@ export function buildDesired(config, root) {
  * recorded so remove can restore it (RF-REM-07).
  */
 export function planGitConfig(root, desired, manifest) {
-  const inRepo = gitTopLevel(root) !== null;
-  const old = new Map((manifest?.entries ?? []).filter((e) => e.kind === 'git-config').map((e) => [e.key, e]));
+  const id = (repo, key) => `${repo ?? ''}::${key}`;
+  const old = new Map((manifest?.entries ?? []).filter((e) => e.kind === 'git-config').map((e) => [id(e.repo, e.key), e]));
+  const wanted = new Set((desired ?? []).map((d) => id(d.repo, d.key)));
   const entries = [];
   const changes = [];
-  if (!inRepo) return { entries, changes };
-  for (const [key, value] of Object.entries(desired ?? {})) {
-    const current = getConfig(root, key);
-    entries.push(old.get(key) ?? { kind: 'git-config', key, hadPrevious: current !== null, ...(current !== null ? { previous: current } : {}) });
-    if (current !== value) changes.push({ type: 'git-config', key, after: value });
+  for (const { repo = '', key, value } of desired ?? []) {
+    const current = getConfig(path.join(root, repo), key);
+    const entry = old.get(id(repo, key)) ?? { kind: 'git-config', key, hadPrevious: current !== null, ...(current !== null ? { previous: current } : {}) };
+    entries.push(repo ? { ...entry, repo } : entry);
+    if (current !== value) changes.push({ type: 'git-config', repo, key, after: value });
   }
-  for (const [key, e] of old) {
-    if (!(key in (desired ?? {}))) changes.push({ type: 'git-config', key, after: e.hadPrevious ? e.previous : null });
+  for (const [k, e] of old) {
+    if (!wanted.has(k)) changes.push({ type: 'git-config', repo: e.repo ?? '', key: e.key, after: e.hadPrevious ? e.previous : null });
   }
   return { entries, changes };
 }
 
+/** git config of the project's repositories, addressed by repo folder ('' = root). */
 export function gitConfigAccess(root) {
-  return { get: (k) => getConfig(root, k), set: (k, v) => setConfig(root, k, v) };
+  return {
+    get: (k, repo = '') => getConfig(path.join(root, repo), k),
+    set: (k, v, repo = '') => setConfig(path.join(root, repo), k, v),
+  };
 }
 
 /** Directories that writing `paths` would create, outermost first. */

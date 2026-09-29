@@ -1,4 +1,4 @@
-// harness init (RF-INI-01..18, RF-INS-07, edge cases 1, 2, 3, 4).
+// sdd-harness-init (RF-INI-01..18, RF-INS-07, edge cases 1, 2, 3, 4).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -159,7 +159,7 @@ test('RF-INI-16: an activated project is not reinstalled', async (t) => {
   const before = snapshot(root);
   const r = await run(['init', '--yes'], { cwd: root });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /harness sync.*harness upgrade/);
+  assert.match(r.stderr, /harness sync.*sdd-harness upgrade/);
   assert.deepEqual(snapshot(root), before);
 });
 

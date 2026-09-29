@@ -16,7 +16,7 @@ import * as claudeCode from './adapters/claude-code.js';
  *
  * Entries use the engine kinds (file, block, json) and carry `tool: id`;
  * the entry that wires the guards carries `enforces: RULES`, which is what
- * `harness doctor` reports as the real enforcement level. Register the module
+ * `sdd-harness doctor` reports as the real enforcement level. Register the module
  * below; the core does not change.
  * @typedef {{ id: string, RULES: string[], generate: (config: object, ctx: { tracked: Set<string>, skills: Record<string, string> }) => { entries: object[], notices: object[] } }} Adapter
  */
@@ -39,7 +39,8 @@ export function generateProject(config, env) {
     acc.entries.push(...r.entries);
     acc.notices.push(...r.notices);
   }
-  const hooks = generateGitHooks(config, { hooksManager: env.hooksManager ?? null, tracked: env.tracked });
+  const repos = env.repos ?? (env.excludePath ? [{ dir: '', hooksManager: env.hooksManager ?? null }] : []);
+  const hooks = generateGitHooks(config, { repos, tracked: env.tracked });
   const ci = generateCi(config);
   acc.entries.push(...hooks.entries, ...ci.entries);
   acc.notices.push(...hooks.notices, ...ci.notices);

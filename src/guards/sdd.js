@@ -82,7 +82,7 @@ export async function runSdd(argv, io) {
     io.stderr.write(`${s}\n`);
     return REFUSED;
   };
-  if (!root) return refuse('This project is not activated (no harness.config.yaml). Run "harness init" first.');
+  if (!root) return refuse('This project is not activated (no harness.config.yaml). Run "sdd-harness-init" first.');
   const settings = loadGuardSettings(root);
   const lang = io.env.HARNESS_LANG?.startsWith('es') ? 'es' : io.env.HARNESS_LANG?.startsWith('en') ? 'en' : settings.language ?? 'es';
   const t = runtimeMessages(lang);

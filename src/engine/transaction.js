@@ -62,8 +62,8 @@ export function applyChanges(root, changes, options = {}) {
       }
     }
     for (const c of options.configChanges ?? []) {
-      configDone.push({ key: c.key, original: options.gitConfig.get(c.key) });
-      options.gitConfig.set(c.key, c.after);
+      configDone.push({ key: c.key, repo: c.repo ?? '', original: options.gitConfig.get(c.key, c.repo ?? '') });
+      options.gitConfig.set(c.key, c.after, c.repo ?? '');
     }
   } catch (error) {
     rollback(fs, done, createdDirs, configDone, options.gitConfig);
@@ -104,9 +104,9 @@ function rollback(fs, done, createdDirs, configDone, gitConfig) {
       // Best effort: keep restoring the rest.
     }
   }
-  for (const { key, original } of configDone.reverse()) {
+  for (const { key, repo, original } of configDone.reverse()) {
     try {
-      gitConfig.set(key, original);
+      gitConfig.set(key, original, repo);
     } catch {
       // Best effort.
     }

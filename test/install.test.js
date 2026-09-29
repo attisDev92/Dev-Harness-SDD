@@ -18,7 +18,7 @@ test('RF-INS-01: npm install -g exposes the harness command', { skip: !process.e
   const prefix = path.join(dir, 'prefix');
   const install = npm(['install', '-g', '--prefix', prefix, '--no-audit', '--no-fund', tarball], dir);
   assert.equal(install.status, 0, install.stderr);
-  const bin = process.platform === 'win32' ? path.join(prefix, 'harness.cmd') : path.join(prefix, 'bin', 'harness');
+  const bin = process.platform === 'win32' ? path.join(prefix, 'sdd-harness.cmd') : path.join(prefix, 'bin', 'sdd-harness');
   const run = spawnSync(bin, ['--version'], { encoding: 'utf8', shell: process.platform === 'win32', windowsHide: true });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout.trim(), /^\d+\.\d+\.\d+$/);

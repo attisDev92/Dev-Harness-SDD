@@ -1,4 +1,4 @@
-// harness upgrade (RF-UPG-01..04): news between versions, configuration
+// sdd-harness upgrade (RF-UPG-01..04): news between versions, configuration
 // migrations, and a sync with the new version, all shown before applying.
 
 import path from 'node:path';
@@ -12,13 +12,14 @@ import { unifiedDiff } from '../../engine/diff.js';
 import { compareVersions } from './common.js';
 import { syncCommand } from './sync.js';
 
-/** What changed in each version, shown by `harness upgrade`. */
+/** What changed in each version, shown by `sdd-harness upgrade`. */
 export const CHANGES = {
   '0.2.0': ['init, sync, doctor y remove', 'Modo local y team, bloques gestionados y fusión JSON'],
   '0.3.0': ['Adaptador de Claude Code: subagentes, comandos /sdd:*, skills, permisos y hooks', 'Flujo SDD determinista con sdd.js, gates humanos y triage', 'Git hook pre-commit y plantilla de CI'],
-  '0.4.0': ['MVP: mensajes en español, log de eventos y harness upgrade'],
+  '0.4.0': ['MVP: mensajes en español, log de eventos y sdd-harness upgrade'],
   '0.5.0': ['Varios repos y workspace, dependencias entre specs y snapshots de contratos', 'Registro curado de skills con instalador verificado', 'Sincronización con GitHub Issues'],
   '0.6.0': ['Cualquier tracker: GitHub desde la CLI y el resto desde el agente con su MCP (/sdd:tracker)'],
+  '0.7.0': ['Comando sdd-harness y atajo sdd-harness-init', 'Ocho skills propias más (clean-code, design-system, api-design…)', 'Git hooks en cada repo de un workspace'],
 };
 
 /**

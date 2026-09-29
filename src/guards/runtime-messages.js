@@ -49,7 +49,7 @@ const en = {
     noTasks: (f) => `${f} has no tasks.`,
     allDone: () => 'All tasks are done. Next: /sdd:validate.',
     problems: (t, ps) => `Task ${t} cannot run yet: ${ps.join(', ')}. Complete it in tasks.md through /sdd:change.`,
-    noVerify: (c) => `Component "${c}" has no verification commands. Ask the user to add components.${c}.verify to harness.config.yaml and run "harness sync" (RF-VER-02).`,
+    noVerify: (c) => `Component "${c}" has no verification commands. Ask the user to add components.${c}.verify to harness.config.yaml and run "sdd-harness sync" (RF-VER-02).`,
     storyPending: (s) => `The manual test of ${s} is pending: request it before starting new work.`,
     started: (t, role) => [
       `Task ${t.id}: ${t.title}`,
@@ -150,7 +150,7 @@ const es = {
     noTasks: (f) => `${f} no tiene tareas.`,
     allDone: () => 'Todas las tareas están hechas. Siguiente paso: /sdd:validate.',
     problems: (t, ps) => `La tarea ${t} todavía no se puede ejecutar: ${ps.join(', ')}. Complétala en tasks.md mediante /sdd:change.`,
-    noVerify: (c) => `El componente "${c}" no tiene comandos de verificación. Pide al usuario que añada components.${c}.verify a harness.config.yaml y ejecute "harness sync" (RF-VER-02).`,
+    noVerify: (c) => `El componente "${c}" no tiene comandos de verificación. Pide al usuario que añada components.${c}.verify a harness.config.yaml y ejecute "sdd-harness sync" (RF-VER-02).`,
     storyPending: (s) => `Falta la prueba manual de ${s}: pídela antes de empezar trabajo nuevo.`,
     started: (t, role) => [
       `Tarea ${t.id}: ${t.title}`,

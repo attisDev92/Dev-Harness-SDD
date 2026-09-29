@@ -1,4 +1,4 @@
-// harness tracker connect | sync | status (RF-TRK-01..10), GitHub Issues first.
+// sdd-harness tracker connect | sync | status (RF-TRK-01..10), GitHub Issues first.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -13,8 +13,8 @@ import { CancelledError, createLinePrompter, createScriptedPrompter } from '../p
 const BASE_FILE = '.harness/state/tracker.json';
 
 const M = {
-  notActivated: 'Este proyecto no está activado. Ejecuta primero "harness init".',
-  usage: 'Uso: harness tracker <connect|sync|status> [--dry-run] [--yes]',
+  notActivated: 'Este proyecto no está activado. Ejecuta primero "sdd-harness-init".',
+  usage: 'Uso: sdd-harness tracker <connect|sync|status> [--dry-run] [--yes]',
   disabled: 'No hay tracker activado. Añade en harness.config.yaml: tracker: {enabled: true, provider: <github|linear|jira|el tuyo>, project: <tablero o proyecto>} (con GitHub, además repo: <owner>/<repo>).',
   viaAgent: (p) => `El tracker "${p}" se sincroniza desde tu agente con su MCP: abre Claude Code en el proyecto y ejecuta /sdd:tracker. El harness calcula los cambios, pide tu aprobación y actualiza tasks.md.`,
   noRepo: 'Falta tracker.repo (owner/repo) en harness.config.yaml.',

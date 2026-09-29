@@ -153,7 +153,7 @@ models:
   assert.equal(issues['models.codex'].code, 'toolNotEnabled');
 });
 
-test('RF-GEN-12: `harness config validate` exits 1 listing each field and location', (t) => {
+test('RF-GEN-12: `sdd-harness config validate` exits 1 listing each field and location', (t) => {
   const dir = tempDir(t);
   writeFileSync(path.join(dir, 'harness.config.yaml'), 'harness_version: 1.0.0\ntools: [vim]\ntopology: single\ncomponents: {app: {path: .}}\n');
   const r = runCli(['config', 'validate'], { cwd: dir });
@@ -173,9 +173,9 @@ test('RF-GEN-12: `harness config validate` exits 1 listing each field and locati
   assert.match(ok.stdout, /valid/);
 });
 
-test('`harness config validate` without a configuration exits 1', (t) => {
+test('`sdd-harness config validate` without a configuration exits 1', (t) => {
   const dir = tempDir(t);
   const r = runCli(['config', 'validate'], { cwd: dir });
   assert.equal(r.code, 1);
-  assert.match(r.stderr, /harness init/);
+  assert.match(r.stderr, /sdd-harness-init/);
 });

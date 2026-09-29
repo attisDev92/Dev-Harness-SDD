@@ -1,4 +1,4 @@
-// harness contracts sync (RF-TOP-07/09/10): refreshes the snapshots of the
+// sdd-harness contracts sync (RF-TOP-07/09/10): refreshes the snapshots of the
 // provider contracts, showing the diff and asking first.
 
 import { parseArgs } from '../../guards/args.js';

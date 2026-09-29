@@ -14,27 +14,39 @@ const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'ch
 process.exit(r.status === null ? 1 : r.status);
 `;
 
+/** Path from a repository folder back to the project root ('' → '.'). */
+const upTo = (dir) => (dir ? dir.split('/').map(() => '..').join('/') : '.');
+
 /**
+ * One pre-commit for the whole project, wired into every repository: the
+ * root one and, in multi-repo and workspace setups, each component repo.
  * @param {object} config
- * @param {{ hooksManager: { name: string, path?: string, hookFile?: string } | null, tracked: Set<string> }} env
- * @returns {{ entries: object[], notices: object[], gitConfig: Record<string, string> }}
+ * @param {{ repos: { dir: string, hooksManager: { name: string, hookFile?: string } | null }[], tracked: Set<string> }} env
+ * @returns {{ entries: object[], notices: object[], gitConfig: { repo: string, key: string, value: string }[] }}
  */
 export function generateGitHooks(config, env) {
-  const out = { entries: [], notices: [], gitConfig: {} };
+  const out = { entries: [], notices: [], gitConfig: [] };
   if (!config.git_hooks?.enabled) return out;
   const local = (config.install_mode ?? 'local') === 'local';
-  const manager = env.hooksManager;
-  if (!manager) {
-    out.entries.push({ kind: 'file', path: `${HOOKS_DIR}/pre-commit`, content: PRE_COMMIT, executable: true, generator: 'githooks' });
-    out.gitConfig['core.hooksPath'] = HOOKS_DIR;
-    return out;
+  let needsHook = false;
+  for (const repo of env.repos ?? []) {
+    const up = upTo(repo.dir);
+    const manager = repo.hooksManager;
+    if (!manager) {
+      needsHook = true;
+      out.gitConfig.push({ repo: repo.dir, key: 'core.hooksPath', value: up === '.' ? HOOKS_DIR : `${up}/${HOOKS_DIR}` });
+      continue;
+    }
+    // RF-VER-05: an existing hooks setup is never replaced; the checks are chained or skipped.
+    const line = up === '.' ? CHECK_LINE : CHECK_LINE.replace('.harness/', `${up}/.harness/`);
+    const hookFile = manager.hookFile ? (repo.dir ? `${repo.dir}/${manager.hookFile}` : manager.hookFile) : null;
+    if (manager.name === 'husky' && hookFile && !(local && env.tracked?.has(hookFile))) {
+      out.entries.push({ kind: 'block', style: 'hash', path: hookFile, content: line, generator: 'githooks' });
+    } else {
+      out.notices.push({ code: 'hooksChainManual', params: { manager: repo.dir ? `${manager.name} (${repo.dir})` : manager.name, line } });
+    }
   }
-  // RF-VER-05: an existing hooks setup is never replaced; the checks are chained or skipped.
-  if (manager.name === 'husky' && manager.hookFile && !(local && env.tracked?.has(manager.hookFile))) {
-    out.entries.push({ kind: 'block', style: 'hash', path: manager.hookFile, content: CHECK_LINE, generator: 'githooks' });
-    return out;
-  }
-  out.notices.push({ code: 'hooksChainManual', params: { manager: manager.name, line: CHECK_LINE } });
+  if (needsHook) out.entries.push({ kind: 'file', path: `${HOOKS_DIR}/pre-commit`, content: PRE_COMMIT, executable: true, generator: 'githooks' });
   return out;
 }
 

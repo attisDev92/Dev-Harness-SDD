@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Guard runner. Tool hooks call it (through `harness guard …` or directly as
+// Guard runner. Tool hooks call it (through `sdd-harness guard …` or directly as
 // .harness/scripts/guard.js) with the hook payload on stdin.
 //
 // Exit codes: 0 = allowed, 2 = blocked / stop (reason on stderr), 1 = usage.

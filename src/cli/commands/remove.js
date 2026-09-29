@@ -1,4 +1,4 @@
-// harness remove (RF-REM-01..08, RNF-06).
+// sdd-harness remove (RF-REM-01..08, RNF-06).
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -121,8 +121,8 @@ export async function removeCommand(argv, { io, t, tc }) {
     // RF-REM-07: core.hooksPath back to what it was.
     const configChanges = manifest.entries
       .filter((e) => e.kind === 'git-config')
-      .map((e) => ({ type: 'git-config', key: e.key, after: e.hadPrevious ? e.previous : null }));
-    for (const c of configChanges) lines.push(`  ~ ${tc.remove.hooksPath(c.after)}`);
+      .map((e) => ({ type: 'git-config', repo: e.repo ?? '', key: e.key, after: e.hadPrevious ? e.previous : null }));
+    for (const c of configChanges) lines.push(`  ~ ${c.repo ? `${c.repo}: ` : ''}${tc.remove.hooksPath(c.after)}`);
 
     out(tc.remove.list);
     lines.forEach(out);

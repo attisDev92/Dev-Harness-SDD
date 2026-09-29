@@ -1,6 +1,6 @@
 // Project discovery and guard settings (dependency-free).
 //
-// The guards never parse YAML: `harness sync` writes the subset they need to
+// The guards never parse YAML: `sdd-harness sync` writes the subset they need to
 // .harness/guards.json. Without that file the defaults below apply.
 
 import { existsSync, readFileSync } from 'node:fs';
