@@ -11,13 +11,13 @@ const VERIFY_KEYS = ['lint', 'typecheck', 'test', 'e2e'];
 const choices = (values, labels = {}) => values.map((value) => ({ value, label: labels[value] ?? value }));
 const splitList = (text) => String(text ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-async function askPrefix(p, t, id, proposal, taken) {
+async function askSpecPrefix(p, t) {
   for (let i = 0; i < 3; i += 1) {
-    const value = (await p.text(`prefix:${id}`, t.q.prefix(id), { default: proposal })).trim().toUpperCase();
-    if (PREFIX_RE.test(value) && !taken.has(value)) return value;
+    const value = (await p.text('specPrefix', t.q.specPrefix, { default: 'SPEC' })).trim().toUpperCase();
+    if (PREFIX_RE.test(value)) return value;
     p.say(t.q.prefixInvalid);
   }
-  return proposal;
+  return 'SPEC';
 }
 
 /**
@@ -45,7 +45,7 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
       const kind = await p.select(`componentKind:${n}`, t.q.kind(path), choices(COMPONENT_KINDS, t.kindLabels), { default: 'other' });
       const stack = await p.text(`componentStack:${n}`, t.q.stack, { default: '' });
       const id = path === '.' ? 'app' : path.split('/').pop().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      comps.push({ path, kind, stack, id, id_prefix: id === 'app' ? 'APP' : id.slice(0, 3).toUpperCase().padEnd(2, 'X'), verify: {} });
+      comps.push({ path, kind, stack, id, verify: {} });
       // A single component at "." cannot coexist with others (overlapping paths).
       if (path === '.' || !(await p.confirm(`addComponent:${n}`, t.q.addAnother, { default: topology === 'monorepo' && n === 0 }))) break;
     }
@@ -54,12 +54,9 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
     for (const c of comps) p.say(`  - ${c.id}: ${c.path} · ${c.stack || '?'} · ${t.kindLabels[c.kind] ?? c.kind}`);
   }
   const components = {};
-  const taken = new Set();
   for (const c of comps) {
     if (comps.length > 1 && !(await p.confirm(`component:${c.id}`, t.q.includeComponent(c.id, c.path), { default: true }))) continue;
     const kind = await p.select(`kind:${c.id}`, t.q.kind(c.id), choices(COMPONENT_KINDS, t.kindLabels), { default: c.kind });
-    const prefix = await askPrefix(p, t, c.id, taken.has(c.id_prefix) ? `${c.id_prefix}2` : c.id_prefix, taken);
-    taken.add(prefix);
     let verify = { ...c.verify };
     const shown = VERIFY_KEYS.map((k) => `${k}: ${verify[k] ?? '—'}`).join(' · ');
     if (!(await p.confirm(`verify:${c.id}`, t.q.verify(c.id, shown), { default: true }))) {
@@ -71,12 +68,16 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
     }
     components[c.id] = {
       path: c.path,
-      id_prefix: prefix,
       ...(c.stack ? { stack: c.stack } : {}),
       kind,
       ...(Object.keys(verify).length ? { verify } : {}),
     };
   }
+
+  // Specs belong to the project, not to a component: one prefix, and where they live.
+  const specPrefix = await askSpecPrefix(p, t);
+  const separateRepos = ['multi-repo', 'workspace'].includes(topology);
+  const specLocation = separateRepos ? await p.select('specLocation', t.q.specLocation, choices(['root', 'per-repo'], t.specLocationLabels), { default: 'root' }) : 'root';
 
   // Tools (RF-INI-04).
   let tools = preset.tools;
@@ -142,6 +143,7 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
       ...(conv.sources.length ? { sources: conv.sources } : {}),
     },
     topology,
+    specs: { location: specLocation, id_prefix: specPrefix },
     components,
     design: { source: design },
     tracker: tracker === 'none' ? { enabled: false } : { enabled: true, provider: tracker },

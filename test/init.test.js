@@ -45,7 +45,7 @@ test('RF-INI-02..10: every interview answer ends up in the configuration', async
   const answers = {
     topology: 'monorepo',
     'kind:web': 'frontend',
-    'prefix:web': 'FRONT',
+    specPrefix: 'FRONT',
     'verify:api': false,
     'verify:api:lint': 'pnpm lint',
     'verify:api:typecheck': '',
@@ -70,7 +70,9 @@ test('RF-INI-02..10: every interview answer ends up in the configuration', async
   const r = await run(['init'], { cwd: root, answers });
   assert.equal(r.code, 0, r.stderr);
   const c = readConfig(root);
-  assert.equal(c.components.web.id_prefix, 'FRONT');
+  assert.equal(c.specs.id_prefix, 'FRONT');
+  assert.equal(c.specs.location, 'root');
+  assert.equal(c.components.web.id_prefix, undefined);
   assert.deepEqual(c.components.api.verify, { lint: 'pnpm lint', test: 'pnpm jest' });
   assert.deepEqual(c.tools, ['claude-code', 'opencode']);
   assert.equal(c.conventions.commits, 'gitmoji');
@@ -86,11 +88,11 @@ test('RF-INI-02..10: every interview answer ends up in the configuration', async
   assert.ok(!exists(root, 'CLAUDE.local.md'));
 });
 
-test('RF-INI-05: an invalid prefix is asked again and the proposal is kept', async (t) => {
+test('RF-INI-05: an invalid spec prefix is asked again and SPEC is kept', async (t) => {
   const root = FIXTURES.frontend(t);
-  const r = await run(['init'], { cwd: root, answers: { 'prefix:shop-web': 'bad prefix!' } });
+  const r = await run(['init'], { cwd: root, answers: { specPrefix: 'bad prefix!' } });
   assert.equal(r.code, 0, r.stderr);
-  assert.equal(readConfig(root).components['shop-web'].id_prefix, 'SW');
+  assert.equal(readConfig(root).specs.id_prefix, 'SPEC');
 });
 
 test('RF-INI-06: the design source is only asked when there is a frontend', async (t) => {
@@ -184,12 +186,12 @@ test('RF-INI-17: end of input (Ctrl+D / closed pipe) cancels too', (t) => {
 
 test('RF-INI-01: the interview also works with piped answers', (t) => {
   const root = FIXTURES.frontend(t);
-  // topology, kind, prefix, verify, tools, conventions, lang:code, lang:commits, design, tracker, manual, mode, artifacts, gitHooks, ci, protected, apply
-  const input = ['', '', 'SHOP', '', '2', '', '', 'es', '2', '', '', '', '', '', '', '', 'y'].join('\n') + '\n';
+  // topology, kind, verify, specPrefix, tools, conventions, lang:code, lang:commits, design, tracker, manual, mode, artifacts, gitHooks, ci, protected, apply
+  const input = ['', '', '', 'SHOP', '2', '', '', 'es', '2', '', '', '', '', '', '', '', 'y'].join('\n') + '\n';
   const r = runCli(['init'], { cwd: root, input });
   assert.equal(r.code, 0, r.stdout + r.stderr);
   const c = readConfig(root);
-  assert.deepEqual([c.components['shop-web'].id_prefix, c.tools, c.language.commits, c.design.source], ['SHOP', ['opencode'], 'es', 'tokens-in-code']);
+  assert.deepEqual([c.specs.id_prefix, c.tools, c.language.commits, c.design.source], ['SHOP', ['opencode'], 'es', 'tokens-in-code']);
 });
 
 test('RF-INI-18: a write failure rolls everything back', async (t) => {

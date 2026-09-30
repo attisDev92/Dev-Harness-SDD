@@ -6,6 +6,7 @@ import path from 'node:path';
 import { FIXTURES, run, write } from './fixtures.js';
 import { runSdd } from '../src/guards/sdd.js';
 import { handleHook } from '../src/guards/hook.js';
+import { parse, stringify } from 'yaml';
 
 const read = (root, p) => fs.readFileSync(path.join(root, p), 'utf8');
 const sdd = async (root, ...argv) => {
@@ -14,6 +15,13 @@ const sdd = async (root, ...argv) => {
   const code = await runSdd(argv, { stdout: { write: (s) => { stdout += s; } }, stderr: { write: (s) => { stderr += s; } }, cwd: root, env: {} });
   return { code, stdout, stderr };
 };
+
+test('workspace: by default the specs live at the root with one project prefix, without --component', async (t) => {
+  const root = FIXTURES.workspace(t);
+  assert.equal((await run(['workspace', 'init', '--yes'], { cwd: root })).code, 0);
+  assert.match((await sdd(root, 'new-spec', 'auth')).stdout, /specs\/SPEC-001-auth\/spec\.md/);
+  assert.match((await sdd(root, 'new-spec', 'login')).stdout, /specs\/SPEC-002-login\/spec\.md/);
+});
 
 test('workspace: specs per repo, cross-repo dependency and contract snapshot', async (t) => {
   const root = FIXTURES.workspace(t);
@@ -36,7 +44,14 @@ test('workspace: specs per repo, cross-repo dependency and contract snapshot', a
   gitIn('api', 'reset', '-q', 'secret.go');
   fs.rmSync(path.join(root, 'api/secret.go'));
 
-  // RF-TOP-02: each repo owns its specs.
+  // RF-TOP-02: with `specs.location: per-repo` each repo owns its specs (component prefixes are optional).
+  const cfgFile = path.join(root, 'harness.config.yaml');
+  const cfg = parse(fs.readFileSync(cfgFile, 'utf8'));
+  cfg.specs = { location: 'per-repo', id_prefix: 'SPEC' };
+  cfg.components.api.id_prefix = 'API';
+  cfg.components.web.id_prefix = 'WEB';
+  fs.writeFileSync(cfgFile, stringify(cfg));
+  assert.equal((await run(['sync', '--yes'], { cwd: root })).code, 0);
   assert.match((await sdd(root, 'new-spec', 'auth', '--component', 'api')).stdout, /api\/specs\/API-001-auth\/spec\.md/);
   write(root, { 'api/specs/API-001-auth/contracts/openapi.yaml': 'openapi: 3.1.0\npaths: {}\n' });
   assert.match((await sdd(root, 'new-spec', 'login', '--component', 'web')).stdout, /web\/specs\/WEB-001-login\/spec\.md/);

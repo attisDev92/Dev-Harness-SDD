@@ -45,6 +45,7 @@ export const schema = obj(
       sources: arr(str()),
     }),
     topology: oneOf(TOPOLOGIES),
+    specs: obj({ location: oneOf(['root', 'per-repo']), id_prefix: str({ pattern: ID_PREFIX, hint: 'SPEC, APP…' }) }),
     components: map(
       obj(
         {
@@ -210,6 +211,10 @@ function crossChecks(config, issues) {
         issues.push({ path: ['components', comps[j].id, 'path'], code: 'overlap', params: { other: comps[i].id } });
       }
     }
+  }
+
+  if (config.specs?.location === 'per-repo' && !separateRepos) {
+    issues.push({ path: ['specs', 'location'], code: 'requiredIf', params: { field: 'topology', value: 'multi-repo | workspace' } });
   }
 
   const prefixes = new Map();

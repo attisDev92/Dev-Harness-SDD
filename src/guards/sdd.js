@@ -29,7 +29,7 @@ const REFUSED = 2;
 
 const USAGE_TEXT = `usage: sdd.js <command>
   status [--json]                 active spec, task, pending decision, blockers
-  new-spec <name> [--component c] create specs/<PREFIX>-<NNN>-<name>/spec.md
+  new-spec <name> [--component c] create specs/<PREFIX>-<NNN>-<name>/spec.md (--component only with specs.location per-repo)
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
   gate request <kind> [--files a,b] [--adr f] [--summary s]
   gate status
@@ -133,21 +133,22 @@ export async function runSdd(argv, io) {
     case 'new-spec': {
       const name = rest.join(' ');
       if (!name) return refuse(USAGE_TEXT);
+      // A spec belongs to no component (its tasks do); the component only picks the repo when specs live per repo.
       let compId = flags.component;
-      if (!compId) {
+      if (!compId && settings.specs.location === 'per-repo') {
         if (componentIds.length !== 1) return refuse(t.spec.componentRequired(componentIds));
         compId = componentIds[0];
       }
-      const comp = settings.components[compId];
-      if (!comp) return refuse(t.spec.unknownComponent(compId, componentIds));
-      const id = nextSpecId(root, comp.id_prefix ?? 'SPEC', slugify(name), specRoots(settings));
+      const comp = compId ? settings.components[compId] : null;
+      if (compId && !comp) return refuse(t.spec.unknownComponent(compId, componentIds));
+      const id = nextSpecId(root, comp?.id_prefix ?? settings.specs.idPrefix, slugify(name), specRoots(settings));
       const specsDir = specsDirFor(settings, compId);
       const p = specPaths(root, id, { specs: { [id]: { dir: `${specsDir}/${id}` } } });
       mkdirSync(p.dir, { recursive: true });
       writeFileSync(p.spec, readTemplate(root, 'spec').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, id.split('-').slice(0, 2).join('-')).replace(/<(name|nombre)>/, name));
       writeFileSync(p.progress, readTemplate(root, 'progress').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, id.split('-').slice(0, 2).join('-')));
       state.activeSpec = id;
-      state.specs[id] = { phase: 'spec', approved: [], component: compId, change: false, dir: path.relative(root, p.dir).split(path.sep).join('/') };
+      state.specs[id] = { phase: 'spec', approved: [], change: false, dir: path.relative(root, p.dir).split(path.sep).join('/') };
       logEvent(state, 'spec-created', { id });
       save();
       out(t.spec.created(id, path.relative(root, p.spec).split(path.sep).join('/')));

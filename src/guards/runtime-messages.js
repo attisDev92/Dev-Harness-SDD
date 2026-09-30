@@ -187,7 +187,7 @@ const es = {
   spec: {
     created: (id, file) => `Spec ${id} creada: ${file}. Entrevista al usuario con una pregunta cada vez (6 como máximo) y complétala.`,
     unknownComponent: (c, all) => `Componente desconocido "${c}". Usa uno de: ${all.join(', ')}.`,
-    componentRequired: (all) => `Hay varios componentes: indica --component <${all.join('|')}>.`,
+    componentRequired: (all) => `Las specs viven en cada repo (specs.location: per-repo) y hay varios componentes: indica --component <${all.join('|')}>.`,
     adrCreated: (f) => `Borrador de ADR creado: ${f}`,
   },
   hook: {

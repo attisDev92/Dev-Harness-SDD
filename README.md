@@ -264,9 +264,12 @@ language:                      # detected from existing conventions, then confir
   ui: es
 
 topology: workspace            # single | monorepo | multi-repo | workspace
+specs:
+  location: root               # root (default) | per-repo (multi-repo / workspace only)
+  id_prefix: SPEC              # SPEC-001-login; specs belong to the project, not to a component
 components:
-  web: { path: ./web-app, id_prefix: WEB, stack: "react+vite+ts" }
-  api: { path: ./api,     id_prefix: API, stack: "nestjs+postgres" }
+  web: { path: ./web-app, stack: "react+vite+ts" }
+  api: { path: ./api,     stack: "nestjs+postgres" }
 
 design:
   source: none                 # none | tokens-in-code | penpot | figma
@@ -318,10 +321,10 @@ Specs, contracts and docs are *your* project artifacts. `init` asks whether they
 
 | Topology | Where specs and contracts live |
 |---|---|
-| Single repo / monorepo | `specs/` at the root |
-| Multi-repo / workspace | **Each repo owns its specs.** IDs are prefixed (`API-004`, `WEB-007`) |
+| Any topology (default) | `specs/` at the root, one project prefix (`SPEC-004`) |
+| Multi-repo / workspace with `specs.location: per-repo` | **Each repo owns its specs.** `new-spec --component <id>` picks the repo, and a component may define its own optional `id_prefix` (`API-004`) |
 
-In a brand-new empty monorepo, `init` asks for each component's path (e.g. `apps/web`, `apps/api`) and kind, and offers to add another. Each spec belongs to a single component, so a full-stack feature is one spec per component linked with `depends_on`.
+In a brand-new empty monorepo, `init` asks for each component's path (e.g. `apps/web`, `apps/api`) and kind, and offers to add another. A spec belongs to the project, not to a component: a full-stack feature is one spec whose tasks each declare their `Component`.
 
 Cross-repo references use stable IDs (`depends_on: api#API-004`). The **provider owns the contract**, and consumers keep a snapshot with origin metadata:
 

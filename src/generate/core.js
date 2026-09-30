@@ -60,11 +60,16 @@ export function repoDirs(config) {
   return [...new Set(Object.values(config.components ?? {}).map((c) => cleanDir(c.path)).filter(Boolean))];
 }
 
+/** Repos whose own specs/ and docs/ the agents may write: only with `specs.location: per-repo`. */
+export function specRepoDirs(config) {
+  return config.specs?.location === 'per-repo' ? repoDirs(config) : [];
+}
+
 /** Whitelist, extended with each repo's spec and doc folders (RF-TOP-02). */
 export function docsWhitelist(config) {
   const base = config.docs_whitelist ?? [...DEFAULT_DOCS_WHITELIST];
   const anchored = base.filter((g) => /^(specs|docs)\//.test(g));
-  return [...new Set([...base, ...repoDirs(config).flatMap((dir) => anchored.map((g) => `${dir}/${g}`))])];
+  return [...new Set([...base, ...specRepoDirs(config).flatMap((dir) => anchored.map((g) => `${dir}/${g}`))])];
 }
 
 /** Protected zones the guards enforce, including the harness itself (RF-GAT-09). */
@@ -179,6 +184,7 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
       {
         language: config.cli?.language ?? config.language?.docs ?? 'en',
         docs_whitelist: docsWhitelist(config),
+        specs: { location: config.specs?.location ?? 'root', id_prefix: config.specs?.id_prefix ?? 'SPEC' },
         protected: guardProtected(config, generatedPaths, contextBlocks),
         managed_blocks: contextBlocks,
         retries: { in_scope: config.retries?.in_scope ?? 2, protected: config.retries?.protected ?? 0 },

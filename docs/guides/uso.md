@@ -23,7 +23,7 @@ La entrevista detecta y te pide confirmar:
 | Pregunta | Qué decide |
 |---|---|
 | Topología | Repo único, monorepo, varios repos o workspace (carpeta con varios repos) |
-| Componentes | Rutas, tipo (frontend, backend, base de datos, otro), prefijo de specs y comandos de verificación |
+| Componentes | Rutas, tipo (frontend, backend, base de datos, otro) y comandos de verificación. Las specs se configuran aparte (`specs.id_prefix` y, en multi-repo/workspace, `specs.location`) |
 | Herramientas | Hoy, Claude Code |
 | Convenciones e idiomas | Lo que ya declara el proyecto (AGENTS.md, CONTRIBUTING.md, linters, historial de commits) |
 | Diseño, tracker, prueba manual | Fuente de diseño, tracker (cualquiera), cuándo pruebas tú |

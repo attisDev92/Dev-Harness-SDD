@@ -153,6 +153,20 @@ models:
   assert.equal(issues['models.codex'].code, 'toolNotEnabled');
 });
 
+test('specs.location per-repo needs several repositories', () => {
+  const cfg = (topology, location) => `harness_version: 1.0.0
+tools: [claude-code]
+topology: ${topology}
+specs: {location: ${location}, id_prefix: SPEC}
+components:
+  web: {path: web}
+  api: {path: api}
+`;
+  assert.equal(byPath(parseConfig(cfg('monorepo', 'per-repo')).issues)['specs.location'].code, 'requiredIf');
+  assert.deepEqual(parseConfig(cfg('workspace', 'per-repo')).issues, []);
+  assert.deepEqual(parseConfig(cfg('monorepo', 'root')).issues, []);
+});
+
 test('RF-GEN-12: `sdd-harness config validate` exits 1 listing each field and location', (t) => {
   const dir = tempDir(t);
   writeFileSync(path.join(dir, 'harness.config.yaml'), 'harness_version: 1.0.0\ntools: [vim]\ntopology: single\ncomponents: {app: {path: .}}\n');

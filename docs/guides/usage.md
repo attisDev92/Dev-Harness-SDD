@@ -23,7 +23,7 @@ The interview detects and asks you to confirm:
 | Question | What it decides |
 |---|---|
 | Topology | Single repo, monorepo, several repos or workspace (a folder with several repos) |
-| Components | Paths, kind (frontend, backend, database, other), spec prefix and verification commands |
+| Components | Paths, kind (frontend, backend, database, other) and verification commands. Specs are configured apart (`specs.id_prefix`, and `specs.location` in multi-repo/workspace) |
 | Tools | Claude Code today |
 | Conventions and languages | What the project already declares (AGENTS.md, CONTRIBUTING.md, linters, commit history) |
 | Design, tracker, manual test | Design source, tracker (any), when you test |

@@ -264,9 +264,12 @@ language:                      # se detecta de las convenciones existentes y lue
   ui: es
 
 topology: workspace            # single | monorepo | multi-repo | workspace
+specs:
+  location: root               # root (por defecto) | per-repo (solo multi-repo / workspace)
+  id_prefix: SPEC              # SPEC-001-login; las specs son del proyecto, no de un componente
 components:
-  web: { path: ./web-app, id_prefix: WEB, stack: "react+vite+ts" }
-  api: { path: ./api,     id_prefix: API, stack: "nestjs+postgres" }
+  web: { path: ./web-app, stack: "react+vite+ts" }
+  api: { path: ./api,     stack: "nestjs+postgres" }
 
 design:
   source: none                 # none | tokens-in-code | penpot | figma
@@ -319,7 +322,8 @@ Las specs, los contratos y los docs son artefactos *de tu proyecto*. `init` te p
 | Topología | Dónde viven las specs y los contratos |
 |---|---|
 | Repo único / monorepo | `specs/` en la raíz |
-| Varios repos / workspace | **Cada repo es dueño de sus specs.** Los IDs llevan prefijo (`API-004`, `WEB-007`) |
+| Cualquier topología (por defecto) | `specs/` en la raíz, con un prefijo único del proyecto (`SPEC-004`) |
+| Varios repos / workspace con `specs.location: per-repo` | **Cada repo es dueño de sus specs.** `new-spec --component <id>` elige el repo y un componente puede definir su propio `id_prefix` opcional (`API-004`) |
 
 Las referencias entre repos usan IDs estables (`depends_on: api#API-004`). **El proveedor es dueño del contrato**, y los consumidores guardan un snapshot con metadatos de origen:
 

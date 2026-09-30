@@ -9,11 +9,11 @@ export const SPEC_DIR_RE = /^([A-Z][A-Z0-9]{1,9})-(\d{3})-([a-z0-9][a-z0-9-]*)$/
 const cleanPath = (p) => String(p ?? '.').replace(/\\/g, '/').replace(/^\.\/?/, '').replace(/\/$/, '');
 
 /**
- * RF-TOP-01/02: where specs live. Single repo and monorepo: specs/ at the
- * root. Several repos and workspace: each repo owns its specs/.
+ * RF-TOP-01/02: where new specs are created. By default specs/ at the root;
+ * with `specs.location: per-repo` (multi-repo, workspace) each repo owns its specs/.
  */
 export function specsDirFor(settings, componentId) {
-  if (!['multi-repo', 'workspace'].includes(settings?.topology)) return 'specs';
+  if (settings?.specs?.location !== 'per-repo' || !['multi-repo', 'workspace'].includes(settings?.topology)) return 'specs';
   const dir = cleanPath(settings.components?.[componentId]?.path);
   return dir ? `${dir}/specs` : 'specs';
 }
@@ -21,7 +21,9 @@ export function specsDirFor(settings, componentId) {
 /** Every folder that may hold specs, relative to the project root. */
 export function specRoots(settings) {
   if (!['multi-repo', 'workspace'].includes(settings?.topology)) return ['specs'];
-  return [...new Set(Object.keys(settings.components ?? {}).map((id) => specsDirFor(settings, id)))];
+  // Also the folders of each repo, so specs created before `specs.location` existed keep being found.
+  const perRepo = Object.values(settings.components ?? {}).map((c) => (cleanPath(c.path) ? `${cleanPath(c.path)}/specs` : 'specs'));
+  return [...new Set(['specs', ...perRepo])];
 }
 
 /** Spec folders under the given roots, sorted, as { id, dir }. */

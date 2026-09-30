@@ -100,7 +100,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-INI-02:** EL SISTEMA detectará la topología (repo git, monorepo o carpeta con varios repos git hijos) y la propondrá para que el usuario la confirme o la corrija.
 - **RF-INI-03:** EL SISTEMA detectará los componentes y su stack a partir de los manifiestos existentes (por ejemplo `package.json`, `pyproject.toml`, `go.mod`, `composer.json`, `*.csproj`) y los propondrá para confirmación.
 - **RF-INI-04:** EL SISTEMA preguntará qué herramientas de agentes se usarán y generará configuración solo para esas herramientas.
-- **RF-INI-05:** EL SISTEMA preguntará el prefijo de ID de specs para cada repo (por ejemplo `API`, `WEB`) y propondrá uno derivado del nombre del componente.
+- **RF-INI-05:** EL SISTEMA preguntará un único prefijo de ID de specs para el proyecto (por defecto `SPEC`) y, en `multi-repo` y `workspace`, si las specs viven en la raíz (por defecto) o en cada repo. Las specs no pertenecen a un componente; el `id_prefix` por componente es opcional.
 - **RF-INI-06:** EL SISTEMA preguntará la fuente de diseño (`none`, `tokens-in-code`, `penpot`, `figma`) cuando exista un componente de frontend.
 - **RF-INI-07:** EL SISTEMA preguntará si se activa un tracker y cuál: cualquiera que use el desarrollador (atajos para `github`, `linear`, `notion`, `jira`, o el nombre de otro), con la opción "ninguno" como valor por defecto.
 - **RF-INI-08:** EL SISTEMA preguntará la granularidad del gate de prueba manual (`task`, `story`, `spec`), con `task` como valor por defecto.
@@ -190,7 +190,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-SDD-01:** CUANDO el usuario invoque `/sdd:constitution`, EL SISTEMA propondrá entre 6 y 10 principios cortos y verificables en `docs/constitution.md` y esperará aprobación.
 - **RF-SDD-02:** EL SISTEMA incluirá siempre en la constitución estos principios: "el agente nunca hace commit", "toda decisión de stack o arquitectura requiere un ADR aprobado" y "ninguna tarea termina con la verificación en rojo".
 - **RF-SDD-03:** CUANDO el usuario invoque `/sdd:spec`, EL SISTEMA entrevistará al usuario con preguntas de una en una (máximo 6) y generará `specs/<PREFIJO>-<NNN>-<nombre>/spec.md`.
-- **RF-SDD-04:** EL SISTEMA asignará a cada spec nueva el siguiente número libre con tres dígitos dentro del prefijo del repo.
+- **RF-SDD-04:** EL SISTEMA asignará a cada spec nueva el siguiente número libre con tres dígitos dentro de su prefijo (el del proyecto, o el del componente si se indicó `--component` y lo define).
 - **RF-SDD-05:** EL SISTEMA redactará los requisitos de la spec en notación EARS, numerados y verificables.
 - **RF-SDD-06:** EL SISTEMA marcará cada hueco de información como `[NECESITA ACLARACIÓN: <pregunta>]` en lugar de inventar una respuesta.
 - **RF-SDD-07:** EL SISTEMA no incluirá en la spec decisiones de stack, archivos, esquemas ni algoritmos.
@@ -274,7 +274,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 ### 5.17 Topologías y contratos (TOP)
 
 - **RF-TOP-01:** MIENTRAS la topología sea `single` o `monorepo`, EL SISTEMA ubicará las specs en `specs/` en la raíz.
-- **RF-TOP-02:** MIENTRAS la topología sea `multi-repo` o `workspace`, EL SISTEMA ubicará las specs de cada repo dentro de ese repo.
+- **RF-TOP-02:** MIENTRAS la topología sea `multi-repo` o `workspace` y `specs.location` sea `per-repo`, EL SISTEMA ubicará las specs de cada repo dentro de ese repo; con `root` (por defecto) las ubicará en `specs/` de la raíz.
 - **RF-TOP-03:** MIENTRAS la topología sea `workspace`, EL SISTEMA guardará la lista de repos en `harness.workspace.yaml` en la raíz y lo mantendrá fuera de cualquier repo.
 - **RF-TOP-04:** EL SISTEMA permitirá declarar dependencias entre specs mediante IDs estables (`depends_on: api#API-004`).
 - **RF-TOP-05:** SI una spec depende de otra inexistente, ENTONCES EL SISTEMA lo advertirá en `doctor` y en `/sdd:status`.

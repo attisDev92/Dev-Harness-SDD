@@ -15,7 +15,7 @@ const joinPath = (base, glob) => (base === '.' || base === '' ? glob : `${base.r
 /** The architect writes specs and ADRs, in every repository that owns specs (RF-TOP-02). */
 function architectWrites(config) {
   const out = ['specs/**', 'docs/decisions/**'];
-  if (['multi-repo', 'workspace'].includes(config.topology)) {
+  if (config.specs?.location === 'per-repo' && ['multi-repo', 'workspace'].includes(config.topology)) {
     for (const c of Object.values(config.components ?? {})) {
       const dir = String(c.path).replace(/\\/g, '/').replace(/^\.\/?/, '').replace(/\/$/, '');
       if (dir) out.push(`${dir}/specs/**`, `${dir}/docs/decisions/**`);

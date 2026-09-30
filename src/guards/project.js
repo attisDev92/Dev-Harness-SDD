@@ -21,6 +21,8 @@ export const DEFAULT_DOCS_WHITELIST = Object.freeze([
   'docs/lessons.md',
 ]);
 
+export const DEFAULT_SPEC_PREFIX = 'SPEC';
+
 export const DEFAULT_RETRIES = Object.freeze({ in_scope: 2, protected: 0 });
 
 /** Nearest ancestor of `start` that holds harness.config.yaml, or null. */
@@ -48,6 +50,10 @@ export function loadGuardSettings(root) {
     language: data.language === 'es' ? 'es' : data.language === 'en' ? 'en' : undefined,
     docsWhitelist: Array.isArray(data.docs_whitelist) ? data.docs_whitelist : [...DEFAULT_DOCS_WHITELIST],
     protected: data.protected && typeof data.protected === 'object' ? data.protected : {},
+    specs: {
+      location: data.specs?.location === 'per-repo' ? 'per-repo' : 'root',
+      idPrefix: typeof data.specs?.id_prefix === 'string' ? data.specs.id_prefix : DEFAULT_SPEC_PREFIX,
+    },
     managedBlocks: Array.isArray(data.managed_blocks) ? data.managed_blocks : [],
     retries: { ...DEFAULT_RETRIES, ...(data.retries ?? {}) },
     components: data.components && typeof data.components === 'object' ? data.components : {},

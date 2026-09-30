@@ -17,8 +17,9 @@ cli: {language: en}
 tools: [claude-code]
 language: {code: en, specs: en, docs: en, commits: en, ui: en}
 topology: single
+specs: {location: root, id_prefix: SVC}
 components:
-  svc: {path: ., kind: backend, id_prefix: SVC, stack: node, verify: {test: node check.js}}
+  svc: {path: ., kind: backend, stack: node, verify: {test: node check.js}}
 git_hooks: {enabled: false}
 protected:
   db: ["**/migrations/**"]
