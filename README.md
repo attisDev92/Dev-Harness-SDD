@@ -249,7 +249,11 @@ Run `sdd-harness doctor` to see what is actually enforced in your project.
 
 ## ⚙️ Configuration
 
-`sdd-harness-init` writes `harness.config.yaml`. Here is an example for a workspace with two repos:
+`sdd-harness-init` writes `harness.config.yaml`, and from then on the configuration grows **with the agent running**: when something needs to change (a component, a verification command, a protected zone, the spec prefix), the agent explains what and why and requests the `config` gate (`sdd.js gate request config --summary "…"`). Only after you answer OK can it edit `harness.config.yaml`, and it then runs `npx sdd-harness sync`. `.harness/` and generated files stay off-limits.
+
+`AGENTS.md` and `CLAUDE.md` are yours too: the harness only owns the block between `<!-- harness:begin -->` and `<!-- harness:end -->`. The agent can add project instructions anywhere else in the file, never inside the block.
+
+Here is an example for a workspace with two repos:
 
 ```yaml
 harness_version: 1.0.0

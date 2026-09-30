@@ -249,7 +249,11 @@ Ejecuta `sdd-harness doctor` para ver qué se aplica realmente en tu proyecto.
 
 ## ⚙️ Configuración
 
-`sdd-harness-init` genera `harness.config.yaml`. Este es un ejemplo para un workspace con dos repos:
+`sdd-harness-init` genera `harness.config.yaml`, y a partir de ahí la configuración va creciendo **con el agente activo**: cuando algo tiene que cambiar (un componente, un comando de verificación, una zona protegida, el prefijo de las specs), el agente explica qué y por qué y pide el gate `config` (`sdd.js gate request config --summary "…"`). Solo si respondes OK puede editar `harness.config.yaml`, y después ejecuta `npx sdd-harness sync`. `.harness/` y los archivos generados siguen siendo intocables.
+
+`AGENTS.md` y `CLAUDE.md` también son tuyos: el harness solo es dueño del bloque entre `<!-- harness:begin -->` y `<!-- harness:end -->`. El agente puede añadir instrucciones del proyecto en cualquier otra parte del archivo, nunca dentro del bloque.
+
+Este es un ejemplo para un workspace con dos repos:
 
 ```yaml
 harness_version: 1.0.0
