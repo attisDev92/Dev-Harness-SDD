@@ -106,8 +106,10 @@ test('RF-GAT-09: guards.json protects the harness itself', () => {
   assert.deepEqual(guards.protected.db, ['**/migrations/**']);
   assert.ok(guards.protected.harness.includes('harness.config.yaml'));
   assert.ok(guards.protected.harness.includes('.harness/**'));
-  assert.ok(guards.protected.harness.includes('AGENTS.md'));
-  assert.ok(guards.protected.harness.includes('CLAUDE.local.md'));
+  // AGENTS.md and CLAUDE.local.md only protect their block, so the agent can extend the rest.
+  assert.ok(!guards.protected.harness.includes('AGENTS.md'));
+  assert.ok(guards.managed_blocks.includes('AGENTS.md'));
+  assert.ok(guards.managed_blocks.includes('CLAUDE.local.md'));
   assert.deepEqual(guards.retries, { in_scope: 2, protected: 0 });
 });
 

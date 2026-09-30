@@ -15,8 +15,9 @@ const settings = {
   protected: {
     deps: ['package.json#dependencies', 'package.json#devDependencies', '**/pnpm-lock.yaml'],
     db: ['**/migrations/**'],
-    harness: ['harness.config.yaml', '.harness/**', 'AGENTS.md', '.claude/settings.local.json'],
+    harness: ['harness.config.yaml', '.harness/**', '.claude/settings.local.json'],
   },
+  managedBlocks: ['AGENTS.md'],
   components: { web: { path: 'apps/web', kind: 'frontend' }, api: { path: 'apps/api', kind: 'backend' } },
 };
 const task = { id: 'T2', component: 'api', scope: ['apps/api/src/auth/**'], verify: null, dirty: false };
@@ -38,9 +39,31 @@ const check = (root, file, state, input = {}) => checkWrite({ root, file: path.j
 
 test('RF-GAT-09 / edge case 12: the harness files are never writable', (t) => {
   const root = project(t);
-  for (const f of ['harness.config.yaml', '.harness/guards.json', '.harness/state/flow.json', 'AGENTS.md', '.claude/settings.local.json']) {
+  for (const f of ['harness.config.yaml', '.harness/guards.json', '.harness/state/flow.json', '.claude/settings.local.json']) {
     assert.equal(check(root, f, implementing()).kind, 'harnessFile', f);
   }
+});
+
+test('harness.config.yaml is editable only after the user approves a config gate', async (t) => {
+  const { requestGate, decide } = await import('../src/guards/flow.js');
+  const root = project(t);
+  const state = implementing();
+  assert.equal(check(root, 'harness.config.yaml', state, { content: 'x' }).kind, 'harnessFile');
+  assert.equal(requestGate(state, { kind: 'config' }).code, 'summaryRequired');
+  const asked = requestGate(state, { kind: 'config', summary: 'añadir componente web' });
+  assert.equal(asked.ok, true);
+  const approved = decide(asked.state, { approved: true }).state;
+  assert.equal(check(root, 'harness.config.yaml', approved, { content: 'x' }).decision, 'allow');
+  assert.equal(check(root, '.harness/guards.json', approved, { content: 'x' }).kind, 'harnessFile');
+});
+
+test('AGENTS.md is editable outside the harness block, never inside it', (t) => {
+  const root = project(t);
+  fs.writeFileSync(path.join(root, 'AGENTS.md'), '# Proyecto\n\n<!-- harness:begin -->\nreglas generadas\n<!-- harness:end -->\n');
+  const edit = (old_string, new_string) => check(root, 'AGENTS.md', implementing(), { old_string, new_string });
+  assert.equal(edit('# Proyecto\n', '# Proyecto\n\nStack: Node 24\n').decision, 'allow');
+  assert.equal(edit('reglas generadas', 'otras reglas').kind, 'contextBlock');
+  assert.equal(check(root, 'AGENTS.md', implementing(), { content: '# solo mio\n' }).kind, 'contextBlock');
 });
 
 test('RF-SDD-13/18: spec files follow the phase order', (t) => {

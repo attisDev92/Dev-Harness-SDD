@@ -48,6 +48,7 @@ export function loadGuardSettings(root) {
     language: data.language === 'es' ? 'es' : data.language === 'en' ? 'en' : undefined,
     docsWhitelist: Array.isArray(data.docs_whitelist) ? data.docs_whitelist : [...DEFAULT_DOCS_WHITELIST],
     protected: data.protected && typeof data.protected === 'object' ? data.protected : {},
+    managedBlocks: Array.isArray(data.managed_blocks) ? data.managed_blocks : [],
     retries: { ...DEFAULT_RETRIES, ...(data.retries ?? {}) },
     components: data.components && typeof data.components === 'object' ? data.components : {},
     roles: data.roles && typeof data.roles === 'object' ? data.roles : {},

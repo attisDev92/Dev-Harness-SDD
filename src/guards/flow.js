@@ -5,7 +5,7 @@
 
 import { logEvent } from './state.js';
 
-export const GATE_KINDS = ['constitution', 'spec', 'clarify', 'plan', 'tasks', 'review', 'manual-test', 'protected', 'change', 'triage', 'lanes', 'validate', 'tracker'];
+export const GATE_KINDS = ['constitution', 'spec', 'clarify', 'plan', 'tasks', 'review', 'manual-test', 'protected', 'change', 'triage', 'lanes', 'validate', 'tracker', 'config'];
 
 const clone = (x) => structuredClone(x);
 
@@ -30,6 +30,7 @@ export function requestGate(state, { kind, files = [], adr, summary, option }) {
     if (state.task.verify?.status !== 'pass' || state.task.dirty) return { ok: false, code: 'verifyFirst' };
   }
   if (['protected', 'lanes'].includes(kind) && !files.length) return { ok: false, code: 'filesRequired' };
+  if (kind === 'config' && !summary) return { ok: false, code: 'summaryRequired' };
   if (kind === 'protected' && !adr) return { ok: false, code: 'adrRequired' };
   if (kind === 'change' && !spec.change) return { ok: false, code: 'noChange' };
   if (kind === 'triage' && !state.triage) return { ok: false, code: 'noTriage' };
@@ -80,6 +81,7 @@ export function decide(state, { approved, text = '' }) {
       case 'review': if (next.task) next.task.review = 'approved'; break;
       case 'manual-test': if (next.task) next.task.manualApproved = true; break;
       case 'protected': next.granted = [...new Set([...(next.granted ?? []), ...gate.files])]; break;
+      case 'config': next.granted = [...new Set([...(next.granted ?? []), 'harness.config.yaml'])]; break;
       case 'change': spec.change = false; break;
       case 'triage':
         // RF-RET-06: apply only the chosen option, with a fresh attempt counter.

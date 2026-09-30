@@ -109,8 +109,11 @@ const en = {
 
 const es = {
   verdict: {
-    harnessFile: (v) => `Bloqueado: "${v.match}" pertenece al harness (harness.config.yaml, .harness/ o un archivo generado). Los agentes nunca lo cambian; di al usuario qué debería cambiar.`,
+    harnessFile: (v) => (v.match === 'harness.config.yaml'
+      ? 'Bloqueado: harness.config.yaml se cambia con la aprobación del usuario. Explica qué quieres cambiar y por qué, y pide la compuerta: node .harness/scripts/sdd.js gate request config --summary "<cambio>"'
+      : `Bloqueado: "${v.match}" pertenece al harness (.harness/ o un archivo generado). Los agentes nunca lo cambian; di al usuario qué debería cambiar.`),
     progressBlock: (v) => `Bloqueado: el bloque de estado de ${v.match} lo mantienen los scripts del harness. Escribe tus notas fuera del bloque.`,
+    contextBlock: (v) => `Bloqueado: el bloque generado de ${v.match} (entre <!-- harness:begin --> y <!-- harness:end -->) lo mantiene el harness. Escribe tus instrucciones fuera del bloque, con Edit o Write (no desde la shell).`,
     specApproved: (v) => `Bloqueado: ${v.match} está aprobada. Los cambios a una spec aprobada pasan por /sdd:change (ejecuta: node .harness/scripts/sdd.js change start).`,
     needsApproval: (v) => `Bloqueado: ${v.match} necesita que antes se apruebe ${v.phase} (RF-SDD-13). Pídelo con: node .harness/scripts/sdd.js gate request ${v.phase}`,
     tasksApproved: () => 'Bloqueado: las tareas están aprobadas; solo "node .harness/scripts/sdd.js task done <T#>" las marca. Los cambios pasan por /sdd:change.',
@@ -134,10 +137,11 @@ const es = {
     noTask: () => 'No hay ninguna tarea en curso.',
     verifyFirst: () => 'La verificación debe pasar (node .harness/scripts/sdd.js verify) antes de pedir la prueba manual.',
     filesRequired: () => 'Indica los archivos con --files a,b.',
+    summaryRequired: () => 'Describe el cambio de configuración con --summary "<cambio>".',
     adrRequired: () => 'Un cambio en zona protegida necesita un borrador de ADR: pasa --adr docs/decisions/ADR-NNNN-nombre.md.',
     noChange: () => 'No hay ningún cambio de spec en curso (node .harness/scripts/sdd.js change start).',
     noTriage: () => 'No hay ningún triage en curso.',
-    requested: (kind) => `Decisión solicitada: ${kind}. ${kind === 'manual-test' ? 'Da las instrucciones de prueba manual y pide al usuario que responda "OK" o "KO <qué falló>". No sigas hasta que responda.' : APPROVE_HINT.es}`,
+    requested: (kind) => `Decisión solicitada: ${kind}. ${kind === 'config' ? 'Tras la aprobación edita harness.config.yaml y ejecuta "npx sdd-harness sync". No sigas hasta que responda.' : kind === 'manual-test' ? 'Da las instrucciones de prueba manual y pide al usuario que responda "OK" o "KO <qué falló>". No sigas hasta que responda.' : APPROVE_HINT.es}`,
   },
   next: {
     lockHeld: (h) => `Otra sesión (${h.session}) tiene trabajo en curso desde ${h.started}. Solo una sesión puede ejecutar tareas a la vez.`,

@@ -68,7 +68,9 @@ export function docsWhitelist(config) {
 }
 
 /** Protected zones the guards enforce, including the harness itself (RF-GAT-09). */
-export function guardProtected(config, generatedPaths) {
+export function guardProtected(config, generatedPaths, blockPaths = []) {
+  // Files with a managed block (AGENTS.md, CLAUDE.md) stay writable outside the block.
+  generatedPaths = generatedPaths.filter((p) => !blockPaths.includes(p));
   return {
     ...(config.protected ?? {}),
     harness: ['harness.config.yaml', '.harness/**', ...generatedPaths.filter((p) => !p.startsWith('.harness/') && !p.startsWith('.git/'))],
@@ -169,6 +171,7 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
   const add = (entry) => entries.push({ generator: 'core', ...entry });
 
   const generatedPaths = [...new Set(entries.map((e) => e.path))];
+  const contextBlocks = [...new Set(entries.filter((e) => e.kind === 'block' && e.style !== 'hash').map((e) => e.path))];
   add({
     kind: 'file',
     path: '.harness/guards.json',
@@ -176,7 +179,8 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
       {
         language: config.cli?.language ?? config.language?.docs ?? 'en',
         docs_whitelist: docsWhitelist(config),
-        protected: guardProtected(config, generatedPaths),
+        protected: guardProtected(config, generatedPaths, contextBlocks),
+        managed_blocks: contextBlocks,
         retries: { in_scope: config.retries?.in_scope ?? 2, protected: config.retries?.protected ?? 0 },
         components: Object.fromEntries(Object.entries(config.components ?? {}).map(([id, c]) => [id, { path: c.path, kind: c.kind ?? 'other', id_prefix: c.id_prefix, verify: c.verify ?? {} }])),
         roles: Object.fromEntries(neededRoles(config).map((r) => [r.role, { writes: r.writes }])),

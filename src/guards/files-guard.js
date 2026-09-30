@@ -78,7 +78,15 @@ export function checkWrite({ root, file, settings, state, input = {}, via = 'too
   const zones = settings.protected ?? {};
 
   // RF-GAT-09 / edge case 12: the harness itself.
-  if (matchesAny(rel, (zones.harness ?? []).map((g) => g.split('#')[0]))) return block('harnessFile', rel);
+  // Its config is the exception: editable once the user approved a `config` gate.
+  const configGranted = rel === 'harness.config.yaml' && (state.granted ?? []).includes(rel);
+  if (!configGranted && matchesAny(rel, (zones.harness ?? []).map((g) => g.split('#')[0]))) return block('harnessFile', rel);
+
+  // AGENTS.md and CLAUDE.md: the agent may write outside the harness block, never inside it.
+  if (current && (settings.managedBlocks ?? []).includes(rel)) {
+    const before = progressBlockOf(current);
+    if (before && (via === 'shell' || progressBlockOf(after ?? '') !== before)) return block('contextBlock', rel);
+  }
 
   // RF-MD-01: documentation whitelist.
   const doc = checkDocWrite({ file: abs, root, whitelist: settings.docsWhitelist, exists: () => exists });

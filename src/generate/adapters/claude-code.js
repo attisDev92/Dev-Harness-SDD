@@ -98,7 +98,7 @@ ${r.body}
 ${skillLine}
 You may write only in: ${writes.length ? writes.map((w) => `\`${w}\``).join(', ') : 'nothing (read-only role)'}. The harness checks it when you finish.
 
-Read AGENTS.md first. Never commit, push, install dependencies or edit \`.harness/\` or \`harness.config.yaml\`.
+Read AGENTS.md first. Never commit, push, install dependencies or edit \`.harness/\`. \`harness.config.yaml\` changes only through the \`config\` gate.
 `;
 }
 
@@ -162,7 +162,7 @@ export function settingsAppends() {
     'permissions.deny': [
       'Bash(git commit:*)', 'Bash(git push:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)', 'Bash(git reset --hard:*)',
       'Bash(git cherry-pick:*)', 'Bash(git revert:*)', 'Bash(git stash drop:*)', 'Bash(git branch -D:*)',
-      'Edit(/.harness/**)', 'Write(/.harness/**)', 'Edit(/harness.config.yaml)', 'Write(/harness.config.yaml)',
+      'Edit(/.harness/**)', 'Write(/.harness/**)',
     ],
     'permissions.ask': [
       'Bash(npm install:*)', 'Bash(npm i:*)', 'Bash(pnpm add:*)', 'Bash(yarn add:*)', 'Bash(bun add:*)', 'Bash(pip install:*)',

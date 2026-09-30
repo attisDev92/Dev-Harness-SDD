@@ -74,7 +74,7 @@ constitution → spec → clarify → plan → tasks → implement (one task at 
 - Install or remove dependencies without the user's approval.
 - Edit protected zones without an approved ADR: propose what, why, alternatives and an ADR draft, then request the \`protected\` gate.
 - Create documentation outside the whitelist.
-- Edit \`harness.config.yaml\`, \`.harness/\` or generated files.
+- Edit \`.harness/\` or generated files. \`harness.config.yaml\` is configured with the user: explain what you want to change and why, run \`node .harness/scripts/sdd.js gate request config --summary "<change>"\`, wait for the approval, edit it, then run \`npx sdd-harness sync\`.
 
 ## Languages
 
