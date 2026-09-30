@@ -48,6 +48,7 @@ export function loadGuardSettings(root) {
   }
   return {
     language: data.language === 'es' ? 'es' : data.language === 'en' ? 'en' : undefined,
+    docsMode: data.docs_mode === 'whitelist' ? 'whitelist' : 'free',
     docsWhitelist: Array.isArray(data.docs_whitelist) ? data.docs_whitelist : [...DEFAULT_DOCS_WHITELIST],
     protected: data.protected && typeof data.protected === 'object' ? data.protected : {},
     specs: {
@@ -58,7 +59,7 @@ export function loadGuardSettings(root) {
     retries: { ...DEFAULT_RETRIES, ...(data.retries ?? {}) },
     components: data.components && typeof data.components === 'object' ? data.components : {},
     roles: data.roles && typeof data.roles === 'object' ? data.roles : {},
-    manualTest: ['task', 'story', 'spec'].includes(data.manual_test) ? data.manual_test : 'task',
+    manualTest: ['task', 'story', 'spec', 'none'].includes(data.manual_test) ? data.manual_test : 'story',
     specsLanguage: data.specs_language === 'es' ? 'es' : 'en',
     docsLanguage: data.docs_language === 'es' ? 'es' : 'en',
     commits: data.commits ?? { convention: 'conventional' },

@@ -95,9 +95,8 @@ test('tracker: pure sync plan in both directions with conflicts and proposals', 
   assert.equal(line, '- [x] T4 New task · Component: web <!-- github:o/r#10 -->');
 });
 
-test('tracker: any tracker through the agent and its MCP (plan → user gate → apply)', async (t) => {
+test('tracker: any tracker through the agent and its MCP (plan → user OK → apply)', async (t) => {
   const { runSdd } = await import('../src/guards/sdd.js');
-  const { handleHook } = await import('../src/guards/hook.js');
   const root = FIXTURES.frontend(t);
   await run(['init', '--yes'], { cwd: root });
   fs.writeFileSync(path.join(root, 'harness.config.yaml'), read(root, 'harness.config.yaml').replace('tracker:\n  enabled: false', 'tracker:\n  enabled: true\n  provider: youtrack\n  project: SHOP'));
@@ -119,12 +118,8 @@ test('tracker: any tracker through the agent and its MCP (plan → user gate →
   const plan = await sdd(['tracker', 'plan'], { 'SW-001-login': [{ key: 'SHOP-9', title: 'Exportar CSV', done: false }] });
   assert.equal(plan.code, 0, plan.stderr);
   assert.match(plan.stdout, /→ crear en el tracker: T1 Formulario\n {2}\? nueva en el tracker: SHOP-9 "Exportar CSV"/);
-  assert.match(plan.stdout, /gate request tracker/);
-
-  // RF-TRK-08: nothing is applied before the user approves.
-  assert.equal((await sdd(['tracker', 'apply'], {})).code, 2);
-  assert.equal((await sdd(['gate', 'request', 'tracker'])).code, 0);
-  handleHook('UserPromptSubmit', { cwd: root, session_id: 's', prompt: '/sdd:approve' }, { env: {} });
+  // RF-TRK-08: the agent shows the plan and writes to the tracker only when the user says yes.
+  assert.match(plan.stdout, /Enséñale el plan al usuario y hazlo cuando diga que sí/);
   const apply = await sdd(['tracker', 'apply'], { 'SW-001-login': { links: { T1: 'SHOP-10' }, proposals: ['SHOP-9'] } });
   assert.equal(apply.code, 0, apply.stderr);
   assert.equal(read(root, 'specs/SW-001-login/tasks.md'), '- [ ] T1 Formulario · Component: shop-web <!-- youtrack:SHOP-10 -->\n- [ ] T2 Exportar CSV <!-- youtrack:SHOP-9 -->\n');

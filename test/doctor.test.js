@@ -42,11 +42,11 @@ test('RF-DOC-02: real enforcement per tool, rule by rule, never overstated', asy
   const json = JSON.parse((await run(['doctor', '--json'], { cwd: root, env })).stdout);
   const claude = json.tools.find((x) => x.tool === 'claude-code');
   assert.deepEqual([claude.potential, claude.current], ['strong', 'strong']);
-  assert.deepEqual(Object.values(claude.rules), Array(7).fill('deterministic'));
+  assert.deepEqual(Object.values(claude.rules), Array(6).fill('deterministic'));
   // Antigravity has no adapter yet (v0.6): its rules are instruction-only and doctor says so.
   const anti = json.tools.find((x) => x.tool === 'antigravity');
   assert.deepEqual([anti.potential, anti.current, anti.adapter], ['weak', 'none', 'v0.6']);
-  assert.deepEqual(Object.values(anti.rules), Array(7).fill('instruction'));
+  assert.deepEqual(Object.values(anti.rules), Array(6).fill('instruction'));
   const text = await run(['doctor'], { cwd: root, env });
   assert.match(text.stdout, /claude-code: current strong · potential strong/);
   assert.match(text.stdout, /antigravity: current instruction only · potential weak\n {4}adapter arrives in v0\.6/);
@@ -91,10 +91,10 @@ test('RF-DOC-04/05: problems come with cause and fix; errors exit 1, warnings do
   assert.equal(r.code, 0);
   assert.match(r.stdout, /\[WARNING\] \.harness\/templates\/spec\.md was modified by hand\n {4}cause: .+\n {4}fix: .+sdd-harness sync/);
 
-  fs.rmSync(path.join(root, '.harness/scripts/guard.js'));
+  fs.rmSync(path.join(root, '.harness/scripts/hook.js'));
   r = await run(['doctor'], { cwd: root, env });
   assert.equal(r.code, 1);
-  assert.match(r.stdout, /\[ERROR\] \.harness\/scripts\/guard\.js is missing\n {4}fix: Run "sdd-harness sync"\./);
+  assert.match(r.stdout, /\[ERROR\] \.harness\/scripts\/hook\.js is missing\n {4}fix: Run "sdd-harness sync"\./);
 
   edit(root, 'AGENTS.md', (s) => s.replace('<!-- harness:end -->', ''));
   r = await run(['doctor'], { cwd: root, env });

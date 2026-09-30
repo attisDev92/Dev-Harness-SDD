@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from '../guards/args.js';
-import { runGuard, processIo } from '../guards/cli.js';
 import { CONFIG_FILE, findProjectRoot } from '../guards/project.js';
 import { loadConfigFile } from '../config/load.js';
 import { describeIssues } from '../config/format.js';
@@ -70,6 +69,24 @@ function extractLang(argv) {
   return { lang, rest };
 }
 
+export function processIo() {
+  return {
+    stdout: process.stdout,
+    stderr: process.stderr,
+    stdin: process.stdin,
+    env: process.env,
+    cwd: process.cwd(),
+    readStdin: () => new Promise((resolve, reject) => {
+      if (process.stdin.isTTY) return resolve('');
+      let data = '';
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', (chunk) => { data += chunk; });
+      process.stdin.on('end', () => resolve(data));
+      process.stdin.on('error', reject);
+    }),
+  };
+}
+
 /**
  * @param {string[]} argv
  * @param {ReturnType<typeof processIo>} io
@@ -103,13 +120,6 @@ export async function main(argv, io = processIo()) {
   }
 
   try {
-    if (command === 'guard') {
-      if (rest.length === 0 || wantsHelp(rest)) {
-        out(t.guardHelp);
-        return rest.length === 0 ? 1 : 0;
-      }
-      return await runGuard(rest, { ...io, env: { ...io.env, HARNESS_LANG: io.env.HARNESS_LANG ?? langFlag ?? lang } });
-    }
     if (command === 'config') {
       if (wantsHelp(rest) || rest[0] !== 'validate') {
         out(t.configHelp);

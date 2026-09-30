@@ -20,7 +20,7 @@ Primero la spec. Subagentes para frontend y backend. Guardarraíles determinista
 
 ![SDD](https://img.shields.io/badge/Spec--Driven-Development-8A2BE2?style=flat-square)
 ![Humano en el bucle](https://img.shields.io/badge/humano-en%20el%20bucle-2ea44f?style=flat-square)
-![Sin commits automáticos](https://img.shields.io/badge/commits%20automáticos-nunca-d73a49?style=flat-square)
+![Dos paradas](https://img.shields.io/badge/paradas%20de%20aprobación-2-2ea44f?style=flat-square)
 ![PRs bienvenidos](https://img.shields.io/badge/PRs-bienvenidos-ff69b4?style=flat-square)
 
 </div>
@@ -36,15 +36,15 @@ Primero la spec. Subagentes para frontend y backend. Guardarraíles determinista
 
 Implementa el flujo de Spec-Driven Development:
 
-**Constitución → Spec → Clarificación → Plan → Tareas → Implementación (una tarea cada vez, tests primero) → Validación → Cambio (primero la spec, luego el código).**
+**Spec → Plan y tareas → Implementación (frontend y backend en paralelo, tests primero) → Validación, con la documentación siempre al día. Un cambio va primero a la spec y luego al código.**
 
-Sobre ese flujo añade subagentes de frontend y backend, un agente de QA, un revisor, un depurador y un documentador, coordinados por un orquestador. En cada punto importante, el harness **se detiene y te pregunta**.
+Sobre ese flujo añade subagentes de frontend y backend, un agente de QA, un revisor, un depurador y un documentador, coordinados por un orquestador. **Solo se detiene dos veces**, para aprobar la spec y el plan, y respondes hablando ("sí", "continúa"). Lo demás avanza y se cuenta en los resúmenes.
 
 ### 🧠 Principio central
 
-> **Las reglas en markdown son sugerencias. Los permisos y los hooks son leyes.**
+> **Usar lo que la herramienta ya tiene y no estorbar nunca.**
 
-Todo lo que para ti es innegociable se aplica con scripts, no solo con prompts. Eso incluye los commits, las dependencias, los cambios de arquitectura y de base de datos, los bucles de reintentos y los `.md` sueltos.
+El harness reutiliza los permisos, subagentes, skills y preguntas de Claude Code en lugar de reinventarlos. Solo pregunta lo irreversible (push, reescribir historial, dependencias) y solo bloquea el propio harness. Todo lo demás es un aviso: el trabajo nunca se atasca.
 
 ---
 
@@ -57,8 +57,8 @@ Todo lo que para ti es innegociable se aplica con scripts, no solo con prompts. 
 | 🎨 | **Frontend con criterio de diseño** | Skills de diseño, sistema de diseño y componentes reutilizables; la fuente de diseño es configurable (ninguna, tokens en código, Penpot, Figma) |
 | 🔐 | **Backend seguro y con arquitectura** | Capas, convenciones de API, código seguro y migraciones de BD seguras |
 | 🧪 | **Agente de QA** | Tests unitarios, de integración y E2E (Playwright), con reportes de errores reproducibles |
-| 🛑 | **Gates humanos** | Ni commits, ni dependencias nuevas, ni cambios de stack/arquitectura/BD sin tu OK. Pruebas tú cada tarea |
-| 🔁 | **Cortacircuitos** | Máximo 2 reintentos automáticos, y solo para arreglos dentro del alcance de la tarea. El resto se detiene con un informe y opciones |
+| 🛑 | **Dos paradas, hablando** | Apruebas la spec y el plan con "sí" o "continúa". El commit se propone al cerrar cada historia y se hace con tu OK |
+| 🔁 | **Cortacircuitos** | Máximo 2 intentos de corrección; después, informe del depurador con opciones y eliges tú |
 | 🗂️ | **Repo ordenado** | Lista blanca de `.md`: los agentes no crean documentos donde quieran |
 | 🔌 | **Multiherramienta** | Un núcleo neutral y adaptadores para Claude Code, opencode, Codex y Antigravity |
 | 🧩 | **Cualquier topología** | Repo único, monorepo, varios repos o una carpeta de trabajo con varios repos |
@@ -72,22 +72,18 @@ Todo lo que para ti es innegociable se aplica con scripts, no solo con prompts. 
 
 ```mermaid
 flowchart LR
-  C[📜 Constitución] --> S[📝 Spec]
-  S --> Q[🔍 Clarificación]
-  Q --> P[🏗️ Plan + contrato API]
-  P --> T[✅ Tareas]
-  T --> I[🤖 Implementar tarea<br/>frontend / backend]
-  I --> V{🧪 Verificar<br/>lint · tipos · tests}
-  V -- fallo en alcance, máx. 2 --> I
-  V -- otro fallo o zona protegida --> D[🩺 Informe del depurador<br/>🛑 tú decides]
-  V -- verde --> R[👀 Revisión]
-  R --> H[🧑 Prueba manual]
-  H -- OK --> N[➡️ Siguiente tarea]
-  H -- KO --> D
-  N --> T
-  N --> X[🏁 Validar spec]
-  X --> DOC[📚 Documentación]
-  DOC --> CM[🧑 Tú haces el commit]
+  S[📝 Spec + revisión] --> A1{🛑 Parada 1<br/>dices que sí}
+  A1 --> P[🏗️ Plan + contratos + tareas]
+  P --> A2{🛑 Parada 2<br/>dices que sí}
+  A2 --> I[🤖 Frontend ∥ Backend<br/>tests primero]
+  I --> V{🧪 Verificar}
+  V -- fallo, máx. 2 --> I
+  V -- sigue fallando --> D[🩺 Informe del depurador<br/>tú eliges]
+  V -- verde --> R[👀 Revisión ∥ 📚 Docs]
+  R --> H[🧑 Prueba manual por historia]
+  H --> CM[💾 Commit propuesto<br/>se hace con tu OK]
+  CM --> I
+  CM --> X[🏁 Validar spec]
 ```
 
 ---
@@ -108,11 +104,10 @@ sdd-harness-init        # entrevista corta → genera la configuración SOLO par
 sdd-harness doctor
 ```
 
-Luego abre tu herramienta de agentes en el proyecto y empieza con:
+Luego abre tu herramienta de agentes en el proyecto y di lo que quieres:
 
 ```
-/sdd:constitution
-/sdd:spec "login de usuario con email y contraseña"
+Quiero un login de usuario con email y contraseña
 ```
 
 Para quitarlo de un proyecto:
@@ -127,7 +122,7 @@ sdd-harness remove      # borra solo lo generado y no modificado. Nunca toca spe
 
 | Comando | Descripción |
 |---|---|
-| `sdd-harness-init` | Entrevista e instalación en el proyecto actual: herramientas, topología, stack, convenciones, fuente de diseño, tracker y gates |
+| `sdd-harness-init` | Entrevista e instalación en el proyecto actual: herramientas, topología, stack, convenciones, fuente de diseño, tracker y pruebas manuales |
 | `sdd-harness sync` | Regenera la configuración de cada herramienta desde `harness.config.yaml`, mostrando antes el diff |
 | `sdd-harness doctor` | Revisión de salud y **nivel real de enforcement** de cada herramienta activada |
 | `sdd-harness skills list \| install \| update \| verify` | Gestiona las skills y plugins requeridos (fijados por versión y verificados) |
@@ -137,21 +132,21 @@ sdd-harness remove      # borra solo lo generado y no modificado. Nunca toca spe
 | `sdd-harness upgrade` | Actualiza a una versión nueva del harness, con diff y confirmación |
 | `sdd-harness remove` | Desinstalación limpia guiada por `.harness/manifest.lock` |
 
-## 💬 Comandos del flujo (dentro de tu agente)
+## 💬 Dentro de tu agente
 
-| Comando | Fase | ¿Espera tu aprobación? |
-|---|---|---|
-| `/sdd:constitution` | Propone los principios del proyecto | ✅ |
-| `/sdd:spec` | Entrevista de requisitos → `spec.md` (EARS) | ✅ |
-| `/sdd:clarify` | Revisión QA de la spec: huecos, contradicciones, conflictos | ✅ |
-| `/sdd:plan` | Plan técnico, contrato API y propuestas de ADR | ✅ |
-| `/sdd:tasks` | Tareas de menos de 30 min con "Hecho cuando" | ✅ |
-| `/sdd:next` | Ejecuta **una** tarea completa y se detiene para tu prueba manual | ✅ |
-| `/sdd:validate` | Recorre cada RF: qué test lo cubre y el veredicto | ✅ |
-| `/sdd:change` | Nuevo requisito: primero actualiza la spec y muestra el diff | ✅ |
-| `/sdd:status` | Spec y tarea actuales, bloqueos, decisiones pendientes, costo | — |
-| `/sdd:commit` | **Propone** mensajes de commit por repo. El commit lo haces tú | ✅ |
-| `/sdd:approve` · `/sdd:reject <motivo>` | Tu respuesta a una decisión pendiente (en las pruebas manuales también vale `OK` / `KO <qué falló>`) | — |
+Di lo que quieres ("añade recuperar contraseña") y la skill `sdd` dirige el flujo. Solo se te pregunta en las **dos paradas** (spec, y plan con tareas) y para dar el OK a cada commit; basta con "sí", "continúa", "aprobado" o el botón "Aprobar".
+
+Los comandos `/sdd:*` son **atajos opcionales** para ver qué pasó o lanzar trabajo en paralelo. Ninguno hace falta para avanzar:
+
+| Comando | Para qué |
+|---|---|
+| `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, última verificación, últimos commits |
+| `/sdd:spec <idea>` | Empezar una spec |
+| `/sdd:next` | Lanzar en paralelo las tareas listas (frontend ∥ backend) |
+| `/sdd:docs` | Poner la documentación al día en segundo plano |
+| `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
+| `/sdd:validate` | Informe requisito → test |
+| `/sdd:commit` | Proponer el commit ahora |
 
 > [!NOTE]
 > La sintaxis de invocación varía según la herramienta. Por ejemplo, Codex invoca las skills como `$nombre` y Antigravity las expone como workflows con `/`. `sdd-harness doctor` te muestra la sintaxis correcta para tu configuración.
@@ -176,7 +171,7 @@ Solo se generan los agentes que tu proyecto necesita. Un proyecto solo de fronte
 Los niveles (`alto` / `medio` / `bajo`) se traducen a modelos concretos en cada herramienta mediante los adaptadores.
 
 > [!IMPORTANT]
-> En Claude Code los subagentes no pueden lanzar otros subagentes, así que **el orquestador es tu sesión principal**, guiada por los comandos `/sdd:*`. En las herramientas sin subagentes equivalentes, el harness funciona en **modo degradado**: los roles se ejecutan uno tras otro en el mismo agente. Los gates se siguen aplicando.
+> En Claude Code los subagentes no pueden lanzar otros subagentes, así que **el orquestador es tu sesión principal**, guiada por la skill `sdd`. En las herramientas sin subagentes equivalentes, el harness funciona en **modo degradado**: los roles se ejecutan uno tras otro en el mismo agente.
 
 ---
 
@@ -188,14 +183,14 @@ El harness incluye sus propias skills e instala skills de terceros curadas **baj
 
 | Skill | La usa | Propósito |
 |---|---|---|
-| `sdd-orchestrator` | sesión principal | Máquina de estados del pipeline, gates, reintentos, `progress.md` |
+| `sdd` | sesión principal | El flujo: dos paradas, tareas en paralelo, revisión y docs, commit por historia |
 | `spec-generator` | fase de spec | Entrevista de requisitos y spec EARS (inspirada en [hello-sdd](https://github.com/mouredev/hello-sdd)) |
 | `clean-code` | frontend, backend | Nombres claros, unidades pequeñas, KISS/YAGNI/DRY, sin abstracciones prematuras. **Mandan las convenciones del proyecto** |
 | `design-system` | frontend | Tokens, API de componentes, variantes, estados. Se adapta a la fuente de diseño elegida |
 | `backend-architecture` | backend, architect | Capas, fronteras, dirección de dependencias, manejo de errores, validación en los bordes |
 | `api-design` | backend, architect | Convenciones REST, paginación, formato de error consistente, versionado, contrato primero |
 | `secure-coding` | backend, reviewer | Checklist basado en OWASP: autenticación y autorización, entradas, secretos, cabeceras |
-| `db-migrations` | backend | Migraciones seguras (expand/contract, reversibles). Todo cambio de esquema pasa por un gate |
+| `db-migrations` | backend | Migraciones seguras (expand/contract, reversibles). Todo cambio de esquema lleva un borrador de ADR |
 | `testing-strategy` | QA | Pirámide de tests, datos de prueba, evitar tests inestables, uno o más tests por RF |
 | `triage-report` | debugger | Informe fijo: error, reproducción, hipótesis, 2–3 opciones, recomendación. Luego se detiene |
 | `adr` | architect | Registros de decisiones de arquitectura con las alternativas descartadas |
@@ -223,16 +218,18 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 
 | Regla | Mecanismo |
 |---|---|
-| 🚫 **Los agentes no hacen commit, push, reset ni rebase** | Permisos de la herramienta + hook previo a cada herramienta. `/sdd:commit` solo propone mensajes; el commit lo haces tú |
-| 📦 **Ninguna dependencia nueva sin preguntar** | Permiso `ask` en los comandos de instalación + guardián sobre manifiestos de dependencias y lockfiles |
-| 🏛️ **Los cambios de stack, arquitectura, BD o seguridad necesitan tu OK** | "Zonas protegidas" en la configuración: cualquier edición ahí activa un gate y una propuesta de ADR |
-| 🔁 **Sin bucles infinitos** | Contador de intentos: máximo **2** reintentos automáticos, y solo para arreglos dentro del alcance de la tarea. Todo lo demás → informe del depurador → tú eliges |
-| 🧑 **Tú pruebas cada implementación** | Tras cada tarea: URL, pasos y datos de prueba, y el agente espera tu OK o KO (granularidad configurable) |
-| 🗂️ **Nada de `.md` al azar** | Hook de escritura con lista blanca. Cualquier otro documento requiere que lo pidas tú |
-| 🧱 **Cada agente en su carril** | Propiedad de rutas por agente, verificada con `git diff` cuando termina cada subagente |
-| ✅ **Nada se da por hecho con tests en rojo** | Un hook de parada bloquea el cierre mientras la verificación falle |
+| 💾 **Commit por historia, con tu OK** | Al cerrar una historia el agente propone el commit y lo hace si dices que sí. Push, rebase, merge, reset, borrar ramas y tags piden confirmación nativa |
+| 📦 **Instalar dependencias te pregunta** | Permiso `ask` en los comandos de instalación. Editar a mano manifiestos o lockfiles solo genera un aviso |
+| 🔔 **Avisos, no muros** | Zonas protegidas, código sin tarea o fuera de su alcance: el harness avisa una vez y deja seguir. Solo se bloquea `.harness/` y los archivos generados |
+| 🧩 **Tareas que surgen** | Se añaden a `tasks.md` como "añadida en implementación", sin parar |
+| 🔁 **Sin bucles infinitos** | Máximo **2** intentos de corrección. Después, informe del depurador → tú eliges |
+| 🧑 **Pruebas lo que importa** | URL, pasos y datos de prueba con la granularidad que elijas (`task`, `story`, `spec` o `none`) |
+| 🗂️ **Documentación siempre al día** | Se puede escribir cualquier `.md`; los agentes deben actualizar todo documento que un cambio afecte. La lista blanca es opcional (`gates.docs: whitelist`) |
+| ⚡ **Agentes en paralelo** | Las tareas de frontend y backend avanzan a la vez; una tarea solo espera a su propio `Depends on` |
+| 🧱 **Cada agente en su carril** | Propiedad de rutas por agente, verificada con `git diff` al terminar cada subagente (un aviso, y solo si trabajó solo) |
+| ✅ **Nada se da por hecho con tests en rojo** | El hook de parada se lo recuerda al agente una vez si la última verificación falló |
 
-**Red de seguridad universal:** git hooks (vía `core.hooksPath`, en Node puro, sin husky) y una plantilla de CI ejecutan los mismos checks. Así, las herramientas con enforcement más débil también quedan cubiertas.
+**Red de seguridad universal:** un pre-commit de git (vía `core.hooksPath`, en Node puro, sin husky) rechaza secretos y archivos `.env`; una plantilla de CI añade la lista blanca de docs y la verificación completa.
 
 ### Nivel de enforcement por herramienta
 
@@ -249,7 +246,7 @@ Ejecuta `sdd-harness doctor` para ver qué se aplica realmente en tu proyecto.
 
 ## ⚙️ Configuración
 
-`sdd-harness-init` genera `harness.config.yaml`, y a partir de ahí la configuración va creciendo **con el agente activo**: cuando algo tiene que cambiar (un componente, un comando de verificación, una zona protegida, el prefijo de las specs), el agente explica qué y por qué y pide el gate `config` (`sdd.js gate request config --summary "…"`). Solo si respondes OK puede editar `harness.config.yaml`, y después ejecuta `npx sdd-harness sync`. `.harness/` y los archivos generados siguen siendo intocables.
+`sdd-harness-init` genera `harness.config.yaml`, y a partir de ahí puede cambiar **en cualquier momento, también a mitad del desarrollo**: lo editas tú o el agente, Claude Code te pide confirmar la edición y un hook regenera la configuración al instante (`sdd-harness sync`). `.harness/` y los archivos generados siguen siendo intocables.
 
 `AGENTS.md` y `CLAUDE.md` también son tuyos: el harness solo es dueño del bloque entre `<!-- harness:begin -->` y `<!-- harness:end -->`. El agente puede añadir instrucciones del proyecto en cualquier otra parte del archivo, nunca dentro del bloque.
 
@@ -282,19 +279,20 @@ tracker:
   enabled: false               # linear | notion | github | jira, sincronizado en ambos sentidos
 
 gates:
-  manual_test: task            # task | story | spec
-  commits: human-only
+  manual_test: story           # task | story | spec | none
+  docs: free                   # free | whitelist
+  commits: per-story           # el agente propone el commit al cerrar cada historia
   deps: ask
 
 retries:
-  in_scope: 2                  # solo arreglos dentro de los archivos de la tarea
-  protected: 0                 # cualquier cambio en zona protegida → parar y preguntar
+  in_scope: 2                  # intentos de corrección antes del informe del depurador
 
 protected:
   deps:         [package.json#dependencies, lockfiles]
   db:           ["**/migrations/**", "**/schema.prisma", "**/*.sql"]
   contracts:    ["specs/**/contracts/**"]
-  architecture: ["tsconfig*.json", "**/eslint.config.*", "docker*", ".env*"]
+  architecture: ["docker-compose*", ".env*"]
+  tooling:      ["tsconfig*.json", "**/eslint.config.*", "Dockerfile*", ".github/workflows/**"]  # lint, tsconfig, CI: solo preguntan, sin tarea ni ADR
   security:     [auth, cors, csp]
 
 docs_whitelist:
@@ -336,7 +334,7 @@ api/specs/API-004-auth/contracts/openapi.yaml          ← fuente de verdad
 web/specs/WEB-007-login/contracts/external/api-openapi.yaml   ← snapshot (repo, spec, commit)
 ```
 
-`sdd-harness doctor` avisa cuando un snapshot se desvió de su proveedor. Adaptarse a un contrato que cambió siempre pasa por un gate.
+`sdd-harness doctor` avisa cuando un snapshot se desvió de su proveedor. Adaptarse a un contrato que cambió se habla antes contigo.
 
 ### Estructura generada en el proyecto
 
@@ -370,8 +368,8 @@ mi-proyecto/
 
 ## 📊 Observabilidad
 
-- `.harness/logs/events.jsonl` registra subagente, tarea, resultado, reintentos y duración.
-- `/sdd:status` muestra el costo y el tiempo por spec y por tarea.
+- `.harness/logs/events.jsonl` registra specs, paradas, verificaciones y subagentes.
+- `/sdd:status` muestra qué pasó: últimas tareas cerradas, pendientes, última verificación y últimos commits.
 - Un nivel de modelo por rol reserva los modelos caros para donde razonar compensa.
 - Se soporta OpenTelemetry nativo en las herramientas que lo ofrecen.
 
@@ -379,7 +377,8 @@ mi-proyecto/
 
 ## 🗺️ Hoja de ruta
 
-- [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, flujo SDD completo, guardianes, gates humanos, git hooks, mensajes en español
+- [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, flujo SDD completo, avisos, dos paradas de aprobación, git hooks, mensajes en español
+- [x] Flujo ligero (v0.8): aprobar hablando, commit por historia, tareas y cambios de configuración a mitad del desarrollo
 - [x] Topologías de varios repos y workspace, dependencias entre specs y snapshots de contratos
 - [ ] Adaptadores de opencode, Codex y Antigravity, y modo degradado
 - [x] Registro de skills e instalador verificado

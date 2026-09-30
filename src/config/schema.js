@@ -69,8 +69,10 @@ export const schema = obj(
       project: str(),
     }),
     gates: obj({
-      manual_test: oneOf(['task', 'story', 'spec']),
-      commits: oneOf(['human-only']),
+      manual_test: oneOf(['task', 'story', 'spec', 'none']),
+      docs: oneOf(['free', 'whitelist']),
+      // per-story: the agent proposes the commit when a story closes (human-only is the pre-0.8 value, same behaviour).
+      commits: oneOf(['per-story', 'human-only']),
       deps: oneOf(['ask']),
     }),
     retries: obj({ in_scope: int({ min: 0, max: 2 }), protected: int({ min: 0, max: 0 }) }),

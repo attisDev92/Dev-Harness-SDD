@@ -1,21 +1,23 @@
-// What an agent may write, and when (RF-GAT-06/07/08/09, RF-MD-01,
-// RF-SDD-13/16/18, RF-RET-02/05, RF-DOM-01, RF-GAT-11). Dependency-free.
+// What an agent writes, and what the harness says about it (RF-GAT-06/07/09,
+// RF-MD-01, RF-ORQ-13). Dependency-free.
 //
-// Verdicts: allow, ask (the tool asks the user) or block (with a reason the
-// agent reads). The same rules apply to writes made through the shell.
+// Verdicts: allow, warn (an alert, once per spec; the work goes on) or block
+// (only the harness itself and the generated block of AGENTS.md/CLAUDE.md).
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { matchesAny, globToRegExp } from './glob.js';
 import { checkDocWrite } from './docs-guard.js';
-import { progressBlockOf } from './state.js';
 
 const TEST_FILE = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**'];
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies', 'bundledDependencies', 'overrides', 'resolutions'];
+const BEGIN = '<!-- harness:begin -->';
+const END = '<!-- harness:end -->';
 
 const posix = (p) => p.split(path.sep).join('/');
 const allow = { decision: 'allow' };
 const block = (kind, match, extra = {}) => ({ decision: 'block', kind, match, ...extra });
+const warn = (kind, match, extra = {}) => ({ decision: 'warn', kind, match, ...extra });
 
 /** Component that owns `rel`, the most specific path first. */
 export function componentOf(rel, components) {
@@ -29,10 +31,6 @@ export function componentOf(rel, components) {
   return best;
 }
 
-function withinComponent(rel, comp) {
-  return comp.dir ? rel.slice(comp.dir.length + 1) : rel;
-}
-
 /** New content of the file after a Write, Edit or MultiEdit. */
 export function contentAfter(input, current) {
   if (typeof input.content === 'string') return input.content;
@@ -41,6 +39,14 @@ export function contentAfter(input, current) {
   if (Array.isArray(input.edits)) return input.edits.reduce(apply, cur);
   if (typeof input.old_string === 'string') return apply(cur, input);
   return null;
+}
+
+/** The managed block of a file, or null. */
+export function managedBlockOf(text) {
+  const t = String(text ?? '');
+  const b = t.indexOf(BEGIN);
+  const e = t.indexOf(END);
+  return b !== -1 && e > b ? t.slice(b, e + END.length) : null;
 }
 
 function depsChanged(before, after) {
@@ -58,7 +64,6 @@ function zoneHits(rel, zones) {
   for (const [zone, globs] of Object.entries(zones ?? {})) {
     for (const glob of globs ?? []) {
       const [file, section] = String(glob).split('#');
-      // `rel/` also covers commands that act on a whole directory (rm -rf migrations).
       if (globToRegExp(file).test(rel) || globToRegExp(file).test(`${rel}/`)) hits.push({ zone, section });
     }
   }
@@ -66,74 +71,60 @@ function zoneHits(rel, zones) {
 }
 
 /**
- * @param {{ root: string, file: string, settings: object, state: object, input?: object, via?: 'tool' | 'shell' }} req
+ * @param {{ root: string, file: string, settings: object, flow?: { spec: { id: string, status: string } | null, tasks: object[] }, input?: object }} req
+ *   `flow` is read from the markdown files by the caller (state.js, tasks.js).
  */
-export function checkWrite({ root, file, settings, state, input = {}, via = 'tool' }) {
+export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [] }, input = {} }) {
   const abs = path.resolve(root, file);
   const rel = posix(path.relative(root, abs));
   if (rel.startsWith('..') || path.isAbsolute(rel)) return allow;
   const exists = existsSync(abs);
   const current = exists ? safeRead(abs) : null;
-  const after = via === 'tool' ? contentAfter(input, current) : null;
+  const after = contentAfter(input, current);
   const zones = settings.protected ?? {};
 
-  // RF-GAT-09 / edge case 12: the harness itself.
-  // Its config is the exception: editable once the user approved a `config` gate.
-  const configGranted = rel === 'harness.config.yaml' && (state.granted ?? []).includes(rel);
-  if (!configGranted && matchesAny(rel, (zones.harness ?? []).map((g) => g.split('#')[0]))) return block('harnessFile', rel);
+  // RF-GAT-09: .harness/ and generated files are the harness's own. Its config
+  // is the user's: the tool asks natively and the hook syncs after the edit.
+  if (rel === 'harness.config.yaml') return allow;
+  if (matchesAny(rel, (zones.harness ?? []).map((g) => g.split('#')[0]))) return block('harnessFile', rel);
 
   // AGENTS.md and CLAUDE.md: the agent may write outside the harness block, never inside it.
   if (current && (settings.managedBlocks ?? []).includes(rel)) {
-    const before = progressBlockOf(current);
-    if (before && (via === 'shell' || progressBlockOf(after ?? '') !== before)) return block('contextBlock', rel);
+    const before = managedBlockOf(current);
+    if (before && managedBlockOf(after ?? '') !== before) return block('contextBlock', rel);
   }
 
-  // RF-MD-01: documentation whitelist.
-  const doc = checkDocWrite({ file: abs, root, whitelist: settings.docsWhitelist, exists: () => exists });
-  if (doc.decision === 'block') return doc;
+  // RF-MD-01: documentation whitelist, only when the user chose it.
+  const doc = checkDocWrite({ file: abs, root, whitelist: settings.docsMode === 'whitelist' ? settings.docsWhitelist : null, exists: () => exists });
+  if (doc.decision === 'block') return { ...doc, allowed: settings.docsWhitelist };
 
-  // The status block of progress.md belongs to the scripts.
-  if (/(^|\/)specs\/[^/]+\/progress\.md$/.test(rel) && current) {
-    const before = progressBlockOf(current);
-    if (via === 'shell' || (before && progressBlockOf(after ?? '') !== before)) return block('progressBlock', rel);
+  // A plan or a task list written before its stop was answered.
+  const specFile = /(?:^|\/)specs\/([^/]+)\/(plan|tasks)\.md$/.exec(rel);
+  if (specFile && !exists && flow.spec?.id === specFile[1] && flow.spec.status === 'draft') {
+    return warn('needsApproval', rel, { phase: 'spec' });
   }
 
-  // RF-SDD-13/18: phase order of the spec files.
-  const specFile = /(?:^|\/)specs\/([^/]+)\/(spec|plan|tasks)\.md$/.exec(rel);
-  if (specFile) {
-    const spec = state.specs?.[specFile[1]] ?? { phase: 'spec', approved: [] };
-    const approved = spec.approved ?? [];
-    if (specFile[2] === 'spec' && approved.includes('spec') && !spec.change) return block('specApproved', rel);
-    if (specFile[2] === 'plan' && !approved.includes('spec')) return block('needsApproval', rel, { phase: 'spec' });
-    if (specFile[2] === 'tasks' && !approved.includes('plan')) return block('needsApproval', rel, { phase: 'plan' });
-    if (specFile[2] === 'tasks' && approved.includes('tasks') && !spec.change) return block('tasksApproved', rel);
-  }
-  if (rel === 'docs/constitution.md' && state.constitution?.approved) return block('constitutionApproved', rel);
-
-  // RF-GAT-06/07/08: protected zones.
-  const granted = new Set(state.granted ?? []);
+  // RF-GAT-06/07: protected zones raise an alert; they never stop the work.
   for (const hit of zoneHits(rel, zones)) {
-    if (hit.zone === 'harness' || granted.has(rel)) continue;
+    if (hit.zone === 'tooling') return allow;
+    if (hit.zone === 'harness') continue;
     if (hit.zone === 'deps') {
       if (hit.section && /package\.json$/.test(rel) && after !== null && !depsChanged(current, after)) continue;
-      return { decision: 'ask', kind: 'depsEdit', match: rel };
+      return warn('depsEdit', rel);
     }
-    return block('protectedZone', rel, { zone: hit.zone });
+    return warn('protectedZone', rel, { zone: hit.zone });
   }
 
-  // Code: one task at a time, inside its scope (RF-ORQ-02, RF-RET-02/05, RF-GAT-11).
+  // RF-ORQ-13: code without a pending task, or outside its scope, is an alert.
   const comp = componentOf(rel, settings.components);
-  // Specs and docs are artifacts, not code, in whatever repository they live (RF-TOP-02).
-  if (!comp || /(^|\/)(specs|docs)\//.test(rel)) return allow;
-  if (state.triage) return block('triageNoCode', rel);
-  if (state.gate) return block('gatePending', rel, { gate: state.gate.kind });
-  if (state.activeSpec && state.specs?.[state.activeSpec]?.change) return block('changePending', rel);
-  if (!state.task) return block('noTask', rel);
-  if (state.task.component !== comp.id) return block('otherComponent', rel, { component: comp.id, task: state.task.id });
-  if (granted.has(rel)) return allow;
-  const inner = withinComponent(rel, comp);
-  if (matchesAny(rel, state.task.scope ?? []) || matchesAny(inner, state.task.scope ?? []) || matchesAny(inner, TEST_FILE)) return allow;
-  return block('outOfScope', rel, { task: state.task.id, scope: state.task.scope });
+  if (!comp || /(^|\/)(specs|docs)\//.test(rel) || /\.(md|mdx)$/i.test(rel)) return allow;
+  const open = (flow.tasks ?? []).filter((x) => !x.done && x.component === comp.id);
+  if (flow.spec?.status !== 'plan-approved' || !open.length) return warn('noTask', rel, { component: comp.id });
+  const inner = comp.dir ? rel.slice(comp.dir.length + 1) : rel;
+  const scope = open.flatMap((x) => x.scope ?? []);
+  // Tasks without a scope cover their whole component.
+  if (open.some((x) => !(x.scope ?? []).length) || matchesAny(rel, scope) || matchesAny(inner, scope) || matchesAny(inner, TEST_FILE)) return allow;
+  return warn('outOfScope', rel, { task: open.map((x) => x.id).join(', '), scope });
 }
 
 function safeRead(file) {

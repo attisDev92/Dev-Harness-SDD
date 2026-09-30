@@ -1,17 +1,17 @@
 // The whole flow through sdd.js and the Claude Code hooks, on a real project
-// (RF-SDD-*, RF-ORQ-*, RF-GAT-10..14, RF-RET-*, RF-DOM-03/04, RF-VER-01/02).
+// (RF-SDD-*, RF-ORQ-*, RF-GAT-*, RF-DOM-03/04, RF-VER-01/02).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { runSdd } from '../src/guards/sdd.js';
 import { handleHook } from '../src/guards/hook.js';
-import { loadFlow } from '../src/guards/state.js';
-import { loadState as loadRetries } from '../src/guards/retry.js';
+import { loadRuntime, specStatus } from '../src/guards/state.js';
+import { parseDecision } from '../src/guards/flow.js';
 import { run, write, git } from './fixtures.js';
 import { tempDir } from './helpers.js';
 
-const CONFIG = `harness_version: 0.3.0
+const CONFIG = `harness_version: 0.8.0
 install_mode: local
 cli: {language: en}
 tools: [claude-code]
@@ -21,15 +21,17 @@ specs: {location: root, id_prefix: SVC}
 components:
   svc: {path: ., kind: backend, stack: node, verify: {test: node check.js}}
 git_hooks: {enabled: false}
+gates: {manual_test: story, commits: per-story, deps: ask}
 protected:
   db: ["**/migrations/**"]
 `;
 
-async function project(t, config = CONFIG) {
+async function project(t, config = CONFIG, extra = {}) {
   const root = tempDir(t);
   write(root, {
+    ...extra,
     'package.json': { name: 'svc', type: 'module' },
-    // The "test suite": passes when pass.flag exists, fails with the flag's absence otherwise.
+    // The "test suite": passes when pass.flag exists, fails otherwise.
     'check.js': "import fs from 'node:fs';\nif (!fs.existsSync('pass.flag')) { console.error('expected pass.flag'); process.exit(1); }\n",
     'src/index.js': 'export {};\n',
   });
@@ -44,21 +46,27 @@ async function project(t, config = CONFIG) {
 function sdd(root, ...argv) {
   let stdout = '';
   let stderr = '';
-  return runSdd(argv, { stdout: { write: (s) => { stdout += s; } }, stderr: { write: (s) => { stderr += s; } }, cwd: root, env: { HARNESS_LANG: 'en' } })
+  return runSdd(argv, { stdout: { write: (s) => { stdout += s; } }, stderr: { write: (s) => { stderr += s; } }, cwd: root, env: {} })
     .then((code) => ({ code, stdout, stderr }));
 }
 
-const hook = (root, event, payload = {}) => handleHook(event, { cwd: root, session_id: 'S1', ...payload }, { env: { HARNESS_LANG: 'en' } });
-const writeTool = (root, file, extra = {}) => hook(root, 'PreToolUse', { tool_name: 'Write', tool_input: { file_path: path.join(root, file), content: 'x' }, ...extra });
+const hook = (root, event, payload = {}, opts = {}) => handleHook(event, { cwd: root, session_id: 'S1', ...payload }, { env: {}, ...opts });
+const writeTool = (root, file) => hook(root, 'PreToolUse', { tool_name: 'Write', tool_input: { file_path: path.join(root, file), content: 'x' } });
 const say = (root, prompt) => hook(root, 'UserPromptSubmit', { prompt });
-const state = (root) => loadFlow(root).state;
+// Alerts reach the agent as context and the user as a message; they never block.
+const alertOf = (r) => (r.stdout ? JSON.parse(r.stdout).systemMessage : undefined);
+const specFile = (root, id) => path.join(root, 'specs', id, 'spec.md');
+const statusOf = (root, id) => specStatus(fs.readFileSync(specFile(root, id), 'utf8'));
 
-async function approvePhases(root) {
-  assert.equal((await sdd(root, 'new-spec', 'login')).code, 0);
-  for (const phase of ['spec', 'plan', 'tasks']) {
-    assert.equal((await sdd(root, 'gate', 'request', phase)).code, 0);
-    assert.match(say(root, '/sdd:approve').stdout, new RegExp(`APPROVED the pending decision \\(${phase}\\)`));
-  }
+/** A spec with both stops approved by talking. */
+async function approved(root, name = 'login') {
+  const id = /Spec (\S+) creada/.exec((await sdd(root, 'new-spec', name)).stdout)[1];
+  await sdd(root, 'stop', 'spec');
+  say(root, 'sí');
+  await sdd(root, 'stop', 'plan');
+  say(root, 'continúa');
+  assert.equal(statusOf(root, id), 'plan-approved');
+  return id;
 }
 
 const TASKS = `# Tasks
@@ -67,209 +75,208 @@ const TASKS = `# Tasks
 - [ ] T2 Metrics · Requirements: RF-02 · Component: svc · Scope: \`src/metrics/**\` · Depends on: T1 · Done when: /metrics lists counters
 `;
 
-test('RF-SDD-13 + RF-SDD-04: phases in order, approvals only from the user', async (t) => {
+test('RF-GAT-08: answers in plain words; "yes, but…" is a change', () => {
+  for (const yes of ['sí', 'Si, adelante', 'ok', 'OK!', 'continúa', 'Continua por favor', 'aprobado', 'dale', 'yes', 'go ahead', 'LGTM', '/sdd:approve']) {
+    assert.equal(parseDecision(yes).approved, true, yes);
+  }
+  for (const no of ['sí, pero cambia el RF-02', 'añade el caso de error', 'no', 'y los errores?', 'okey, but add rate limiting', '/sdd:reject falta X']) {
+    assert.equal(parseDecision(no).approved, false, no);
+  }
+});
+
+test('RF-SDD-13: two stops, approved by talking; the status lives in spec.md', async (t) => {
   const root = await project(t);
-  // No spec, no task: code is off limits.
-  assert.match(writeTool(root, 'src/app.js').stderr, /no task is in progress/);
+  // No spec, no task: an alert, never a block, and only once.
+  const first = writeTool(root, 'src/app.js');
+  assert.equal(first.code, 0);
+  assert.match(alertOf(first), /no hay ninguna tarea pendiente/);
+  assert.equal(writeTool(root, 'src/app.js').stdout, undefined, 'the same alert is not repeated');
 
   const created = await sdd(root, 'new-spec', 'Health check');
   assert.equal(created.code, 0, created.stderr);
-  assert.match(created.stdout, /Spec SVC-001-health-check created: specs\/SVC-001-health-check\/spec\.md/);
-  assert.match(fs.readFileSync(path.join(root, 'specs/SVC-001-health-check/spec.md'), 'utf8'), /^# SVC-001 — Health check/);
-  assert.equal((await sdd(root, 'new-spec', 'other')).stdout.includes('SVC-002-other'), true);
+  assert.match(created.stdout, /Spec SVC-001-health-check creada: specs\/SVC-001-health-check\/spec\.md/);
+  const text = fs.readFileSync(specFile(root, 'SVC-001-health-check'), 'utf8');
+  assert.match(text, /^---\nstatus: draft\n---\n\n# SVC-001 — Health check/);
 
-  assert.equal(writeTool(root, 'specs/SVC-002-other/plan.md').code, 2, 'plan before the spec is approved');
-  assert.equal((await sdd(root, 'gate', 'request', 'plan')).code, 2);
-  assert.equal((await sdd(root, 'gate', 'request', 'spec')).code, 0);
-  assert.equal((await sdd(root, 'gate', 'request', 'clarify')).code, 2, 'one decision at a time');
+  assert.match(alertOf(writeTool(root, 'specs/SVC-001-health-check/plan.md')), /la spec todavía no está aprobada/, 'plan before the spec: an alert');
 
-  // Words that are not a decision do not approve anything.
-  assert.equal(say(root, 'looks fine, go ahead').stdout, undefined);
-  assert.equal(state(root).gate.kind, 'spec');
-  assert.match(say(root, '/sdd:reject add the error case').stdout, /REJECTED the pending decision \(spec\): "add the error case"/);
-  assert.equal(writeTool(root, 'specs/SVC-002-other/plan.md').code, 2);
+  // Nothing pending: words are just words, and approve refuses.
+  assert.equal(say(root, 'sí').stdout, undefined);
+  assert.equal((await sdd(root, 'approve')).code, 2);
 
-  await sdd(root, 'gate', 'request', 'spec');
-  say(root, '/sdd:approve');
-  assert.equal(writeTool(root, 'specs/SVC-002-other/plan.md').code, 0);
-  assert.equal(writeTool(root, 'specs/SVC-002-other/spec.md').code, 2, 'approved spec is frozen (RF-SDD-18)');
-  assert.match(say(root, '/sdd:approve').stdout, /no pending decision/);
+  assert.match((await sdd(root, 'stop', 'spec')).stdout, /Parada "spec" de SVC-001-health-check registrada/);
+  assert.match(say(root, 'añade el caso de error').stdout, /no aprobó todavía spec/);
+  assert.equal(statusOf(root, 'SVC-001-health-check'), 'draft');
+  assert.match(say(root, 'sí, continúa').stdout, /El usuario APROBÓ spec de SVC-001-health-check/);
+  assert.equal(statusOf(root, 'SVC-001-health-check'), 'spec-approved');
+  assert.equal(loadRuntime(root).pending, null);
+
+  // The second stop answered through AskUserQuestion: the agent records it.
+  await sdd(root, 'stop', 'plan');
+  const ok = await sdd(root, 'approve');
+  assert.equal(ok.code, 0, ok.stderr);
+  assert.match(ok.stdout, /Aprobado: plan de SVC-001-health-check/);
+  assert.equal(statusOf(root, 'SVC-001-health-check'), 'plan-approved');
+  assert.equal(writeTool(root, 'specs/SVC-001-health-check/spec.md').code, 0, 'an approved spec is updated like any document');
 });
 
-test('one task end to end: tests-first scope, verification, retries, triage, manual test, done', async (t) => {
+test('implementing: parallel list, verification, tasks that come up, validation', async (t) => {
   const root = await project(t);
-  await approvePhases(root);
-  const spec = state(root).activeSpec;
+  const spec = await approved(root);
   fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
-  fs.writeFileSync(path.join(root, 'specs', spec, 'spec.md'), '- **RF-01:** WHEN GET /health is called, THE SYSTEM SHALL answer 200.\n- **RF-02:** THE SYSTEM SHALL expose counters.\n');
+  fs.writeFileSync(specFile(root, spec), `---\nstatus: plan-approved\n---\n- **RF-01:** WHEN GET /health is called, THE SYSTEM SHALL answer 200.\n- **RF-02:** THE SYSTEM SHALL expose counters.\n`);
 
-  // RF-ORQ-01/03: the first ready task, delegated to the role of its component.
+  // RF-ORQ-02/03: what can start now, with its role; next is informative and never blocks.
   const next = await sdd(root, 'next');
   assert.equal(next.code, 0, next.stderr);
-  assert.match(next.stdout, /Task T1: Health endpoint\nComponent: svc · Role: backend-dev · Scope: src\/\*\*/);
-  assert.equal((await sdd(root, 'next')).code, 2, 'one task per invocation (RF-ORQ-02)');
+  assert.match(next.stdout, /T1 Health endpoint {2}→ {2}backend-dev \(svc\)\n {2}Alcance: src\/\*\*/);
+  assert.match(next.stdout, /T2 espera a T1/);
 
-  assert.equal(writeTool(root, 'src/health.js').code, 0);
-  assert.equal(writeTool(root, 'check.js').code, 2, 'outside the task scope (RF-RET-02)');
-  hook(root, 'PostToolUse', { tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/health.js') } });
-  assert.equal(state(root).task.dirty, true);
+  assert.equal(writeTool(root, 'src/health.js').stdout, undefined, 'inside the scope: nothing to say');
+  assert.match(alertOf(writeTool(root, 'check.js')), /fuera del alcance de T1, T2/, 'outside the scope: an alert');
 
-  // RF-VER-01: no finishing with unverified changes (once, to avoid loops).
-  assert.match(hook(root, 'Stop').stderr, /changes that were not verified/);
-  assert.equal(hook(root, 'Stop', { stop_hook_active: true }).code, 0);
-
-  // RF-RET-01/03/07: counted by the script; the same error twice → triage.
-  let v = await sdd(root, 'verify');
+  // RF-VER-01: a failing verification is reminded once when the agent stops, never in a loop.
+  const v = await sdd(root, 'verify');
   assert.equal(v.code, 2);
-  assert.match(v.stderr, /Automatic fix attempt 1 of 2 allowed/);
-  v = await sdd(root, 'verify');
-  assert.match(v.stderr, /same error happened twice in a row/);
-  assert.equal(state(root).triage.task, 'T1');
-  assert.match(writeTool(root, 'src/health.js').stderr, /triage is in progress/, 'RF-RET-05');
-  assert.equal((await sdd(root, 'gate', 'request', 'manual-test')).code, 2);
-
-  // RF-RET-04/06: the user picks an option; the counter starts again.
-  assert.equal((await sdd(root, 'gate', 'request', 'triage')).code, 0);
-  assert.match(say(root, '/sdd:approve option 2: add the flag').stdout, /APPROVED.*triage.*option 2/);
-  assert.equal(state(root).triage, null);
-  assert.equal(loadRetries(root).tasks.T1, undefined);
-
+  assert.match(v.stderr, /hasta 2 intentos/);
+  assert.match(hook(root, 'Stop').stderr, /La última verificación de svc falló \(node check.js\)/);
+  assert.equal(hook(root, 'Stop').code, 0, 'reminded once');
   fs.writeFileSync(path.join(root, 'pass.flag'), '');
-  v = await sdd(root, 'verify');
-  assert.equal(v.code, 0, v.stderr);
-  assert.equal(state(root).task.dirty, false);
-  assert.equal(hook(root, 'Stop').code, 0);
+  assert.equal((await sdd(root, 'verify', '--component', 'svc')).code, 0);
+  assert.equal(loadRuntime(root).verify.svc.status, 'pass');
 
-  // RF-GAT-10/11/12: nothing is done before the user's manual test.
-  assert.match((await sdd(root, 'task', 'done', 'T1')).stderr, /has not approved the manual test/);
-  assert.equal((await sdd(root, 'gate', 'request', 'manual-test')).code, 0);
-  assert.match((await sdd(root, 'next')).stderr, /decision is pending/);
-  assert.match(say(root, 'KO: /health returns 500').stdout, /REJECTED.*manual-test.*\n.*start the debugger triage/);
-  assert.equal(state(root).triage.reason, '/health returns 500', 'RF-GAT-13');
-  await sdd(root, 'gate', 'request', 'triage');
-  say(root, '/sdd:approve fix the route');
-  await sdd(root, 'verify');
-  await sdd(root, 'gate', 'request', 'manual-test');
-  say(root, 'OK');
-  const done = await sdd(root, 'task', 'done', 'T1');
-  assert.equal(done.code, 0, done.stderr);
-  assert.match(fs.readFileSync(path.join(root, 'specs', spec, 'tasks.md'), 'utf8'), /- \[x\] T1 Health endpoint/);
-  assert.match(fs.readFileSync(path.join(root, 'specs', spec, 'progress.md'), 'utf8'), /\| Current task \| — \|/);
+  // The agent ticks T1 itself; T2 can start. Work that came up is added with just its component.
+  const tasks = path.join(root, 'specs', spec, 'tasks.md');
+  fs.writeFileSync(tasks, fs.readFileSync(tasks, 'utf8').replace('- [ ] T1', '- [x] T1') + '- [ ] T3 Cache headers (added during implementation) · Component: svc\n');
+  const again = await sdd(root, 'next');
+  assert.match(again.stdout, /T2 Metrics/);
+  assert.doesNotMatch(again.stdout, /necesita arreglo/, 'a task with only its component is fine');
+  const status = await sdd(root, 'status');
+  assert.match(status.stdout, /Hechas \(1\/3\): T1 Health endpoint/);
+  assert.match(status.stdout, /Añadidas en implementación: T3/);
+  assert.match(status.stdout, /Última verificación svc: ok/);
 
-  // RF-SDD-14/15: requirement → test coverage.
+  // RF-SDD-14/15: requirement → test coverage; the spec closes when every task is done.
   write(root, { 'src/health.test.js': "test('RF-01 health answers 200', () => {});\n" });
+  fs.writeFileSync(tasks, fs.readFileSync(tasks, 'utf8').replace(/- \[ \]/g, '- [x]'));
   const val = await sdd(root, 'validate');
   assert.equal(val.code, 2);
-  assert.match(val.stdout, /✔ RF-01: src\/health\.test\.js\n {2}✖ RF-02: not covered by any test\n1 of 2 requirements/);
+  assert.match(val.stdout, /✔ RF-01: src\/health\.test\.js\n {2}✖ RF-02: sin ningún test\n1 de 2 requisitos/);
+  assert.match(val.stdout, /la spec queda como "done"/);
+  assert.equal(statusOf(root, spec), 'done');
 });
 
-test('RF-VER-02 and edge case 14: tasks need verification commands and a scope', async (t) => {
+test('frontend and backend tasks are listed together; a task waits only for its own dependency', async (t) => {
+  const cfg = CONFIG.replace('topology: single', 'topology: monorepo').replace(
+    '  svc: {path: ., kind: backend, stack: node, verify: {test: node check.js}}',
+    '  api: {path: api, kind: backend, stack: node, verify: {test: node check.js}}\n  web: {path: web, kind: frontend, stack: node, verify: {test: node check.js}}',
+  );
+  const check = "import fs from 'node:fs';\nif (!fs.existsSync('pass.flag')) process.exit(1);\n";
+  const root = await project(t, cfg, { 'api/package.json': { name: 'api', type: 'module' }, 'web/package.json': { name: 'web', type: 'module' }, 'api/check.js': check, 'web/check.js': check, 'api/src/a.js': '', 'web/src/w.js': '' });
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), `# Tasks
+
+- [ ] T1 Login endpoint · Requirements: RF-01 · Component: api · Scope: \`src/**\` · Depends on: — · Done when: POST /login answers 200
+- [ ] T2 Login screen · Requirements: RF-01 · Component: web · Scope: \`src/**\` · Depends on: — · Done when: the form renders against the contract
+- [ ] T3 Connect the screen · Requirements: RF-01 · Component: web · Scope: \`src/**\` · Depends on: T1, T2 · Done when: the form calls the real endpoint
+`);
+  const next = await sdd(root, 'next');
+  assert.equal(next.code, 0, next.stderr);
+  assert.match(next.stdout, /T1 Login endpoint {2}→ {2}backend-dev[\s\S]*T2 Login screen {2}→ {2}frontend-dev/);
+  assert.match(next.stdout, /Delégalas a la vez/);
+  assert.match(next.stdout, /T3 espera a T1, T2/);
+
+  // Both write at the same time, each inside its own scope, with no alert.
+  assert.equal(writeTool(root, 'api/src/login.js').stdout, undefined);
+  assert.equal(writeTool(root, 'web/src/Login.jsx').stdout, undefined);
+
+  // Verification per component; without --component every component runs.
+  fs.writeFileSync(path.join(root, 'api/pass.flag'), '');
+  assert.equal((await sdd(root, 'verify', '--component', 'api')).code, 0);
+  assert.equal((await sdd(root, 'verify')).code, 2, 'web still fails');
+  assert.deepEqual([loadRuntime(root).verify.api.status, loadRuntime(root).verify.web.status], ['pass', 'fail']);
+});
+
+test('RF-VER-02: a component without verification commands is pointed out, not blocked', async (t) => {
   const root = await project(t, CONFIG.replace(', verify: {test: node check.js}', ''));
-  await approvePhases(root);
-  const spec = state(root).activeSpec;
+  const spec = await approved(root);
   fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
-  assert.match((await sdd(root, 'next')).stderr, /no verification commands/);
-  const root2 = await project(t);
-  await approvePhases(root2);
-  fs.writeFileSync(path.join(root2, 'specs', state(root2).activeSpec, 'tasks.md'), '- [ ] T1 X · Requirements: RF-01 · Component: svc · Done when: y\n');
-  assert.match((await sdd(root2, 'next')).stderr, /cannot run yet: noScope/);
+  const next = await sdd(root, 'next');
+  assert.equal(next.code, 0);
+  assert.match(next.stdout, /no tiene comandos de verificación/);
 });
 
-test('RF-SDD-16: a change updates the spec first, and blocks code until approved', async (t) => {
+test('RF-GAT-07: a protected zone alerts and points to an ADR draft', async (t) => {
   const root = await project(t);
-  await approvePhases(root);
-  const spec = state(root).activeSpec;
+  const spec = await approved(root);
   fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
-  await sdd(root, 'next');
-  assert.equal((await sdd(root, 'change', 'start')).code, 0);
-  assert.equal(writeTool(root, `specs/${spec}/spec.md`).code, 0);
-  assert.match(writeTool(root, 'src/health.js').stderr, /spec change is in progress/);
-  await sdd(root, 'gate', 'request', 'change');
-  say(root, '/sdd:approve');
-  assert.equal(writeTool(root, 'src/health.js').code, 0);
-  assert.equal(writeTool(root, `specs/${spec}/spec.md`).code, 2);
-});
-
-test('RF-GAT-07/08: protected change through an ADR and an approved gate', async (t) => {
-  const root = await project(t);
-  await approvePhases(root);
-  fs.writeFileSync(path.join(root, 'specs', state(root).activeSpec, 'tasks.md'), TASKS);
-  await sdd(root, 'next');
-  const blocked = writeTool(root, 'src/migrations/001.sql');
-  assert.match(blocked.stderr, /protected zone "db".*gate request protected --files src\/migrations\/001\.sql/s);
+  const alerted = writeTool(root, 'src/migrations/001.sql');
+  assert.equal(alerted.code, 0, 'a protected zone never blocks');
+  assert.match(alertOf(alerted), /zona protegida "db".*new-adr/s);
   const adr = await sdd(root, 'new-adr', 'Add health table');
   assert.match(adr.stdout, /docs\/decisions\/ADR-0001-add-health-table\.md/);
-  assert.equal((await sdd(root, 'gate', 'request', 'protected', '--files', 'src/migrations/001.sql', '--adr', 'docs/decisions/ADR-0001-add-health-table.md')).code, 0);
-  say(root, '/sdd:approve');
-  assert.equal(writeTool(root, 'src/migrations/001.sql').code, 0);
-  assert.equal(writeTool(root, 'src/migrations/002.sql').code, 2, 'only the approved change');
 });
 
-test('RF-GAT-05/06 through the hook: installs ask the user', async (t) => {
+test('RF-GAT-09: harness.config.yaml can change at any moment and is synced right away', async (t) => {
   const root = await project(t);
-  const r = hook(root, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'npm install lodash' } });
-  const out = JSON.parse(r.stdout);
-  assert.deepEqual([out.hookSpecificOutput.hookEventName, out.hookSpecificOutput.permissionDecision], ['PreToolUse', 'ask']);
-  assert.match(out.hookSpecificOutput.permissionDecisionReason, /adds, removes or upgrades dependencies/);
-  assert.match(hook(root, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git commit -am x' } }).stderr, /Committing is the user's job/);
+  await approved(root);
+  const pre = writeTool(root, 'harness.config.yaml');
+  assert.deepEqual([pre.code, pre.stdout], [0, undefined], 'no gate: the tool asks natively');
+  assert.equal(writeTool(root, '.harness/guards.json').code, 2, 'the harness itself stays blocked');
+  let synced = 0;
+  const post = hook(root, 'PostToolUse', { tool_name: 'Edit', tool_input: { file_path: path.join(root, 'harness.config.yaml') } }, { runSync: () => { synced += 1; return { ok: true, output: 'Applied 2 changes.' }; } });
+  assert.equal(synced, 1);
+  assert.match(alertOf(post), /se regeneró \(sdd-harness sync\)\.\nApplied 2 changes\./);
+  const failed = hook(root, 'PostToolUse', { tool_name: 'Edit', tool_input: { file_path: path.join(root, 'harness.config.yaml') } }, { runSync: () => ({ ok: false, output: 'invalid field' }) });
+  assert.match(alertOf(failed), /no se pudo regenerar la configuración: invalid field/);
 });
 
-test('RF-DOM-03/04: a subagent that writes outside its lanes stops the flow', async (t) => {
+test('RF-DOM-03/04: a subagent that writes outside its lanes raises an alert', async (t) => {
   const root = await project(t);
   let snap = { 'src/index.js': 'a' };
-  const opts = { env: { HARNESS_LANG: 'en' }, snapshot: () => snap };
-  handleHook('PreToolUse', { cwd: root, session_id: 'S1', tool_name: 'Task', tool_input: { subagent_type: 'qa-tester', prompt: 'x' } }, opts);
+  const opts = { snapshot: () => snap };
+  hook(root, 'PreToolUse', { tool_name: 'Task', tool_input: { subagent_type: 'qa-tester', prompt: 'x' } }, opts);
   snap = { 'src/index.js': 'b', 'tests/a.test.js': 'c' };
-  const r = handleHook('PostToolUse', { cwd: root, session_id: 'S1', tool_name: 'Task', tool_input: { subagent_type: 'qa-tester' } }, opts);
-  assert.equal(r.code, 2);
-  assert.match(r.stderr, /The qa-tester subagent changed files outside its paths: src\/index\.js\. .*Do not revert anything yourself/);
+  const r = hook(root, 'PostToolUse', { tool_name: 'Task', tool_input: { subagent_type: 'qa-tester' } }, opts);
+  assert.equal(r.code, 0);
+  assert.match(alertOf(r), /El subagente qa-tester cambió archivos fuera de sus rutas: src\/index\.js\./);
   // Inside its lanes: nothing to report.
-  handleHook('PreToolUse', { cwd: root, session_id: 'S1', tool_name: 'Task', tool_input: { subagent_type: 'qa-tester' } }, opts);
+  hook(root, 'PreToolUse', { tool_name: 'Task', tool_input: { subagent_type: 'qa-tester' } }, opts);
   snap = { ...snap, 'tests/b.test.js': 'd' };
-  assert.equal(handleHook('PostToolUse', { cwd: root, session_id: 'S1', tool_name: 'Task', tool_input: {} }, opts).code, 0);
+  assert.equal(hook(root, 'PostToolUse', { tool_name: 'Task', tool_input: { subagent_type: 'qa-tester' } }, opts).stdout, undefined);
 });
 
-test('RF-ORQ-12 and RF-ORQ-09: one session at a time; a new session resumes', async (t) => {
+test('RF-ORQ-09/12: any session may work; a new one sees where things are', async (t) => {
   const root = await project(t);
-  await approvePhases(root);
-  fs.writeFileSync(path.join(root, 'specs', state(root).activeSpec, 'tasks.md'), TASKS);
-  assert.equal(hook(root, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'node .harness/scripts/sdd.js next' } }).code, 0);
-  await sdd(root, 'next');
-  const other = handleHook('PreToolUse', { cwd: root, session_id: 'S2', tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/x.js'), content: '' } }, { env: { HARNESS_LANG: 'en' } });
-  assert.match(other.stderr, /Another session \(S1\) is running tasks/);
-  const resumed = handleHook('SessionStart', { cwd: root, session_id: 'S2' }, { env: { HARNESS_LANG: 'en' } });
-  assert.match(resumed.stdout, /resuming the work in progress\.\n- Active spec: SVC-001-login \(Phase: implement\)\n- Current task: T1 Health endpoint/);
-  hook(root, 'SessionEnd');
-  assert.equal(handleHook('PreToolUse', { cwd: root, session_id: 'S2', tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/x.js'), content: '' } }, { env: { HARNESS_LANG: 'en' } }).code, 0);
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  const other = handleHook('PreToolUse', { cwd: root, session_id: 'S2', tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/x.js'), content: '' } }, { env: {} });
+  assert.equal(other.code, 0, 'no session lock');
+  const resumed = hook(root, 'SessionStart');
+  assert.match(resumed.stdout, /trabajo en curso\.\n- Spec en curso: SVC-001-login \(Estado: plan-approved\)\n- Hechas \(0\/2\): —\n- Pendientes: T1, T2\n- Listas para empezar: T1/);
+  // Deleting the runtime state loses nothing that matters: the status is in the files.
+  fs.rmSync(path.join(root, '.harness', 'state'), { recursive: true, force: true });
+  assert.match(hook(root, 'SessionStart').stdout, /Estado: plan-approved/);
 });
 
-test('edge case 13: deleting .harness/state mid-spec rebuilds it and says so', async (t) => {
-  const root = await project(t);
-  await approvePhases(root);
-  fs.writeFileSync(path.join(root, 'specs', state(root).activeSpec, 'tasks.md'), TASKS);
-  await sdd(root, 'next');
-  fs.rmSync(path.join(root, '.harness', 'state'), { recursive: true });
-  const r = hook(root, 'SessionStart');
-  assert.match(r.stdout, /state was rebuilt from progress\.md/);
-  assert.equal(state(root).task.id, 'T1');
-});
-
-test('RF-GAT-03/04: commit context per repository, never a commit', async (t) => {
+test('RF-GAT-03/04: commit context per repository, for a commit the user okays', async (t) => {
   const root = await project(t);
   write(root, { 'src/new.js': 'export const a = 1;\n' });
-  const r = await sdd(root, 'commit-context');
-  const ctx = JSON.parse(r.stdout);
+  const ctx = JSON.parse((await sdd(root, 'commit-context')).stdout);
   assert.equal(ctx.convention, 'conventional');
   assert.deepEqual(ctx.repositories.map((x) => x.repo), ['.']);
   assert.ok(ctx.repositories[0].files.some((f) => f.startsWith('src/')));
-  assert.match(ctx.note, /Never run git commit/);
+  assert.match(ctx.note, /only after the user says yes; never push/);
 });
 
-test('/sdd:status shows spec, task, blockers and cost as not available', async (t) => {
+test('/sdd:status: what happened, what is pending and the last commits', async (t) => {
   const root = await project(t);
-  await approvePhases(root);
+  await approved(root);
+  git(root, 'add', '-A');
+  git(root, '-c', 'user.email=a@b.c', '-c', 'user.name=A', 'commit', '-q', '-m', 'feat: first');
   const r = await sdd(root, 'status');
-  assert.match(r.stdout, /Active spec: SVC-001-login\n {2}Phase: implement · Approved: spec, plan, tasks\n {2}Current task: —\n {2}Pending decision: —\n {2}Blockers: —\n {2}Cost: not available/);
+  assert.match(r.stdout, /Estado de sdd-harness\n- Spec en curso: SVC-001-login \(Estado: plan-approved\)/);
+  assert.match(r.stdout, /Últimos commits:\n {4}\w+ feat: first/);
   const json = JSON.parse((await sdd(root, 'status', '--json')).stdout);
-  assert.equal(json.cost, null);
+  assert.deepEqual([json.spec, json.status, json.pending], ['SVC-001-login', 'plan-approved', null]);
 });

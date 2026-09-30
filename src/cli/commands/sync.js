@@ -8,7 +8,6 @@ import { issueLines } from '../../config/format.js';
 import { planChanges } from '../../engine/plan.js';
 import { MANIFEST_FILE, readManifest, serializeManifest } from '../../engine/manifest.js';
 import { applyChanges } from '../../engine/transaction.js';
-import { lockIsFresh, readLock } from '../../guards/state.js';
 import { CancelledError, createLinePrompter, createScriptedPrompter } from '../prompt.js';
 import { buildDesired, compareVersions, gitConfigAccess, makeReader, makeResolver, missingDirs, planGitConfig, renderDiffs, renderErrors, renderNotices, renderReport } from './common.js';
 
@@ -46,23 +45,6 @@ export async function syncCommand(argv, { io, t, tc, version, override }) {
   const dryRun = flags['dry-run'];
   const prompter = io.prompter ?? (flags.yes || dryRun ? createScriptedPrompter({}, { output: io.stdout }) : createLinePrompter({ input: io.stdin, output: io.stdout, t: tc }));
   try {
-    // Edge case 26: an agent session is running tasks; wait for it or cancel.
-    if (!dryRun && lockIsFresh(readLock(root))) {
-      const holder = readLock(root);
-      err(tc.sync.locked(holder.session));
-      if (flags.yes || !(await prompter.confirm('waitLock', tc.sync.waitLock, { default: true }))) {
-        out(tc.sync.aborted);
-        return 1;
-      }
-      const deadline = Date.now() + (io.lockWaitMs ?? 10 * 60 * 1000);
-      while (lockIsFresh(readLock(root))) {
-        if (Date.now() > deadline) {
-          out(tc.sync.aborted);
-          return 1;
-        }
-        await new Promise((r) => setTimeout(r, io.lockPollMs ?? 2000));
-      }
-    }
     const { entries, notices, gitConfig } = buildDesired(config, root);
     const git = planGitConfig(root, gitConfig, manifest);
     const plan = await planChanges({

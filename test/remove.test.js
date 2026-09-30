@@ -131,8 +131,7 @@ test('RNF-06: remove is idempotent and runtime state is cleaned up', async (t) =
   const before = snapshot(root);
   await run(['init', '--yes'], { cwd: root });
   write(root, { 'harness.config.yaml': read(root, 'harness.config.yaml') });
-  assert.equal((await run(['guard', 'retry', 'record', '--task', 'T1', '--error', 'x'], { cwd: root })).code, 0);
-  write(root, { '.harness/logs/events.jsonl': '{}\n' });
+  write(root, { '.harness/logs/events.jsonl': '{}\n', '.harness/state/runtime.json': '{"version":2}\n' });
   assert.equal((await run(['remove', '--yes'], { cwd: root })).code, 0);
   assert.deepEqual(snapshot(root), before);
   const again = await run(['remove', '--yes'], { cwd: root });

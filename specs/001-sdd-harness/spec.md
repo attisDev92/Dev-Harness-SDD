@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Estado | Borrador, pendiente de aprobación |
-| Fecha | 2026-09-28 |
+| Fecha | 2026-09-30 (revisión: flujo ligero) |
 | Alcance | Producto completo v1.0 en una sola spec, entregado por hitos (ver sección final) |
 | Idioma | Spec y docs en español; código e identificadores en inglés |
 | Ubicación en el repo | `specs/001-sdd-harness/spec.md` |
@@ -19,10 +19,10 @@ Los agentes de IA para programar son rápidos, pero sin un entorno que los guíe
 
 **sdd-harness** es una herramienta de línea de comandos, open source, que cualquier persona instala una vez y activa por proyecto. Al activarla, prepara el proyecto para trabajar con Spec-Driven Development (SDD) usando agentes de IA con cuatro garantías:
 
-1. **Flujo SDD completo:** constitución → spec → clarificación → plan → tareas → implementación (una tarea cada vez, tests primero) → validación → cambio.
+1. **Flujo SDD completo:** constitución → spec → plan y tareas → implementación (frontend y backend en paralelo, tests primero) → validación, con la documentación siempre al día.
 2. **Roles especializados** (frontend, backend, QA, revisión, depuración, documentación) coordinados por un orquestador.
-3. **Guardarraíles deterministas:** lo innegociable se aplica con scripts y permisos, no solo con instrucciones.
-4. **El humano decide:** commits, dependencias, cambios de stack, arquitectura o base de datos, y la validación de cada implementación.
+3. **Ligero y rápido:** solo dos paradas de aprobación (spec y plan+tareas), que se responden hablando ("continúa", "aprobado"). Lo demás son avisos, no bloqueos. Reutiliza lo que la herramienta ya ofrece (permisos, subagentes, skills y preguntas nativas) en lugar de reinventarlo.
+4. **El humano decide:** aprueba la spec y el plan, confirma commits (que el agente propone al cerrar cada historia), dependencias y operaciones de git destructivas, y prueba lo implementado.
 
 Funciona con varias herramientas de agentes (Claude Code, opencode, Codex y Antigravity), en varios sistemas operativos (Windows, macOS y Linux) y con varias topologías de proyecto (repo único, monorepo, varios repos y workspace).
 
@@ -30,7 +30,7 @@ Funciona con varias herramientas de agentes (Claude Code, opencode, Codex y Anti
 
 | Actor | Descripción |
 |---|---|
-| **Desarrollador** | Instala la CLI, activa el harness en sus proyectos y dirige el flujo SDD. Aprueba o rechaza en cada gate |
+| **Desarrollador** | Instala la CLI, activa el harness en sus proyectos y dirige el flujo SDD. Aprueba la spec y el plan, y confirma los commits |
 | **Compañero de equipo sin harness** | Trabaja en el mismo repo sin usar el harness. No debe verse afectado |
 | **Agente de IA** | Herramienta de agentes que ejecuta el flujo según la configuración generada |
 | **Contribuidor** | Persona que mejora el harness: adaptadores, skills del registro, conectores de tracker |
@@ -46,8 +46,8 @@ Funciona con varias herramientas de agentes (Claude Code, opencode, Codex y Anti
 | **Topología** | `single` (repo único), `monorepo`, `multi-repo` o `workspace` (carpeta no versionada que contiene varios repos) |
 | **Rol** | Especialización de un agente: `spec-reviewer`, `architect`, `frontend-dev`, `backend-dev`, `qa-tester`, `reviewer`, `debugger`, `doc-writer` |
 | **Orquestador** | Lógica que dirige el flujo SDD desde la sesión principal del agente |
-| **Gate** | Punto donde el sistema se detiene y espera una decisión explícita del desarrollador |
-| **Zona protegida** | Conjunto de rutas o secciones cuya modificación exige aprobación: dependencias, base de datos, contratos, arquitectura, seguridad y la propia configuración del harness |
+| **Parada** | Uno de los dos puntos donde el flujo espera al desarrollador: aprobar la spec y aprobar el plan con sus tareas. Se responde en lenguaje natural |
+| **Zona protegida** | Conjunto de rutas cuya modificación genera un aviso y un ADR en borrador: dependencias, base de datos, contratos, arquitectura y seguridad |
 | **Arreglo en alcance** | Intento de corregir un fallo que solo modifica archivos del alcance de la tarea actual y ninguna zona protegida |
 | **Artefactos** | Specs, contratos, ADRs y docs del proyecto. Son contenido del desarrollador, no archivos generados |
 | **Archivo generado** | Archivo creado por el harness y registrado en `.harness/manifest.lock` |
@@ -65,8 +65,11 @@ Funciona con varias herramientas de agentes (Claude Code, opencode, Codex y Anti
 - **H1:** Como desarrollador quiero instalar la CLI una sola vez para activarla solo en los proyectos que elija.
 - **H2:** Como desarrollador quiero una entrevista guiada al activar el harness, para adaptarlo a las herramientas, la topología, el stack y las convenciones de cada proyecto.
 - **H3:** Como desarrollador quiero que se respeten las convenciones que mi proyecto ya declara, para no tener que reescribirlas.
-- **H4:** Como desarrollador quiero que ningún agente haga commits, instale dependencias ni cambie stack, arquitectura o base de datos sin mi aprobación, para mantener el control.
-- **H5:** Como desarrollador quiero probar personalmente cada implementación antes de avanzar, para validar que funciona como espero.
+- **H4:** Como desarrollador quiero que ningún agente haga commits, push ni instale dependencias sin mi OK, y que me avise cuando toque stack, arquitectura o base de datos, para mantener el control sin frenar el trabajo.
+- **H5:** Como desarrollador quiero probar personalmente cada historia antes de hacer commit, para validar que funciona como espero.
+- **H16:** Como desarrollador quiero aprobar hablando ("continúa", "aprobado") y solo en dos momentos, para que una spec de media hora no se alargue horas.
+- **H17:** Como desarrollador quiero que las tareas que aparecen durante la implementación y los cambios de configuración entren en el flujo sin bloquearlo.
+- **H18:** Como desarrollador quiero comandos que me informen de qué pasó y lancen trabajo en paralelo, pero ninguno que sea obligatorio para avanzar.
 - **H6:** Como desarrollador quiero que, ante un error fuera de alcance o repetido, el agente se detenga y me dé el diagnóstico con opciones, para no gastar tiempo ni tokens en bucles.
 - **H7:** Como desarrollador quiero que frontend y backend los implementen agentes distintos con skills de su especialidad, para obtener código de mejor calidad y bien separado.
 - **H8:** Como desarrollador quiero que los agentes solo creen documentos en ubicaciones permitidas, para mantener el repo ordenado.
@@ -103,7 +106,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-INI-05:** EL SISTEMA preguntará un único prefijo de ID de specs para el proyecto (por defecto `SPEC`) y, en `multi-repo` y `workspace`, si las specs viven en la raíz (por defecto) o en cada repo. Las specs no pertenecen a un componente; el `id_prefix` por componente es opcional.
 - **RF-INI-06:** EL SISTEMA preguntará la fuente de diseño (`none`, `tokens-in-code`, `penpot`, `figma`) cuando exista un componente de frontend.
 - **RF-INI-07:** EL SISTEMA preguntará si se activa un tracker y cuál: cualquiera que use el desarrollador (atajos para `github`, `linear`, `notion`, `jira`, o el nombre de otro), con la opción "ninguno" como valor por defecto.
-- **RF-INI-08:** EL SISTEMA preguntará la granularidad del gate de prueba manual (`task`, `story`, `spec`), con `task` como valor por defecto.
+- **RF-INI-08:** EL SISTEMA preguntará la granularidad de la prueba manual (`task`, `story`, `spec`, `none`), con `story` como valor por defecto.
 - **RF-INI-09:** EL SISTEMA preguntará el modo de instalación (`local` o `team`), con `local` como valor por defecto.
 - **RF-INI-10:** EL SISTEMA preguntará si los artefactos (specs, contratos, ADRs, docs) se versionan o se mantienen locales.
 - **RF-INI-11:** EL SISTEMA detectará los comandos de verificación de cada componente (lint, typecheck, tests, e2e) a partir de los scripts del proyecto y los propondrá para confirmación.
@@ -187,70 +190,73 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 
 ### 5.10 Flujo SDD (SDD)
 
-- **RF-SDD-01:** CUANDO el usuario invoque `/sdd:constitution`, EL SISTEMA propondrá entre 6 y 10 principios cortos y verificables en `docs/constitution.md` y esperará aprobación.
-- **RF-SDD-02:** EL SISTEMA incluirá siempre en la constitución estos principios: "el agente nunca hace commit", "toda decisión de stack o arquitectura requiere un ADR aprobado" y "ninguna tarea termina con la verificación en rojo".
-- **RF-SDD-03:** CUANDO el usuario invoque `/sdd:spec`, EL SISTEMA entrevistará al usuario con preguntas de una en una (máximo 6) y generará `specs/<PREFIJO>-<NNN>-<nombre>/spec.md`.
+- **RF-SDD-01:** CUANDO se empiece la primera spec de un proyecto sin `docs/constitution.md`, EL SISTEMA propondrá entre 6 y 10 principios cortos y verificables y los incluirá en la primera parada.
+- **RF-SDD-02:** EL SISTEMA incluirá siempre en la constitución estos principios: "el agente propone el commit al cerrar cada historia y solo lo hace con el OK del usuario", "toda decisión de stack o arquitectura queda en un ADR" y "ninguna tarea termina con la verificación en rojo".
+- **RF-SDD-03:** CUANDO el usuario pida una funcionalidad nueva (en lenguaje natural o con `/sdd:spec`), EL SISTEMA entrevistará al usuario con preguntas de una en una (máximo 6) y generará `specs/<PREFIJO>-<NNN>-<nombre>/spec.md`.
 - **RF-SDD-04:** EL SISTEMA asignará a cada spec nueva el siguiente número libre con tres dígitos dentro de su prefijo (el del proyecto, o el del componente si se indicó `--component` y lo define).
 - **RF-SDD-05:** EL SISTEMA redactará los requisitos de la spec en notación EARS, numerados y verificables.
 - **RF-SDD-06:** EL SISTEMA marcará cada hueco de información como `[NECESITA ACLARACIÓN: <pregunta>]` en lugar de inventar una respuesta.
 - **RF-SDD-07:** EL SISTEMA no incluirá en la spec decisiones de stack, archivos, esquemas ni algoritmos.
-- **RF-SDD-08:** CUANDO el usuario invoque `/sdd:clarify`, EL SISTEMA listará ambigüedades, contradicciones, casos límite ausentes y conflictos con la constitución, sin resolverlos.
-- **RF-SDD-09:** CUANDO el usuario invoque `/sdd:plan`, EL SISTEMA generará `plan.md` con módulos, modelo de datos, decisiones justificadas (con la alternativa descartada) y estrategia de tests, indicando qué requisitos cubre cada parte.
+- **RF-SDD-08:** ANTES de la primera parada, EL SISTEMA revisará la spec (ambigüedades, contradicciones, casos límite ausentes, conflictos con la constitución) y presentará los hallazgos junto con la spec.
+- **RF-SDD-09:** CUANDO se apruebe la spec, EL SISTEMA generará `plan.md` con módulos, modelo de datos, decisiones justificadas (con la alternativa descartada) y estrategia de tests, indicando qué requisitos cubre cada parte.
 - **RF-SDD-10:** DONDE la spec afecte a más de un componente, EL SISTEMA generará el contrato entre componentes en `contracts/` dentro de la spec del proveedor.
-- **RF-SDD-11:** CUANDO el plan contenga una decisión de stack o de arquitectura, EL SISTEMA propondrá un ADR en `docs/decisions/ADR-<NNNN>-<nombre>.md` y esperará aprobación.
-- **RF-SDD-12:** CUANDO el usuario invoque `/sdd:tasks`, EL SISTEMA generará `tasks.md` con tareas ordenadas por dependencia. Cada una incluirá los requisitos que cubre, el componente, el alcance de archivos y una línea "Hecho cuando:" verificable.
-- **RF-SDD-13:** EL SISTEMA no pasará de una fase a la siguiente sin la aprobación explícita del usuario.
-- **RF-SDD-14:** CUANDO el usuario invoque `/sdd:validate`, EL SISTEMA recorrerá la spec requisito por requisito, indicará qué test cubre cada uno y su resultado, y dará un veredicto final.
+- **RF-SDD-11:** CUANDO el plan contenga una decisión de stack o de arquitectura, EL SISTEMA redactará un ADR en `docs/decisions/ADR-<NNNN>-<nombre>.md` que se aprueba junto con el plan.
+- **RF-SDD-12:** EL SISTEMA generará `tasks.md` junto con el plan, con tareas ordenadas por dependencia. Cada tarea indica su componente; los requisitos que cubre, el alcance de archivos y la línea "Hecho cuando:" son recomendados.
+- **RF-SDD-13:** EL SISTEMA tendrá exactamente dos paradas de aprobación: la spec y el plan con sus tareas. El resto del flujo avanza sin esperar.
+- **RF-SDD-14:** CUANDO se cierre la última historia de la spec, o el usuario invoque `/sdd:validate`, EL SISTEMA recorrerá la spec requisito por requisito, indicará qué test cubre cada uno y dará un veredicto final.
 - **RF-SDD-15:** SI un requisito no tiene test asociado, ENTONCES EL SISTEMA lo marcará como no cubierto en la validación.
-- **RF-SDD-16:** CUANDO el usuario invoque `/sdd:change` con un requisito nuevo, EL SISTEMA actualizará primero la spec, mostrará el diff y no tocará código hasta tener aprobación.
-- **RF-SDD-17:** CUANDO el usuario invoque `/sdd:status`, EL SISTEMA mostrará la spec activa, la tarea actual, los bloqueos, las decisiones pendientes y el costo acumulado.
-- **RF-SDD-18:** EL SISTEMA no modificará una spec aprobada salvo a través de `/sdd:change`.
+- **RF-SDD-16:** CUANDO el usuario pida algo que cambie o amplíe una spec aprobada, EL SISTEMA actualizará primero la spec (y plan y tareas si hace falta), mostrará el diff y seguirá; solo se detendrá si el cambio contradice requisitos ya implementados.
+- **RF-SDD-17:** CUANDO el usuario invoque `/sdd:status`, EL SISTEMA mostrará la spec activa y su fase, las últimas tareas cerradas, las tareas en curso y pendientes, las añadidas durante la implementación y el último resultado de verificación.
+- **RF-SDD-18:** EL SISTEMA guardará el estado de cada spec en el frontmatter de `spec.md` (`status: draft | spec-approved | plan-approved | done`) y el de cada tarea en las casillas de `tasks.md`, sin estado oculto.
+- **RF-SDD-19:** CUANDO durante la implementación aparezca trabajo no previsto, EL SISTEMA lo añadirá a `tasks.md` como tarea marcada "añadida en implementación" y lo contará en su resumen, sin detenerse.
 
 ### 5.11 Orquestación y roles (ORQ)
 
-- **RF-ORQ-01:** CUANDO el usuario invoque `/sdd:next`, EL SISTEMA seleccionará la primera tarea pendiente cuyas dependencias estén completadas.
-- **RF-ORQ-02:** EL SISTEMA ejecutará una sola tarea por invocación de `/sdd:next`.
+- **RF-ORQ-01:** EL SISTEMA ofrecerá una skill orquestadora (`sdd`) que se activa por lenguaje natural, lee el estado de los `.md` y ejecuta el siguiente paso lógico.
+- **RF-ORQ-02:** EL SISTEMA ejecutará en paralelo las tareas de componentes distintos: una tarea espera solo a sus propias dependencias (`Depends on`). `/sdd:next` lanza todas las que están listas.
 - **RF-ORQ-03:** EL SISTEMA delegará la implementación al rol que corresponde al componente de la tarea.
 - **RF-ORQ-04:** EL SISTEMA hará que el rol implementador escriba los tests de la tarea antes que el código.
 - **RF-ORQ-05:** CUANDO la implementación termine, EL SISTEMA ejecutará los comandos de verificación del componente.
-- **RF-ORQ-06:** CUANDO la verificación pase, EL SISTEMA delegará al rol `reviewer`, que revisará primero el cumplimiento de la spec y después la calidad y la seguridad.
-- **RF-ORQ-07:** SI el revisor encuentra incumplimientos, ENTONCES EL SISTEMA los mostrará al usuario y esperará su decisión antes de corregir.
-- **RF-ORQ-08:** EL SISTEMA registrará en `progress.md` la tarea actual, su estado, sus bloqueos y las decisiones tomadas.
-- **RF-ORQ-09:** CUANDO se abra una sesión nueva en un proyecto con una spec en curso, EL SISTEMA retomará el trabajo a partir de `progress.md` y del estado en `.harness/state/`.
+- **RF-ORQ-06:** CUANDO la verificación pase, EL SISTEMA lanzará en paralelo el rol `reviewer` (cumplimiento de la spec, luego calidad y seguridad) y el rol `doc-writer` (documentos afectados). También se pueden lanzar con `/sdd:review` y `/sdd:docs`.
+- **RF-ORQ-07:** SI el revisor encuentra incumplimientos, ENTONCES EL SISTEMA los corregirá dentro de la tarea y los contará en el resumen; solo preguntará si la corrección cambia la spec.
+- **RF-ORQ-08:** EL SISTEMA registrará en `progress.md` las decisiones tomadas y los avisos relevantes.
+- **RF-ORQ-09:** CUANDO se abra una sesión nueva en un proyecto con una spec en curso, EL SISTEMA mostrará automáticamente un resumen del estado leído de los `.md`.
 - **RF-ORQ-10:** EL SISTEMA asignará a cada rol un nivel de modelo (`high`, `mid`, `low`) configurable, que cada adaptador traducirá a un modelo concreto de su herramienta.
-- **RF-ORQ-11:** DONDE la herramienta no ofrezca subagentes equivalentes, EL SISTEMA ejecutará los roles en modo degradado sin omitir ningún gate.
-- **RF-ORQ-12:** SI dos sesiones intentan ejecutar tareas en el mismo proyecto a la vez, ENTONCES EL SISTEMA bloqueará la segunda e indicará qué sesión tiene la tarea en curso.
+- **RF-ORQ-11:** DONDE la herramienta no ofrezca subagentes equivalentes, EL SISTEMA ejecutará los roles en modo degradado, uno tras otro.
+- **RF-ORQ-12:** EL SISTEMA no bloqueará sesiones concurrentes en el mismo proyecto.
+- **RF-ORQ-13:** EL SISTEMA avisará, sin bloquear, cuando se escriba código sin tarea en curso, fuera del alcance de la tarea o en una zona protegida; cada aviso se emite una vez por tarea. Solo se bloquea lo que dañaría el propio harness.
+- **RF-ORQ-14:** Los comandos `/sdd:*` (`status`, `spec`, `next`, `docs`, `review`, `validate`, `commit`) serán atajos que informan o lanzan trabajo; ninguno será necesario para aprobar ni para avanzar.
 
-### 5.12 Gates humanos (GAT)
+### 5.12 Aprobaciones y confirmaciones (GAT)
 
-- **RF-GAT-01:** SI un agente intenta ejecutar un comando que crea commits o modifica el historial o el remoto (`git commit`, `push`, `reset --hard`, `rebase`, `merge`, `cherry-pick`, `revert`, `tag`, `stash drop`, `branch -D`), ENTONCES EL SISTEMA lo bloqueará e informará al agente de que el commit es tarea del usuario.
-- **RF-GAT-02:** EL SISTEMA detectará los comandos bloqueados aunque estén encadenados (`&&`, `;`, `|`), envueltos en otra shell (`bash -c`, `cmd /c`, `powershell -Command`) o invocados mediante alias de git.
-- **RF-GAT-03:** CUANDO el usuario invoque `/sdd:commit`, EL SISTEMA propondrá un mensaje de commit por cada repo con cambios, referenciando las specs y tareas, sin ejecutar el commit.
-- **RF-GAT-04:** EL SISTEMA no incluirá en una misma propuesta de commit cambios de repos distintos.
-- **RF-GAT-05:** SI un agente intenta ejecutar un comando de instalación de dependencias de cualquier gestor de paquetes soportado, ENTONCES EL SISTEMA pedirá aprobación al usuario antes de ejecutarlo.
-- **RF-GAT-06:** SI un agente intenta modificar la sección de dependencias de un manifiesto o un lockfile, ENTONCES EL SISTEMA pedirá aprobación al usuario.
-- **RF-GAT-07:** SI un agente intenta modificar una zona protegida, ENTONCES EL SISTEMA detendrá la acción y presentará qué quiere cambiar, por qué, las alternativas y un borrador de ADR.
-- **RF-GAT-08:** CUANDO el usuario apruebe un cambio en zona protegida, EL SISTEMA registrará el ADR aprobado y permitirá solo el cambio aprobado.
-- **RF-GAT-09:** EL SISTEMA tratará `harness.config.yaml`, `.harness/` y los archivos generados como zona protegida frente a los agentes.
-- **RF-GAT-10:** CUANDO una tarea supere verificación y revisión, EL SISTEMA presentará instrucciones de prueba manual: cómo arrancar la app, la URL o el comando, los pasos, los datos de prueba y el resultado esperado por requisito.
-- **RF-GAT-11:** MIENTRAS esté pendiente la prueba manual de una tarea, EL SISTEMA no la marcará como hecha ni iniciará otra.
-- **RF-GAT-12:** CUANDO el usuario responda OK a la prueba manual, EL SISTEMA marcará la tarea como hecha en `tasks.md` y actualizará `progress.md`.
-- **RF-GAT-13:** CUANDO el usuario responda KO con una descripción, EL SISTEMA iniciará el triage (RF-RET-04) sin modificar código.
-- **RF-GAT-14:** DONDE la granularidad del gate manual sea `story` o `spec`, EL SISTEMA agrupará la prueba manual al completar todas las tareas de esa historia o de esa spec.
+- **RF-GAT-01:** EL SISTEMA pedirá confirmación nativa de la herramienta, mostrando el comando, para `git push`, `rebase`, `reset --hard`, `branch -D`, `tag`, `cherry-pick`, `merge` y `stash drop`. `git add` y `git commit` no piden confirmación a la herramienta porque el commit ya se acordó con el usuario (RF-GAT-03).
+- **RF-GAT-02:** EL SISTEMA se apoyará en los permisos nativos de la herramienta para estas confirmaciones, sin analizar el shell por su cuenta.
+- **RF-GAT-03:** CUANDO se cierre una historia (o el usuario invoque `/sdd:commit`), EL SISTEMA propondrá un mensaje de commit por cada repo con cambios, referenciando specs y tareas, y hará el commit solo si el usuario responde afirmativamente.
+- **RF-GAT-04:** EL SISTEMA no incluirá en un mismo commit cambios de repos distintos.
+- **RF-GAT-05:** SI un agente intenta ejecutar un comando de instalación de dependencias de cualquier gestor de paquetes soportado, ENTONCES EL SISTEMA pedirá confirmación nativa al usuario.
+- **RF-GAT-06:** SI un agente modifica la sección de dependencias de un manifiesto o un lockfile, ENTONCES EL SISTEMA le avisará, sin bloquear.
+- **RF-GAT-07:** SI un agente modifica una zona protegida, ENTONCES EL SISTEMA le avisará, sin bloquear, para que deje la decisión registrada (borrador de ADR) y la cuente al usuario. Las configuraciones de herramientas (zona `tooling`) no generan aviso.
+- **RF-GAT-08:** CUANDO el usuario responda a una parada con una frase afirmativa ("continúa", "aprobado", "sí", "ok", "dale", "adelante") o con el botón de aprobación, EL SISTEMA registrará la aprobación en el frontmatter de la spec de forma determinista y seguirá. Cualquier otra respuesta se tomará como petición de cambios.
+- **RF-GAT-09:** EL SISTEMA bloqueará la edición de `.harness/` y de los archivos generados por parte de los agentes. `harness.config.yaml` se podrá editar en cualquier momento con la confirmación nativa, y después la configuración se sincronizará automáticamente.
+- **RF-GAT-10:** CUANDO una historia supere verificación y revisión, EL SISTEMA presentará instrucciones de prueba manual: cómo arrancar la app, la URL o el comando, los pasos, los datos de prueba y el resultado esperado por requisito.
+- **RF-GAT-11:** La prueba manual será una pregunta normal, no una parada: una respuesta afirmativa cierra la historia y una descripción de fallo inicia el triage de esa historia; las demás siguen.
+- **RF-GAT-12:** CUANDO una tarea termine con la verificación en verde, EL SISTEMA marcará su casilla en `tasks.md`.
+- **RF-GAT-13:** CUANDO el usuario informe de un fallo en la prueba manual, EL SISTEMA iniciará el triage (RF-RET-04).
+- **RF-GAT-14:** DONDE la granularidad de la prueba manual sea `task`, `story`, `spec` o `none`, EL SISTEMA la pedirá con esa granularidad (por defecto `story`).
 
 ### 5.13 Reintentos y triage (RET)
 
-- **RF-RET-01:** SI la verificación de una tarea falla y el arreglo necesario es en alcance, ENTONCES EL SISTEMA permitirá hasta 2 intentos automáticos de corrección por tarea.
-- **RF-RET-02:** SI el arreglo necesario requiere modificar archivos fuera del alcance de la tarea o una zona protegida, ENTONCES EL SISTEMA no hará ningún intento automático e iniciará el triage.
-- **RF-RET-03:** SI se agotan los intentos automáticos o el mismo error se repite en dos intentos consecutivos, ENTONCES EL SISTEMA detendrá la corrección e iniciará el triage.
+- **RF-RET-01:** SI la verificación de una tarea falla, ENTONCES EL SISTEMA hará hasta 2 intentos de corrección.
+- **RF-RET-02:** SI el arreglo necesario requiere una zona protegida, ENTONCES EL SISTEMA lo hará con el aviso correspondiente y lo contará en el resumen.
+- **RF-RET-03:** SI se agotan los intentos o el mismo error se repite, ENTONCES EL SISTEMA detendrá la corrección e iniciará el triage.
 - **RF-RET-04:** CUANDO se inicie el triage, EL SISTEMA delegará al rol `debugger`, que entregará un informe con: error, pasos de reproducción, hipótesis de causa ordenadas por probabilidad, entre 2 y 3 opciones con ventajas e inconvenientes, y una recomendación.
 - **RF-RET-05:** EL SISTEMA no modificará código durante el triage.
-- **RF-RET-06:** CUANDO el usuario elija una opción del informe, EL SISTEMA aplicará solo esa opción y reiniciará el contador de intentos de la tarea.
-- **RF-RET-07:** EL SISTEMA aplicará el contador de intentos mediante un script determinista, independiente de las instrucciones al modelo, en las herramientas que lo permitan.
+- **RF-RET-06:** CUANDO el usuario elija una opción del informe, EL SISTEMA aplicará esa opción con un contador de intentos nuevo.
+- **RF-RET-07:** El límite de intentos es una instrucción del orquestador; no se aplica con estado oculto.
 
 ### 5.14 Orden de archivos y documentos (MD)
 
-- **RF-MD-01:** SI un agente intenta crear un archivo de documentación (`.md` o `.mdx`) fuera de la lista blanca configurada, ENTONCES EL SISTEMA bloqueará la escritura e indicará las ubicaciones permitidas.
+- **RF-MD-01:** EL SISTEMA permitirá a los agentes crear y actualizar cualquier documento `.md` o `.mdx`, y les exigirá mantener al día los que cada cambio afecte (spec, plan, tareas, README, ADR). DONDE `gates.docs` sea `whitelist`, bloqueará la creación de documentos fuera de la lista blanca.
 - **RF-MD-02:** EL SISTEMA incluirá en la lista blanca por defecto: `README.md`, `CHANGELOG.md`, `AGENTS.md`, los archivos de spec con nombre fijo (`spec`, `plan`, `tasks`, `progress`), `docs/constitution.md`, `docs/decisions/ADR-*.md`, `docs/architecture/*.md` y `docs/lessons.md`.
 - **RF-MD-03:** DONDE el usuario pida explícitamente un documento fuera de la lista blanca, EL SISTEMA solicitará confirmación y lo añadirá a la lista blanca del proyecto.
 - **RF-MD-04:** EL SISTEMA hará que el rol `doc-writer` modifique solo documentos de la lista blanca.
@@ -260,14 +266,14 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-DOM-01:** EL SISTEMA asignará a cada rol implementador las rutas donde puede escribir, según los componentes configurados.
 - **RF-DOM-02:** EL SISTEMA configurará los roles `spec-reviewer`, `reviewer` y `debugger` como solo lectura sobre el código.
 - **RF-DOM-03:** CUANDO un rol termine su trabajo, EL SISTEMA comprobará con el diff de git que no modificó archivos fuera de sus rutas.
-- **RF-DOM-04:** SI un rol modificó archivos fuera de sus rutas, ENTONCES EL SISTEMA detendrá el flujo, listará esos archivos y preguntará al usuario si conservarlos o descartarlos, sin revertir nada automáticamente.
+- **RF-DOM-04:** SI un rol modificó archivos fuera de sus rutas, ENTONCES EL SISTEMA avisará, sin detener el flujo, listando esos archivos, y no revertirá nada automáticamente.
 
 ### 5.16 Verificación (VER)
 
-- **RF-VER-01:** SI un agente intenta dar por terminada una tarea con la verificación fallando, ENTONCES EL SISTEMA bloqueará el cierre e indicará qué comando falla.
+- **RF-VER-01:** SI un agente intenta dar por terminada una tarea con la verificación fallando, ENTONCES EL SISTEMA bloqueará el cierre una sola vez e indicará qué comando falla. Tener cambios sin verificar no bloquea.
 - **RF-VER-02:** SI un componente no tiene comandos de verificación configurados, ENTONCES EL SISTEMA pedirá al usuario que los defina antes de ejecutar su primera tarea.
 - **RF-VER-03:** DONDE el usuario lo acepte en `init`, EL SISTEMA configurará los git hooks del proyecto mediante `core.hooksPath` sin añadir dependencias al proyecto.
-- **RF-VER-04:** EL SISTEMA ejecutará en pre-commit la lista blanca de documentos, la detección de secretos y los comandos de verificación rápidos de los componentes con cambios.
+- **RF-VER-04:** EL SISTEMA ejecutará en pre-commit solo la detección de secretos y de archivos `.env`. La lista blanca de documentos y la verificación se ejecutan en CI.
 - **RF-VER-05:** SI el proyecto ya tiene `core.hooksPath` configurado o usa un gestor de git hooks, ENTONCES EL SISTEMA no lo reemplazará y ofrecerá encadenar sus checks o saltar este paso.
 - **RF-VER-06:** DONDE el usuario lo solicite, EL SISTEMA generará una plantilla de CI que ejecute los mismos checks que los git hooks, además de la suite completa.
 
@@ -318,7 +324,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 
 ### 5.20 Observabilidad (OBS)
 
-- **RF-OBS-01:** EL SISTEMA registrará en `.harness/logs/events.jsonl` cada evento del flujo: fase, tarea, rol, resultado, intentos, gate y duración.
+- **RF-OBS-01:** EL SISTEMA registrará en `.harness/logs/events.jsonl` cada evento del flujo: fase, tarea, rol, resultado, aprobación y duración.
 - **RF-OBS-02:** EL SISTEMA no registrará secretos, tokens ni el contenido de archivos `.env`.
 - **RF-OBS-03:** DONDE la herramienta exponga datos de costo o tokens, EL SISTEMA los asociará a la tarea y a la spec en curso.
 - **RF-OBS-04:** SI la herramienta no expone datos de costo, ENTONCES EL SISTEMA mostrará "no disponible" en lugar de estimarlos.
@@ -329,7 +335,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 - **RF-ADP-01:** EL SISTEMA generará, para cada herramienta activada, los roles, los comandos del flujo, los permisos y los hooks en el formato nativo de esa herramienta.
 - **RF-ADP-02:** EL SISTEMA conectará los mismos scripts guardianes al mecanismo de bloqueo de cada herramienta que lo soporte.
 - **RF-ADP-03:** DONDE una herramienta no soporte el bloqueo determinista de una regla, EL SISTEMA aplicará esa regla por instrucción y la informará como tal en `doctor`.
-- **RF-ADP-04:** DONDE esté activada `antigravity`, EL SISTEMA indicará en `doctor` qué comandos deben estar fuera de su allowlist de terminal para conservar los gates.
+- **RF-ADP-04:** DONDE esté activada `antigravity`, EL SISTEMA indicará en `doctor` qué comandos deben estar fuera de su allowlist de terminal para conservar las confirmaciones.
 - **RF-ADP-05:** EL SISTEMA permitirá configurar el modelo concreto de cada nivel (`high`, `mid`, `low`) por herramienta en `harness.config.yaml`.
 - **RF-ADP-06:** EL SISTEMA definirá una interfaz documentada de adaptador que permita añadir herramientas nuevas sin modificar el núcleo.
 
@@ -373,7 +379,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 11. **Commits del usuario desde un IDE o GUI.** No se bloquean; solo pasan por el pre-commit si está configurado.
 12. **Un agente intenta editar `.harness/`, `harness.config.yaml` o los guardianes.** Se bloquea como zona protegida (RF-GAT-09).
 13. **Borrado de `.harness/state/` a mitad de una spec.** El orquestador reconstruye el estado desde `tasks.md` y `progress.md` y avisa.
-14. **Tarea sin alcance de archivos definido.** No se puede ejecutar con `/sdd:next` hasta completar su alcance.
+14. **Tarea sin alcance de archivos definido.** Se ejecuta igual; los avisos de alcance no se emiten para ella.
 15. **Error intermitente** (un test que a veces falla). Cuenta como fallo, y el informe de triage lo identifica como posible inestabilidad.
 16. **Descarga de skill sin red.** Se informa, y el resto de la instalación continúa sin esa skill, marcada como pendiente en `doctor`.
 17. **Skill eliminada o SHA inexistente en el repo de origen.** Se informa como no disponible y no se busca otra versión automáticamente.
@@ -406,7 +412,7 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 1. Todos los requisitos `RF-*` tienen al menos un test automatizado en verde.
 2. La matriz de CI (Windows, macOS, Linux) está en verde.
 3. Existen fixtures de proyecto y pasan `init`, `sync`, `doctor` y `remove` en cada uno: solo frontend, monorepo fullstack, workspace con dos repos, varios repos y proyecto con configuración previa de agentes y git hooks.
-4. Demo manual del flujo completo (`/sdd:constitution` hasta `/sdd:commit`) con Claude Code en el fixture de workspace, incluyendo un fallo en alcance, un fallo en zona protegida con su triage y una prueba manual con KO.
+4. Demo manual del flujo completo (de la primera spec al commit de la última historia) con Claude Code en el fixture de workspace, incluyendo una tarea añadida durante la implementación, un cambio de `harness.config.yaml` a mitad, un fallo con su triage y una prueba manual fallida.
 5. `sdd-harness doctor` muestra el nivel de enforcement correcto en las cuatro herramientas.
 6. `sdd-harness remove` deja cada fixture idéntico a su estado previo a `init`, salvo los artefactos.
 7. README (en inglés y español), guía de adaptadores, guía de contribución al registro y NOTICE publicados.

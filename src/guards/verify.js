@@ -1,11 +1,10 @@
-// Verification runner (RF-ORQ-05, RF-VER-01/02, RF-RET-01/03/07) and the
+// Verification runner (RF-ORQ-05, RF-VER-01/02) and the
 // change snapshot used to check role lanes (RF-DOM-03). Dependency-free.
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { errorSignature } from './retry.js';
 
 export const VERIFY_ORDER = ['lint', 'typecheck', 'test', 'e2e'];
 const QUICK = ['lint', 'typecheck'];
@@ -18,7 +17,7 @@ function tail(text, lines = 60) {
 /**
  * Runs the configured commands of one component, stopping at the first
  * failure. `quick` runs only lint and typecheck (pre-commit).
- * @returns {{ status: 'pass' | 'fail' | 'unconfigured', results: { name: string, command: string, code: number, output: string }[], failing?: { name: string, command: string }, signature?: string }}
+ * @returns {{ status: 'pass' | 'fail' | 'unconfigured', results: { name: string, command: string, code: number, output: string }[], failing?: { name: string, command: string } }}
  */
 export function runVerify(root, component, { quick = false, run = defaultRun } = {}) {
   const commands = VERIFY_ORDER.filter((k) => component.verify?.[k] && (!quick || QUICK.includes(k)));
@@ -30,7 +29,7 @@ export function runVerify(root, component, { quick = false, run = defaultRun } =
     const { code, output } = run(command, cwd);
     results.push({ name, command, code, output: tail(output) });
     if (code !== 0) {
-      return { status: 'fail', results, failing: { name, command }, signature: errorSignature(`${name}\n${output}`) };
+      return { status: 'fail', results, failing: { name, command } };
     }
   }
   return { status: 'pass', results };

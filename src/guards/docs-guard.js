@@ -10,9 +10,11 @@ const DOC_EXT = /\.(md|mdx)$/i;
  * Decides whether an agent may write `file`. Only the creation of new
  * documentation files outside the whitelist is blocked; code files, existing
  * documents and paths outside the project are left to other rules.
- * @param {{ file: string, root: string, whitelist: string[], exists?: (p: string) => boolean }} input
+ * @param {{ file: string, root: string, whitelist: string[] | null, exists?: (p: string) => boolean }} input
  */
 export function checkDocWrite({ file, root, whitelist, exists = existsSync }) {
+  // Documentation is free unless the project asks for a whitelist (gates.docs).
+  if (!whitelist) return { decision: 'allow' };
   const abs = path.resolve(root, file);
   if (!DOC_EXT.test(abs)) return { decision: 'allow' };
   const rel = path.relative(root, abs);

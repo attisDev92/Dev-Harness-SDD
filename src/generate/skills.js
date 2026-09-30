@@ -18,63 +18,57 @@ const S = (lang) => ({
 function flowSkills(config) {
   const l = S({ cli: config.cli?.language ?? config.language?.docs, specs: config.language?.specs, docs: config.language?.docs });
   return {
-    'sdd-orchestrator': `---
-name: sdd-orchestrator
-description: Runs the Spec-Driven Development flow of this project with sdd-harness. Use it for every /sdd:* command, and whenever you are about to change code, start or finish a task, or need the user's approval.
+    sdd: `---
+name: sdd
+description: Runs the Spec-Driven Development flow of this project. Use it whenever the user asks for a new feature, a change to how something works, a bug fix that changes behaviour, or says to continue with the work; and for every /sdd:* command. It reads the state from the spec files and does the next step.
 ---
 
-# SDD orchestrator
+# SDD
 
-You are the orchestrator. You run in the main session; subagents cannot start other subagents, so you delegate each step to the right role and you own the gates.
+You are the orchestrator, in the main session: you delegate to the subagents (they cannot start other subagents) and you talk to the user. Keep the flow moving: **the user is asked only at two stops** (the spec, and the plan with its tasks), for the commit when a story closes, and when something is really theirs to decide. Everything else goes on without waiting and is told in your summaries.
 
-## State lives in scripts, not in your memory
+## Where are we
 
-\`node .harness/scripts/sdd.js <command>\` is the source of truth. Run it; never simulate it.
+\`node .harness/scripts/sdd.js status\`. The state is in the files: \`status\` in the frontmatter of spec.md (\`draft\` → \`spec-approved\` → \`plan-approved\` → \`done\`) and the checkboxes of tasks.md.
 
-| Need | Command |
-|---|---|
-| Where are we? | \`sdd.js status\` |
-| New spec | \`sdd.js new-spec <name> [--component <id>]\` |
-| New ADR draft | \`sdd.js new-adr <name>\` |
-| Ask the user to decide | \`sdd.js gate request <constitution\\|spec\\|clarify\\|plan\\|tasks\\|review\\|manual-test\\|protected\\|change\\|triage\\|lanes\\|validate>\` |
-| Next task | \`sdd.js next\` |
-| Verify the current task | \`sdd.js verify\` |
-| Close the task | \`sdd.js task done <T#>\` |
-| Start triage | \`sdd.js triage start\` |
-| Change an approved spec | \`sdd.js change start\` |
-| Requirement coverage | \`sdd.js validate\` |
-| Commit proposal input | \`sdd.js commit-context\` |
-| Structural checks | \`sdd.js lint <spec\\|tasks\\|constitution>\` |
+## 1. Spec (status: draft)
 
-If a script refuses (exit code 2), read its reason and follow it. Hooks enforce the same rules: a blocked tool call is a signal to stop, not an obstacle to work around.
+- First spec of the project and no \`docs/constitution.md\`: propose 6–10 principles from .harness/templates/constitution.md; they are approved at the same stop as the spec.
+- Follow the spec-generator skill: \`sdd.js new-spec <name>\`, one question at a time (6 at most), EARS requirements, \`[NEEDS CLARIFICATION]\` for gaps. Then delegate a review to \`spec-reviewer\` and fix what it finds that the user already answered.
+- **Stop 1:** \`sdd.js stop spec\`, show a short summary (requirements, open questions, reviewer findings) and ask with AskUserQuestion: "Aprobar" / "Cambiar algo". A yes in plain words ("sí", "continúa", "aprobado", "dale") is recorded by the harness on its own; if they pick "Aprobar" in the question, run \`sdd.js approve\`. Anything else is a change: apply it and ask again.
 
-## Phases
+## 2. Plan and tasks (status: spec-approved)
 
-constitution → spec → clarify → plan → tasks → implement (one task at a time) → validate → change.
+- Delegate to \`architect\`: plan.md, contracts/ when several components are involved, ADR drafts for stack or architecture decisions, and tasks.md, all at once.
+- **Stop 2:** \`sdd.js stop plan\`, summarise the plan and the task list (by component and story) and ask the same way.
 
-- Never move to the next phase without the user's approval: request the gate and stop.
-- The user answers with \`/sdd:approve\`, \`/sdd:reject <reason>\`, or OK / KO for manual tests. Only their message counts; you cannot approve for them.
+## 3. Implement (status: plan-approved)
 
-## One task (/sdd:next)
+1. \`sdd.js next\` lists what can start now. Delegate every listed task **in the same message** so frontend and backend work at once. Tests first.
+2. When a subagent finishes: \`sdd.js verify --component <id>\`. If it fails, fix it (2 attempts at most). If it still fails, delegate to \`debugger\`, show its options and let the user choose.
+3. Green: tick the task in tasks.md, then delegate **in parallel** to \`reviewer\` and \`doc-writer\`. Fix the clear review findings inside the task; ask only if a finding changes the spec.
+4. Call \`next\` again: dependencies that finished unblock new tasks.
+5. When a story (or the whole spec, per the configuration) is done: ${config.gates?.manual_test === 'none' ? 'no manual test is asked for.' : 'give the manual test (how to start it, URL or command, steps, test data, expected result per requirement) as a normal question. A failure starts the triage of that story; the rest go on.'} Then **propose the commit**: \`sdd.js commit-context\`, one message per repository with changes, following the project convention; if the user says yes, \`git add\` + \`git commit\`. Never push unless they ask.
+6. Last story done: \`sdd.js validate\` (requirement → test) and give the verdict; the spec is closed as \`done\`.
 
-1. \`sdd.js next\` gives the task, its scope, requirements and role.
-2. Delegate to that role (\`frontend-dev\` or \`backend-dev\`). Tests first, then code, only inside the scope.
-3. \`sdd.js verify\`. If it fails, fix only inside the scope; the script counts the attempts (2 at most) and switches to triage when needed.
-4. Delegate to \`reviewer\`: spec compliance first, then quality and security. If there are findings, show them and request the \`review\` gate; wait.
-5. Request \`manual-test\` and give the user: how to start the app, URL or command, steps, test data and the expected result per requirement.
-6. On OK: \`sdd.js task done <T#>\`. On KO: triage.
+## Things that come up
 
-## Triage
+- **New work during implementation:** add it to tasks.md with its component, marked "${config.language?.specs === 'es' ? 'añadida en implementación' : 'added during implementation'}", and carry on. Say so in your summary. No need to ask.
+- **The user changes or adds a requirement:** update the spec first (and plan/tasks), show the diff in a few lines and continue. Stop only if it contradicts something already built.
+- **Configuration:** \`harness.config.yaml\` can change at any moment; the tool asks the user to confirm the edit and the harness regenerates the configuration on its own.
+- **Alerts** (protected zone, code without a task, out of scope): they never stop you. Keep the documents in line (ADR draft, tasks.md) and mention it in your summary.
+- **Dependencies:** installing one makes the tool ask the user; say why you need it.
 
-\`sdd.js triage start\`, delegate to \`debugger\` (read-only), present its report, request the \`triage\` gate. Apply only the option the user chose. No code changes during triage.
+## Shortcuts the user may type
+
+\`/sdd:status\` (what happened), \`/sdd:spec\`, \`/sdd:next\`, \`/sdd:docs\`, \`/sdd:review\`, \`/sdd:validate\`, \`/sdd:commit\`. None of them is needed to approve or move on.
 
 ## Never
 
-- Commit, push, merge, rebase, tag, or reset. Use /sdd:commit to propose messages.
-- Install or remove dependencies without the user's approval.
-- Edit protected zones without an approved ADR: propose what, why, alternatives and an ADR draft, then request the \`protected\` gate.
-- Create documentation outside the whitelist.
-- Edit \`.harness/\` or generated files. \`harness.config.yaml\` is configured with the user: explain what you want to change and why, run \`node .harness/scripts/sdd.js gate request config --summary "<change>"\`, wait for the approval, edit it, then run \`npx sdd-harness sync\`.
+- Edit \`.harness/\` or generated files, or the generated block of AGENTS.md/CLAUDE.md.
+- Push, rebase, reset or delete branches without the user asking.
+- Finish with verification failing without telling the user.
+- Leave a document out of date: every \`.md\` a change affects is updated with it.
 
 ## Languages
 
@@ -82,15 +76,15 @@ Talk to the user in ${l.talk}. Specs in ${l.specs}; docs and ADRs in ${l.docs}.
 `,
     'spec-generator': `---
 name: spec-generator
-description: Interviews the user and writes or reviews a spec with numbered EARS requirements. Use it for /sdd:spec and, in review mode, for /sdd:clarify.
+description: Interviews the user and writes a spec with numbered EARS requirements, or reviews one. Used by the sdd skill and the spec-reviewer subagent.
 ---
 
 # Spec generator
 
-## Writing a spec (/sdd:spec)
+## Writing a spec
 
-1. \`node .harness/scripts/sdd.js new-spec <short name> [--component <id>]\` creates the folder and the template.
-2. Ask one question at a time, six at most: goal, actors, main flows, rules and limits, errors, what is out of scope.
+1. \`node .harness/scripts/sdd.js new-spec <short name> [--component <id>]\` creates the folder and the template (status: draft).
+2. Ask one question at a time, six at most: goal, actors, main flows, rules and limits, errors, what is out of scope. Skip what the user already said.
 3. Fill in the template:
    - Requirements in EARS, numbered \`RF-01\`, \`RF-02\`… and verifiable:
      - WHEN <event>, THE SYSTEM SHALL <response>.
@@ -100,11 +94,11 @@ description: Interviews the user and writes or reviews a spec with numbered EARS
      - THE SYSTEM SHALL <response> (always).
    - Every gap is written as \`[NEEDS CLARIFICATION: <question>]\`. Never invent the answer.
    - No stack, files, schemas or algorithms: that is the plan.
-4. \`sdd.js lint spec\` must pass, then \`sdd.js gate request spec\` and stop.
+4. Back to the sdd skill for the review and the stop.
 
-## Reviewing a spec (/sdd:clarify)
+## Reviewing a spec
 
-List, without fixing anything: ambiguities, contradictions, missing edge cases, untestable requirements, and conflicts with \`docs/constitution.md\`. Group them by severity. Then request the \`clarify\` gate.
+List, without fixing anything: ambiguities, contradictions, missing edge cases, untestable requirements, and conflicts with \`docs/constitution.md\`. Group them by severity.
 
 Write specs in ${l.specs}.
 `,
@@ -125,7 +119,7 @@ Report, always in this order:
 4. **Options** (2 or 3): what to change, which files, which are outside the task scope or in protected zones, pros and cons, risk.
 5. **Recommendation**: one option and why.
 
-Then stop. The orchestrator requests the \`triage\` gate and the user chooses.
+Then stop. The orchestrator shows the report and the user chooses.
 `,
     adr: `---
 name: adr
@@ -136,7 +130,7 @@ description: Writes Architecture Decision Records with the discarded alternative
 
 1. \`node .harness/scripts/sdd.js new-adr <short name>\` creates \`docs/decisions/ADR-<NNNN>-<name>.md\`.
 2. Fill in: context (the forces and constraints), decision, discarded alternatives with the reason for each, consequences (good and bad).
-3. Status stays "Proposed" until the user approves the related gate.
+3. Status stays "Proposed" until the user approves the plan (or the change) it belongs to.
 
 Write ADRs in ${l.docs}.
 `,

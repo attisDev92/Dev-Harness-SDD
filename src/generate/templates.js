@@ -1,13 +1,14 @@
-// SDD templates in Spanish and English (RF-CNV-04). The SDD commands (v0.3)
+// SDD templates in Spanish and English (RF-CNV-04). sdd.js and the sdd skill
 // copy them into specs/ and docs/; the placeholders are in <angle brackets>.
+// The status of a spec lives in its frontmatter, added by `sdd.js new-spec`.
 
 const en = {
   constitution: `# Constitution
 
 Short, verifiable principles. They take precedence over every other instruction.
 
-1. The agent never commits: it proposes commit messages and the user commits.
-2. Every stack or architecture decision requires an approved ADR.
+1. The agent proposes the commit when a story closes and commits only after the user's OK.
+2. Every stack or architecture decision is recorded in an ADR.
 3. No task is finished with verification failing.
 4. <principle>
 5. <principle>
@@ -17,7 +18,6 @@ Short, verifiable principles. They take precedence over every other instruction.
 
 | Field | Value |
 |---|---|
-| Status | Draft, pending approval |
 | Date | <YYYY-MM-DD> |
 | Depends on | <none \\| repo#ID> |
 
@@ -69,19 +69,13 @@ Short, verifiable principles. They take precedence over every other instruction.
 `,
   tasks: `# Tasks — <PREFIX>-<NNN>
 
-Ordered by dependency. One task at a time, tests first.
+Ordered by dependency; tasks of different components run in parallel, tests first. Only the component is required. Work that comes up while implementing is added at the end, marked "added during implementation".
 
 - [ ] T1 <title> · Requirements: RF-01 · Component: <id> · Scope: <globs> · Depends on: — · Done when: <verifiable check>
 `,
   progress: `# Progress — <PREFIX>-<NNN>
 
-| Field | Value |
-|---|---|
-| Phase | <spec \\| clarify \\| plan \\| tasks \\| implement \\| validate> |
-| Current task | <T#> |
-| State | <in progress \\| awaiting manual test \\| blocked \\| done> |
-
-## Blockers
+Decisions and notes taken while building this spec. The status is in spec.md and tasks.md.
 
 ## Decisions
 
@@ -114,8 +108,8 @@ const es = {
 
 Principios cortos y verificables. Prevalecen sobre cualquier otra instrucción.
 
-1. El agente nunca hace commit: propone los mensajes y el commit lo hace el usuario.
-2. Toda decisión de stack o arquitectura requiere un ADR aprobado.
+1. El agente propone el commit al cerrar cada historia y solo lo hace con el OK del usuario.
+2. Toda decisión de stack o arquitectura queda registrada en un ADR.
 3. Ninguna tarea termina con la verificación en rojo.
 4. <principio>
 5. <principio>
@@ -125,7 +119,6 @@ Principios cortos y verificables. Prevalecen sobre cualquier otra instrucción.
 
 | Campo | Valor |
 |---|---|
-| Estado | Borrador, pendiente de aprobación |
 | Fecha | <AAAA-MM-DD> |
 | Depende de | <ninguna \\| repo#ID> |
 
@@ -177,19 +170,13 @@ Principios cortos y verificables. Prevalecen sobre cualquier otra instrucción.
 `,
   tasks: `# Tareas — <PREFIJO>-<NNN>
 
-Ordenadas por dependencia. Una tarea cada vez, tests primero.
+Ordenadas por dependencia; las de componentes distintos avanzan en paralelo, tests primero. Solo el componente es obligatorio. El trabajo que surge al implementar se añade al final, marcado "añadida en implementación".
 
 - [ ] T1 <título> · Requisitos: RF-01 · Componente: <id> · Alcance: <globs> · Depende de: — · Hecho cuando: <comprobación verificable>
 `,
   progress: `# Progreso — <PREFIJO>-<NNN>
 
-| Campo | Valor |
-|---|---|
-| Fase | <spec \\| clarify \\| plan \\| tasks \\| implement \\| validate> |
-| Tarea actual | <T#> |
-| Estado | <en curso \\| esperando prueba manual \\| bloqueada \\| hecha> |
-
-## Bloqueos
+Decisiones y notas tomadas al construir esta spec. El estado está en spec.md y tasks.md.
 
 ## Decisiones
 

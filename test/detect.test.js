@@ -75,8 +75,10 @@ test('RF-INI-12: protected zones follow the detected stack', (t) => {
   assert.ok(zones.deps.includes('package.json#dependencies'));
   assert.ok(zones.deps.includes('**/pnpm-lock.yaml'));
   assert.ok(zones.db.includes('**/schema.prisma'));
-  assert.ok(zones.architecture.includes('**/tsconfig*.json'));
-  assert.ok(zones.architecture.includes('**/next.config.*'));
+  assert.ok(zones.tooling.includes('**/tsconfig*.json'));
+  assert.ok(zones.tooling.includes('**/next.config.*'));
+  assert.ok(zones.tooling.includes('**/eslint.config.*'));
+  assert.ok(zones.architecture.includes('**/.env*'));
   assert.deepEqual(zones.contracts, ['**/specs/**/contracts/**']);
   const go = proposeProtected([{ ecosystems: ['go'], databases: [], frameworks: [] }]);
   assert.deepEqual(go.deps, ['**/go.mod', '**/go.sum']);

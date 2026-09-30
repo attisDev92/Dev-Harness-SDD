@@ -25,11 +25,10 @@ export const HEADER = {
 export const TOOL_CONTEXT_LIMITS = { codex: 32768, 'claude-code': 40000, opencode: 40000, antigravity: 12000 };
 
 const GUARD_SOURCES = [
-  'args.js', 'bash-guard.js', 'checks.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'git-guard.js', 'glob.js', 'hook.js',
-  'messages.js', 'project.js', 'contracts.js', 'retry.js', 'runtime-messages.js', 'sdd.js', 'shell.js', 'state.js', 'tasks.js', 'tracker-sync.js', 'verify.js',
-  ['cli.js', 'guard.js'],
+  'args.js', 'checks.js', 'contracts.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'glob.js', 'hook.js', 'project.js',
+  'runtime-messages.js', 'sdd.js', 'state.js', 'status.js', 'tasks.js', 'tracker-sync.js', 'verify.js',
 ];
-const GUARDS_DIR = path.dirname(fileURLToPath(new URL('../guards/cli.js', import.meta.url)));
+const GUARDS_DIR = path.dirname(fileURLToPath(new URL('../guards/hook.js', import.meta.url)));
 
 const ARTIFACT_EXCLUDES = ['/specs/', '/docs/constitution.md', '/docs/decisions/', '/docs/architecture/', '/docs/lessons.md'];
 
@@ -183,6 +182,7 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
     content: JSON.stringify(
       {
         language: config.cli?.language ?? config.language?.docs ?? 'en',
+        docs_mode: config.gates?.docs ?? 'free',
         docs_whitelist: docsWhitelist(config),
         specs: { location: config.specs?.location ?? 'root', id_prefix: config.specs?.id_prefix ?? 'SPEC' },
         protected: guardProtected(config, generatedPaths, contextBlocks),
@@ -190,7 +190,7 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
         retries: { in_scope: config.retries?.in_scope ?? 2, protected: config.retries?.protected ?? 0 },
         components: Object.fromEntries(Object.entries(config.components ?? {}).map(([id, c]) => [id, { path: c.path, kind: c.kind ?? 'other', id_prefix: c.id_prefix, verify: c.verify ?? {} }])),
         roles: Object.fromEntries(neededRoles(config).map((r) => [r.role, { writes: r.writes }])),
-        manual_test: config.gates?.manual_test ?? 'task',
+        manual_test: config.gates?.manual_test ?? 'story',
         specs_language: config.language?.specs ?? 'en',
         docs_language: config.language?.docs ?? 'en',
         commits: { convention: config.conventions?.commits ?? 'conventional', language: config.language?.commits ?? 'en', note: config.conventions?.commits_note },

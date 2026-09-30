@@ -12,7 +12,7 @@ const en = {
   langLabels: { es: 'Spanish', en: 'English' },
   designLabels: { none: 'none', 'tokens-in-code': 'tokens in code', penpot: 'Penpot', figma: 'Figma' },
   trackerLabels: { none: 'none', linear: 'Linear', notion: 'Notion', github: 'GitHub Issues', jira: 'Jira' },
-  manualLabels: { task: 'after every task', story: 'after every user story', spec: 'once per spec' },
+  manualLabels: { none: 'never (automatic verification only)', task: 'after every task', story: 'after every user story', spec: 'once per spec' },
   modeLabels: { local: 'local: nothing is committed, the team sees nothing', team: 'team: generated configuration is committed' },
   artifactLabels: { versioned: 'committed with the project', local: 'kept local (ignored by git)' },
   ciLabels: { none: 'no', github: 'GitHub Actions' },
@@ -87,7 +87,7 @@ const en = {
     notices: 'Notes:',
     confirm: 'Write these files?',
     done: (n) => `Done: ${n} file${n === 1 ? '' : 's'} written. The harness is active in this project.`,
-    next: 'Next: run "sdd-harness doctor", then open your agent tool and start with /sdd:constitution.',
+    next: 'Next: run "sdd-harness doctor", then open your agent tool and tell it what you want to build (or use /sdd:spec).',
     dryRun: 'Dry run: nothing was written.',
     failed: (m) => `Writing failed (${m}). Every change was rolled back; the project is as it was.`,
     badConfig: (f) => `${f} is not a valid configuration:`,
@@ -166,7 +166,7 @@ const en = {
     antigravityHint: 'Antigravity: keep git commit/push/merge/rebase/reset and package installs out of the terminal allowlist.',
     invocation: 'Flow commands',
     summary: (e, w) => `${e} error${e === 1 ? '' : 's'}, ${w} warning${w === 1 ? '' : 's'}.`,
-    rules: { commits: 'no commits', deps: 'dependencies ask first', protected: 'protected zones', docs: 'docs whitelist', retries: 'retry limit', verify: 'no done with red tests', lanes: 'role paths' },
+    rules: { commits: 'git push asks', deps: 'dependencies ask first', protected: 'protected zones', docs: 'docs whitelist', verify: 'no done with red tests', lanes: 'role paths' },
   },
 };
 
@@ -181,7 +181,7 @@ const es = {
   langLabels: { es: 'español', en: 'inglés' },
   designLabels: { none: 'ninguna', 'tokens-in-code': 'tokens en código', penpot: 'Penpot', figma: 'Figma' },
   trackerLabels: { none: 'ninguno', linear: 'Linear', notion: 'Notion', github: 'GitHub Issues', jira: 'Jira' },
-  manualLabels: { task: 'tras cada tarea', story: 'tras cada historia', spec: 'una vez por spec' },
+  manualLabels: { none: 'nunca (solo verificación automática)', task: 'tras cada tarea', story: 'tras cada historia', spec: 'una vez por spec' },
   modeLabels: { local: 'local: no se commitea nada, el equipo no ve nada', team: 'team: la configuración generada se commitea' },
   artifactLabels: { versioned: 'se commitean con el proyecto', local: 'se quedan en local (git los ignora)' },
   ciLabels: { none: 'no', github: 'GitHub Actions' },
@@ -259,7 +259,7 @@ const es = {
     notices: 'Notas:',
     confirm: '¿Escribo estos archivos?',
     done: (n) => `Listo: ${n} archivo${n === 1 ? '' : 's'} escrito${n === 1 ? '' : 's'}. El harness está activo en este proyecto.`,
-    next: 'Siguiente paso: ejecuta "sdd-harness doctor", abre tu herramienta de agentes y empieza con /sdd:constitution.',
+    next: 'Siguiente paso: ejecuta "sdd-harness doctor", abre tu herramienta de agentes y dile qué quieres construir (o usa /sdd:spec).',
     dryRun: 'Simulación: no se escribió nada.',
     failed: (m) => `La escritura falló (${m}). Se revirtieron todos los cambios; el proyecto está como estaba.`,
     badConfig: (f) => `${f} no es una configuración válida:`,
@@ -338,7 +338,7 @@ const es = {
     antigravityHint: 'Antigravity: deja git commit/push/merge/rebase/reset y las instalaciones de paquetes fuera de la allowlist del terminal.',
     invocation: 'Comandos del flujo',
     summary: (e, w) => `${e} error${e === 1 ? '' : 'es'}, ${w} aviso${w === 1 ? '' : 's'}.`,
-    rules: { commits: 'sin commits', deps: 'dependencias preguntan', protected: 'zonas protegidas', docs: 'lista blanca de docs', retries: 'límite de reintentos', verify: 'nada hecho con tests en rojo', lanes: 'rutas por rol' },
+    rules: { commits: 'git push pregunta', deps: 'dependencias preguntan', protected: 'zonas protegidas', docs: 'lista blanca de docs', verify: 'nada hecho con tests en rojo', lanes: 'rutas por rol' },
   },
 };
 
@@ -358,7 +358,7 @@ es.contracts = {
   unavailable: (s) => `${s.snapshot}: el repo proveedor (${s.source?.repo ?? '?'}) no está disponible localmente; se mantiene el snapshot actual sin verificar.`,
   stale: (s) => `${s.snapshot} está desactualizado respecto a ${s.source.path}:`,
   confirm: (s) => `¿Actualizo ${s.snapshot}?`,
-  updated: (s) => `Actualizado: ${s.snapshot}. Adaptar el consumidor a este cambio requiere aprobación (gate "protected" con ADR).`,
+  updated: (s) => `Actualizado: ${s.snapshot}. Adaptar el consumidor a este cambio se consulta con el usuario (con un ADR si cambia la arquitectura).`,
   kept: (s) => `Sin cambios: ${s.snapshot}.`,
   usage: 'Uso: sdd-harness contracts sync [--dry-run] [--yes]',
 };

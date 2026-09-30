@@ -142,6 +142,28 @@ export function parseTasks(text) {
   return tasks;
 }
 
+/**
+ * Tasks of different components run in parallel; a task waits only for its own
+ * dependencies (and for the task already running in its component).
+ * @returns {{ ready: object[], waiting: { task: object, on: string[] }[] }}
+ */
+export function taskQueue(tasks, active = {}) {
+  const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
+  const busy = new Map(Object.values(active).map((t) => [t.component, t.id]));
+  const ready = [];
+  const waiting = [];
+  for (const task of tasks.filter((t) => !t.done && !active[t.id])) {
+    const on = task.depends.filter((d) => !done.has(d));
+    if (!on.length && busy.has(task.component)) on.push(busy.get(task.component));
+    if (on.length) waiting.push({ task, on });
+    else {
+      ready.push(task);
+      busy.set(task.component, task.id);
+    }
+  }
+  return { ready, waiting };
+}
+
 /** RF-ORQ-01: first pending task whose dependencies are all done. */
 export function selectNextTask(tasks) {
   const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
@@ -160,16 +182,20 @@ export function markTaskDone(text, id) {
     .join(eol);
 }
 
-/** Problems that stop a task from running (RF-SDD-12, edge case 14). */
+/**
+ * RF-SDD-12: only the component is required (it picks the role). Scope,
+ * requirements and "Done when" are recommended: tasks that come up during the
+ * work are added quickly and completed later.
+ */
 export function taskProblems(task, components) {
   const problems = [];
   if (!task.component) problems.push('noComponent');
   else if (!components[task.component]) problems.push('unknownComponent');
-  if (!task.scope.length) problems.push('noScope');
-  if (!task.requirements.length) problems.push('noRequirements');
-  if (!task.doneWhen) problems.push('noDoneWhen');
   return problems;
 }
+
+/** RF-SDD-19: tasks added while implementing. */
+export const ADDED_RE = /añadida en implementación|anadida en implementacion|added during implementation/i;
 
 // Specs ----------------------------------------------------------------------
 
@@ -203,7 +229,7 @@ export function lintSpec(text) {
 }
 
 const MANDATORY_PRINCIPLES = [
-  /never commits|nunca hace commit/i,
+  /commit.*(OK|approv|aprob)|(OK|approv|aprob).*commit/i,
   /ADR/,
   /verification (failing|red)|verificación en rojo|with verification failing/i,
 ];

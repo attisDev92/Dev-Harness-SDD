@@ -112,7 +112,7 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
   if (tracker === 'other') {
     tracker = (await p.text('trackerName', 'Nombre del tracker (p. ej. asana, clickup, youtrack)', { default: '' })).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || 'none';
   }
-  const manual = await p.select('manualTest', t.q.manualTest, choices(['task', 'story', 'spec'], t.manualLabels), { default: 'task' });
+  const manual = await p.select('manualTest', t.q.manualTest, choices(['none', 'task', 'story', 'spec'], t.manualLabels), { default: 'story' });
   const mode = preset.mode ?? (await p.select('installMode', t.q.installMode, choices(['local', 'team'], t.modeLabels), { default: 'local' }));
   const artifacts = await p.select('artifacts', t.q.artifacts, choices(['versioned', 'local'], t.artifactLabels), { default: mode === 'team' ? 'versioned' : 'local' });
 
@@ -147,8 +147,8 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
     components,
     design: { source: design },
     tracker: tracker === 'none' ? { enabled: false } : { enabled: true, provider: tracker },
-    gates: { manual_test: manual, commits: 'human-only', deps: 'ask' },
-    retries: { in_scope: 2, protected: 0 },
+    gates: { manual_test: manual, commits: 'per-story', deps: 'ask' },
+    retries: { in_scope: 2 },
     protected: protectedZones,
     docs_whitelist: [...DEFAULT_DOCS_WHITELIST],
     artifacts: { versioned: artifacts === 'versioned' },

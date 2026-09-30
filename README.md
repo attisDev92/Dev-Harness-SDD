@@ -20,7 +20,7 @@ Specs first. Sub-agents for frontend and backend. Deterministic guardrails. You 
 
 ![SDD](https://img.shields.io/badge/Spec--Driven-Development-8A2BE2?style=flat-square)
 ![Human in the loop](https://img.shields.io/badge/human-in%20the%20loop-2ea44f?style=flat-square)
-![No auto commits](https://img.shields.io/badge/auto%20commits-never-d73a49?style=flat-square)
+![Two approval stops](https://img.shields.io/badge/approval%20stops-2-2ea44f?style=flat-square)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-ff69b4?style=flat-square)
 
 </div>
@@ -36,15 +36,15 @@ Specs first. Sub-agents for frontend and backend. Deterministic guardrails. You 
 
 It implements the Spec-Driven Development flow:
 
-**Constitution → Spec → Clarify → Plan → Tasks → Implement (one task at a time, tests first) → Validate → Change (spec first, code later).**
+**Spec → Plan and tasks → Implement (frontend and backend in parallel, tests first) → Validate, with the docs always up to date. A change goes to the spec first, then to the code.**
 
-On top of that flow it adds sub-agents for frontend and backend, a QA agent, a reviewer, a debugger and a docs writer, all coordinated by an orchestrator. At every point that matters, the harness **stops and asks you**.
+On top of that flow it adds sub-agents for frontend and backend, a QA agent, a reviewer, a debugger and a docs writer, all coordinated by an orchestrator. It **stops only twice**, to approve the spec and the plan, and you answer by talking ("yes", "continue"). Everything else moves on and is told in summaries.
 
 ### 🧠 Core principle
 
-> **Markdown rules are suggestions. Permissions and hooks are laws.**
+> **Use what the tool already has, and never get in the way.**
 
-Everything you consider non-negotiable is enforced by scripts, not by prompts alone. That covers commits, dependencies, architecture changes, database changes, retry loops, and stray `.md` files.
+The harness reuses Claude Code's own permissions, sub-agents, skills and questions instead of reinventing them. Only what is irreversible asks (push, history rewrites, dependencies) and only the harness itself is blocked. Everything else is an alert: the work never stalls.
 
 ---
 
@@ -57,8 +57,8 @@ Everything you consider non-negotiable is enforced by scripts, not by prompts al
 | 🎨 | **Design-aware frontend** | Design skills, a reusable design system and components; design source is configurable (none, tokens-in-code, Penpot, Figma) |
 | 🔐 | **Secure, architecture-aware backend** | Layering, API conventions, secure coding, safe DB migrations |
 | 🧪 | **QA agent** | Unit, integration and E2E (Playwright), with reproducible bug reports |
-| 🛑 | **Human gates** | No commits, no new dependencies, no stack/architecture/DB changes without your OK. You manually test every task |
-| 🔁 | **Loop breaker** | At most 2 automatic retries, and only for in-scope fixes. Anything else stops with a report and options |
+| 🛑 | **Two stops, by talking** | You approve the spec and the plan with "yes" or "continue". Commits are proposed when a story closes and made with your OK |
+| 🔁 | **Loop breaker** | At most 2 fix attempts; then a debugger report with options and you choose |
 | 🗂️ | **Tidy repo** | `.md` whitelist: agents can't create documents wherever they like |
 | 🔌 | **Multi-tool** | One neutral core, adapters for Claude Code, opencode, Codex and Antigravity |
 | 🧩 | **Any topology** | Single repo, monorepo, multi-repo, or a workspace folder with several repos |
@@ -72,22 +72,18 @@ Everything you consider non-negotiable is enforced by scripts, not by prompts al
 
 ```mermaid
 flowchart LR
-  C[📜 Constitution] --> S[📝 Spec]
-  S --> Q[🔍 Clarify]
-  Q --> P[🏗️ Plan + API contract]
-  P --> T[✅ Tasks]
-  T --> I[🤖 Implement task<br/>frontend / backend]
-  I --> V{🧪 Verify<br/>lint · types · tests}
-  V -- in-scope fail, max 2 --> I
-  V -- other fail or protected zone --> D[🩺 Debugger report<br/>🛑 you decide]
-  V -- green --> R[👀 Review]
-  R --> H[🧑 Manual test gate]
-  H -- OK --> N[➡️ Next task]
-  H -- KO --> D
-  N --> T
-  N --> X[🏁 Validate spec]
-  X --> DOC[📚 Docs]
-  DOC --> CM[🧑 You commit]
+  S[📝 Spec + review] --> A1{🛑 Stop 1<br/>you say yes}
+  A1 --> P[🏗️ Plan + contracts + tasks]
+  P --> A2{🛑 Stop 2<br/>you say yes}
+  A2 --> I[🤖 Frontend ∥ Backend<br/>tests first]
+  I --> V{🧪 Verify}
+  V -- fail, max 2 --> I
+  V -- still failing --> D[🩺 Debugger report<br/>you choose]
+  V -- green --> R[👀 Review ∥ 📚 Docs]
+  R --> H[🧑 Manual test per story]
+  H --> CM[💾 Commit proposed<br/>made with your OK]
+  CM --> I
+  CM --> X[🏁 Validate spec]
 ```
 
 ---
@@ -108,11 +104,10 @@ sdd-harness-init        # short interview → generates config for THIS project 
 sdd-harness doctor
 ```
 
-Then open your agent tool in the project and start with:
+Then open your agent tool in the project and just say what you want:
 
 ```
-/sdd:constitution
-/sdd:spec "user login with email and password"
+I want a user login with email and password
 ```
 
 To remove it from a project:
@@ -127,7 +122,7 @@ sdd-harness remove      # deletes only generated, unmodified files. Never touche
 
 | Command | Description |
 |---|---|
-| `sdd-harness-init` | Interview and install into the current project: tools, topology, stack, conventions, design source, tracker, gates |
+| `sdd-harness-init` | Interview and install into the current project: tools, topology, stack, conventions, design source, tracker, manual tests |
 | `sdd-harness sync` | Regenerate tool configs from `harness.config.yaml`, showing a diff first |
 | `sdd-harness doctor` | Health check, plus the **real enforcement level** for each enabled tool |
 | `sdd-harness skills list \| install \| update \| verify` | Manage the required skills and plugins (pinned, verified) |
@@ -137,21 +132,21 @@ sdd-harness remove      # deletes only generated, unmodified files. Never touche
 | `sdd-harness upgrade` | Move to a newer harness version, with a diff and confirmation |
 | `sdd-harness remove` | Clean uninstall driven by `.harness/manifest.lock` |
 
-## 💬 Workflow commands (inside your agent)
+## 💬 Inside your agent
 
-| Command | Phase | Stops for your approval? |
-|---|---|---|
-| `/sdd:constitution` | Propose project principles | ✅ |
-| `/sdd:spec` | Requirements interview → `spec.md` (EARS) | ✅ |
-| `/sdd:clarify` | QA review of the spec: gaps, contradictions, conflicts | ✅ |
-| `/sdd:plan` | Technical plan, API contract, ADR proposals | ✅ |
-| `/sdd:tasks` | Tasks under 30 min with "Done when" | ✅ |
-| `/sdd:next` | Run **one** task end to end, then stop for manual testing | ✅ |
-| `/sdd:validate` | Walk through every RF: which test covers it, and the verdict | ✅ |
-| `/sdd:change` | New requirement: update the spec first, show the diff | ✅ |
-| `/sdd:status` | Current spec, task, blockers, pending decisions, cost | — |
-| `/sdd:commit` | **Proposes** commit messages per repo. You run the commit | ✅ |
-| `/sdd:approve` · `/sdd:reject <reason>` | Your answer to a pending decision (for manual tests you can also reply `OK` / `KO <what failed>`) | — |
+Just say what you want ("add a password reset") and the `sdd` skill runs the flow. You are asked only at the **two stops** (spec, plan with tasks) and to okay each commit; "yes", "continue", "approved" or the "Approve" button are enough.
+
+The `/sdd:*` commands are **optional shortcuts** to see what happened or to launch work in parallel. None of them is needed to move on:
+
+| Command | What for |
+|---|---|
+| `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification, last commits |
+| `/sdd:spec <idea>` | Start a spec |
+| `/sdd:next` | Launch the ready tasks in parallel (frontend ∥ backend) |
+| `/sdd:docs` | Bring the docs up to date in the background |
+| `/sdd:review` | Review (and QA) of the recent changes, in parallel |
+| `/sdd:validate` | Requirement → test report |
+| `/sdd:commit` | Propose the commit now |
 
 > [!NOTE]
 > Invocation syntax varies by tool. For example, Codex invokes skills as `$name`, and Antigravity exposes these as workflows under `/`. `sdd-harness doctor` prints the right syntax for your setup.
@@ -176,7 +171,7 @@ Only the agents your project needs are generated. A frontend-only project gets n
 Tiers (`high` / `mid` / `low`) map to concrete models per tool through the adapters.
 
 > [!IMPORTANT]
-> In Claude Code, sub-agents cannot spawn other sub-agents, so the **orchestrator is your main session**, driven by the `/sdd:*` commands. In tools without equivalent sub-agents, the harness runs in **degraded mode**: roles run one after another in the same agent. The gates still apply.
+> In Claude Code, sub-agents cannot spawn other sub-agents, so the **orchestrator is your main session**, driven by the `sdd` skill. In tools without equivalent sub-agents, the harness runs in **degraded mode**: roles run one after another in the same agent.
 
 ---
 
@@ -188,14 +183,14 @@ The harness bundles its own skills and installs curated third-party skills **on 
 
 | Skill | Used by | Purpose |
 |---|---|---|
-| `sdd-orchestrator` | main session | Pipeline state machine, gates, retries, `progress.md` |
+| `sdd` | main session | The flow: two stops, parallel tasks, review and docs, commit per story |
 | `spec-generator` | spec phase | Requirements interview and EARS spec (inspired by [hello-sdd](https://github.com/mouredev/hello-sdd)) |
 | `clean-code` | frontend, backend | Naming, small units, KISS/YAGNI/DRY, no premature abstraction. **Project conventions win** |
 | `design-system` | frontend | Tokens, component API, variants, states. Adapts to the chosen design source |
 | `backend-architecture` | backend, architect | Layers, boundaries, dependency direction, error handling, validation at the edges |
 | `api-design` | backend, architect | REST conventions, pagination, a consistent error format, versioning, contract-first |
 | `secure-coding` | backend, reviewer | OWASP-based checklist: authN/authZ, input handling, secrets, headers |
-| `db-migrations` | backend | Safe migrations (expand/contract, reversible). Every schema change goes through a gate |
+| `db-migrations` | backend | Safe migrations (expand/contract, reversible). Every schema change gets an ADR draft |
 | `testing-strategy` | QA | Test pyramid, test data, avoiding flaky tests, one or more tests per RF |
 | `triage-report` | debugger | Fixed report format: error, reproduction, hypotheses, 2–3 options, recommendation. Then stop |
 | `adr` | architect | Architecture Decision Records with the discarded alternatives |
@@ -223,16 +218,18 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 
 | Rule | Mechanism |
 |---|---|
-| 🚫 **No commits, pushes, resets or rebases by agents** | Tool permissions + a pre-tool hook. `/sdd:commit` only proposes messages, you commit |
-| 📦 **No new dependencies without asking** | `ask` permission on install commands + a guard on dependency manifests and lockfiles |
-| 🏛️ **Stack, architecture, DB or security changes need your OK** | "Protected zones" in the config: any edit there triggers a gate and an ADR proposal |
-| 🔁 **No infinite loops** | Attempt counter: max **2** automatic retries, and only for fixes inside the task scope. Everything else → debugger report → you choose |
-| 🧑 **You test every implementation** | After each task: URL, steps and test data, then the agent waits for your OK or KO (granularity configurable) |
-| 🗂️ **No random `.md` files** | Write hook with a whitelist. Anything else requires your explicit request |
-| 🧱 **Agents stay in their lane** | Path ownership per agent, checked on sub-agent stop against `git diff` |
-| ✅ **No "done" with red tests** | Stop hook blocks completion while verification fails |
+| 💾 **Commit per story, with your OK** | When a story closes the agent proposes the commit and makes it if you say yes. Push, rebase, merge, reset, deleting branches and tags ask natively |
+| 📦 **Dependency installs ask you** | `ask` permission on install commands. Editing manifests or lockfiles by hand only raises an alert |
+| 🔔 **Alerts, not walls** | Protected zones, code without a task or outside its scope: the harness warns once and lets the work go on. Only `.harness/` and generated files are blocked |
+| 🧩 **Tasks that come up** | Added to `tasks.md` as "added during implementation", without stopping |
+| 🔁 **No infinite loops** | Max **2** fix attempts. Then debugger report → you choose |
+| 🧑 **You test what matters** | URL, steps and test data at the granularity you choose (`task`, `story`, `spec` or `none`) |
+| 🗂️ **Docs always up to date** | Any `.md` can be written; agents must update every document a change affects. A whitelist is opt-in (`gates.docs: whitelist`) |
+| ⚡ **Parallel agents** | Frontend and backend tasks run at once; a task waits only for its own `Depends on` |
+| 🧱 **Agents stay in their lane** | Path ownership per agent, checked with `git diff` when a sub-agent ends (an alert, and only when it ran alone) |
+| ✅ **No "done" with red tests** | The Stop hook reminds the agent once when the last verification failed |
 
-**Universal safety net:** git hooks (via `core.hooksPath`, pure Node, no husky) and a CI template run the same checks. That way the tools with weaker enforcement are still covered.
+**Universal safety net:** a git pre-commit (via `core.hooksPath`, pure Node, no husky) refuses secrets and `.env` files; a CI template adds the docs whitelist and the full verification.
 
 ### Enforcement level by tool
 
@@ -249,7 +246,7 @@ Run `sdd-harness doctor` to see what is actually enforced in your project.
 
 ## ⚙️ Configuration
 
-`sdd-harness-init` writes `harness.config.yaml`, and from then on the configuration grows **with the agent running**: when something needs to change (a component, a verification command, a protected zone, the spec prefix), the agent explains what and why and requests the `config` gate (`sdd.js gate request config --summary "…"`). Only after you answer OK can it edit `harness.config.yaml`, and it then runs `npx sdd-harness sync`. `.harness/` and generated files stay off-limits.
+`sdd-harness-init` writes `harness.config.yaml`, and from then on it can change **at any moment, even mid-development**: you or the agent edit it, Claude Code asks you to confirm the edit, and a hook regenerates the configuration right away (`sdd-harness sync`). `.harness/` and generated files stay off-limits.
 
 `AGENTS.md` and `CLAUDE.md` are yours too: the harness only owns the block between `<!-- harness:begin -->` and `<!-- harness:end -->`. The agent can add project instructions anywhere else in the file, never inside the block.
 
@@ -282,19 +279,20 @@ tracker:
   enabled: false               # linear | notion | github | jira, synced both ways
 
 gates:
-  manual_test: task            # task | story | spec
-  commits: human-only
+  manual_test: story           # task | story | spec | none
+  docs: free                   # free | whitelist
+  commits: per-story           # the agent proposes the commit when a story closes
   deps: ask
 
 retries:
-  in_scope: 2                  # only fixes that stay inside the task's files
-  protected: 0                 # any protected-zone change → stop and ask
+  in_scope: 2                  # fix attempts before the debugger report
 
 protected:
   deps:         [package.json#dependencies, lockfiles]
   db:           ["**/migrations/**", "**/schema.prisma", "**/*.sql"]
   contracts:    ["specs/**/contracts/**"]
-  architecture: ["tsconfig*.json", "**/eslint.config.*", "docker*", ".env*"]
+  architecture: ["docker-compose*", ".env*"]
+  tooling:      ["tsconfig*.json", "**/eslint.config.*", "Dockerfile*", ".github/workflows/**"]  # lint, tsconfig, CI: only ask, no task or ADR needed
   security:     [auth, cors, csp]
 
 docs_whitelist:
@@ -337,7 +335,7 @@ api/specs/API-004-auth/contracts/openapi.yaml          ← source of truth
 web/specs/WEB-007-login/contracts/external/api-openapi.yaml   ← snapshot (repo, spec, commit)
 ```
 
-`sdd-harness doctor` warns when a snapshot has drifted from its provider. Adapting to a changed contract always goes through a gate.
+`sdd-harness doctor` warns when a snapshot has drifted from its provider. Adapting to a changed contract is discussed with you first.
 
 ### Generated project layout
 
@@ -371,8 +369,8 @@ my-project/
 
 ## 📊 Observability
 
-- `.harness/logs/events.jsonl` records sub-agent, task, result, retries and duration.
-- `/sdd:status` shows cost and time per spec and per task.
+- `.harness/logs/events.jsonl` records specs, stops, verifications and sub-agents.
+- `/sdd:status` shows what happened: last tasks closed, pending ones, last verification and last commits.
 - A model tier per role keeps expensive models where reasoning actually pays off.
 - Native OpenTelemetry is supported where the tool provides it.
 
@@ -380,7 +378,8 @@ my-project/
 
 ## 🗺️ Roadmap
 
-- [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, full SDD flow, guards, human gates, git hooks, Spanish messages
+- [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, full SDD flow, alerts, two approval stops, git hooks, Spanish messages
+- [x] Light flow (v0.8): approvals by talking, commit per story, tasks and config changes mid-development
 - [x] Multi-repo and workspace topologies, cross-spec dependencies and contract snapshots
 - [ ] opencode, Codex and Antigravity adapters, and degraded mode
 - [x] Skills registry and verified installer

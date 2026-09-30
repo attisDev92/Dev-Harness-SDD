@@ -10,7 +10,7 @@ import { neededRoles } from '../context.js';
 import { withMdHeader } from '../core.js';
 
 export const id = 'claude-code';
-export const RULES = ['commits', 'deps', 'protected', 'docs', 'retries', 'verify', 'lanes'];
+export const RULES = ['commits', 'deps', 'protected', 'docs', 'verify', 'lanes'];
 
 /** RF-ORQ-10: model tier of each role (README table). */
 export const ROLE_TIERS = {
@@ -32,36 +32,36 @@ const TOOLS = {
 
 const ROLE_TEXT = {
   'spec-reviewer': {
-    description: 'QA of a spec: finds ambiguities, contradictions, missing edge cases and conflicts with the constitution. Never fixes them. Use for /sdd:clarify.',
+    description: 'QA of a spec before it is approved: finds ambiguities, contradictions, missing edge cases and conflicts with the constitution. Never fixes them.',
     body: 'Review the spec you are given. List problems grouped by severity; do not rewrite the spec. Load the spec-generator skill (review mode).',
   },
   architect: {
-    description: 'Technical plan, API contracts and ADR proposals for an approved spec. Use for /sdd:plan and /sdd:tasks.',
-    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). For tasks.md, each task under 30 minutes, ordered by dependency, in the format of .harness/templates/tasks.md.',
+    description: 'Technical plan, API contracts, ADR drafts and tasks.md for an approved spec, all in one go.',
+    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks run in parallel.',
   },
   'frontend-dev': {
     description: 'Implements frontend tasks: UI, design system, components. Tests first. Use for tasks of frontend components.',
-    body: 'Implement exactly the task you are given, inside its scope. Write the tests first, then the code. Reuse the design system and existing components; follow the component AGENTS.md. Do not add dependencies. When done, report the files you changed.',
+    body: 'Implement the task you are given. Write the tests first, then the code. Reuse the design system and existing components; follow the component AGENTS.md. If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
   },
   'backend-dev': {
     description: 'Implements backend tasks: API, domain, persistence. Tests first. Use for tasks of backend or other non-UI components.',
-    body: 'Implement exactly the task you are given, inside its scope. Write the tests first, then the code. Validate input at the edges, keep layers separate, follow the component AGENTS.md. Do not add dependencies or touch migrations without an approved gate. When done, report the files you changed.',
+    body: 'Implement the task you are given. Write the tests first, then the code. Validate input at the edges, keep layers separate, follow the component AGENTS.md. A schema or migration change gets an ADR draft (adr skill). If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
   },
   'qa-tester': {
     description: 'Unit, integration and end-to-end tests, and reproducible bug reports.',
-    body: 'Write or extend tests that prove the requirements (put the requirement ID, e.g. RF-01, in the test name so /sdd:validate can find it). Report bugs with steps, expected and actual result.',
+    body: 'Write or extend tests that prove the requirements (put the requirement ID, e.g. RF-01, in the test name so the validation can find it). Report bugs with steps, expected and actual result.',
   },
   reviewer: {
-    description: 'Reviews a finished task: spec compliance first, then quality and security. Read-only. Use after verification passes.',
-    body: 'First check each requirement of the task against the code and tests. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line; change nothing.',
+    description: 'Reviews finished work: spec compliance first, then quality and security. Read-only. Runs in parallel with doc-writer after verification passes.',
+    body: 'First check each requirement of the task against the code and tests. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line, most important first; change nothing.',
   },
   debugger: {
-    description: 'Root-cause triage when a fix is not automatic. Reports options; never fixes. Use when sdd.js asks for triage.',
+    description: 'Root-cause triage when a fix does not work after 2 attempts. Reports options; never fixes.',
     body: 'Follow the triage-report skill exactly. Do not modify any file.',
   },
   'doc-writer': {
-    description: 'Updates the allowed documentation (README, CHANGELOG, architecture docs, lessons).',
-    body: 'Update only documents in the whitelist of AGENTS.md. Keep them short and accurate.',
+    description: 'Keeps the documentation current: spec, plan, tasks.md, README, CHANGELOG, ADRs, architecture docs. Runs in parallel with reviewer after each task.',
+    body: 'Read the changes (git diff) and update every document they affect: tick nothing, but keep spec/plan/tasks.md consistent with what was built (add tasks that came up, marked "added during implementation" in the specs language), README and CHANGELOG, ADRs and architecture docs. Keep them short and accurate. Report what you updated.',
   },
 };
 
@@ -98,25 +98,21 @@ ${r.body}
 ${skillLine}
 You may write only in: ${writes.length ? writes.map((w) => `\`${w}\``).join(', ') : 'nothing (read-only role)'}. The harness checks it when you finish.
 
-Read AGENTS.md first. Never commit, push, install dependencies or edit \`.harness/\`. \`harness.config.yaml\` changes only through the \`config\` gate.
+Read AGENTS.md first. Do not commit or push (the orchestrator proposes the commit to the user when a story closes), and do not edit \`.harness/\`.
 `;
 }
 
 const S = 'node .harness/scripts/sdd.js';
 
+// RF-ORQ-14: shortcuts that inform or launch work. None of them is needed to approve or to move on.
 const COMMANDS = {
-  constitution: ['Propose the project principles (constitution)', '', `Load the sdd-orchestrator skill. Propose 6–10 short, verifiable principles in docs/constitution.md starting from .harness/templates/constitution.md. Always keep: the agent never commits; every stack or architecture decision needs an approved ADR; no task is finished with verification failing. Run \`${S} lint constitution\`, then \`${S} gate request constitution\` and stop.`],
-  spec: ['Interview and write a spec (EARS)', '<short description>', `Load the spec-generator skill and follow it for: $ARGUMENTS`],
-  clarify: ['QA review of the active spec', '', `Delegate to the spec-reviewer subagent with the active spec (\`${S} status\`). Present its findings without resolving them, then \`${S} gate request clarify\` and stop.`],
-  plan: ['Technical plan, contracts and ADR proposals', '', `Check \`${S} status\`: the spec must be approved. Delegate to the architect subagent to write plan.md (and contracts/, ADR drafts). Show the plan, then \`${S} gate request plan\` and stop. Every ADR stays "Proposed" until approved.`],
-  tasks: ['Break the plan into tasks', '', `Delegate to the architect subagent to write tasks.md from .harness/templates/tasks.md: tasks under 30 minutes, ordered by dependency, each with requirements, component, scope (globs) and "Done when". Run \`${S} lint tasks\`, then \`${S} gate request tasks\` and stop.`],
-  next: ['Run exactly one task, then stop for the manual test', '', `Load the sdd-orchestrator skill and follow "One task": \`${S} next\`, delegate, \`${S} verify\`, review, \`${S} gate request manual-test\` with the manual test instructions. Stop and wait for OK or KO.`],
-  validate: ['Validate the spec requirement by requirement', '', `Run \`${S} validate\` and the verification of every component. Give, for each requirement: the test that covers it and its result. Requirements without a test are "not covered". End with a verdict, then \`${S} gate request validate\`.`],
-  change: ['New requirement: update the spec first', '<the change>', `Run \`${S} change start\`. Update the spec for: $ARGUMENTS (and plan/tasks if needed). Show the diff, then \`${S} gate request change\` and stop. No code until it is approved.`],
-  status: ['Show the state of the flow', '', `Run \`${S} status\` and summarise it: active spec, current task, blockers, pending decisions, cost.`],
-  commit: ['Propose commit messages (you never commit)', '', `Run \`${S} commit-context\`. Propose one commit message per repository with changes, following its convention and language, referencing specs and tasks. Never run git commit: the user commits.`],
-  approve: ['Approve the pending decision', '[comment or chosen option]', 'The user approved the pending decision (the harness already recorded it). Continue with the next step of the flow.'],
-  reject: ['Reject the pending decision', '<reason>', 'The user rejected the pending decision (the harness already recorded it): $ARGUMENTS. Do not continue with that step; address the reason first.'],
+  status: ['What happened and what comes next', '', `Run \`${S} status\` and summarise it for the user: the spec in progress and its state, the last tasks closed, what is pending and what can start now, tasks added during implementation, the last verification and the last commits. Suggest the next step in one line.`],
+  spec: ['Start a new spec', '<short description>', `Load the sdd skill and start a new spec for: $ARGUMENTS`],
+  next: ['Launch in parallel every task that can start now', '', `Load the sdd skill and follow "Implement": \`${S} next\` lists the tasks that can start now (one per component); delegate them at the same time.`],
+  docs: ['Bring the documentation up to date, in the background', '[what changed]', `Delegate to the doc-writer subagent: update every document affected by the recent changes (git diff) $ARGUMENTS. Keep working on anything else meanwhile, and summarise what it updated.`],
+  review: ['Review the recent changes, in parallel', '[scope]', `Delegate at the same time to the reviewer subagent (spec compliance, quality, security) and, when there are tests to add, to qa-tester, over the recent changes (git diff) $ARGUMENTS. Summarise the findings, most important first, and fix the clear ones inside the task.`],
+  validate: ['Validate the spec requirement by requirement', '', `Run \`${S} verify\` and \`${S} validate\`. Give, for each requirement: the test that covers it and its result; requirements without a test are "not covered". End with a verdict.`],
+  commit: ['Propose the commit now', '', `Run \`${S} commit-context\`. Propose one commit message per repository with changes, following its convention and language, referencing specs and tasks, and ask the user. If they say yes, run git add and git commit. Never push unless they ask.`],
 };
 
 function commandFile(name) {
@@ -132,7 +128,7 @@ ${body}
 
 /**
  * RF-TRK-*: sync with whatever tracker the user has. The agent talks to the
- * tracker through its MCP; sdd.js decides what changes and gates the writes.
+ * tracker through its MCP; sdd.js decides what changes, the user okays the writes.
  */
 function trackerCommand(tracker) {
   const where = tracker.project ? ` (proyecto/tablero: ${tracker.project})` : tracker.repo ? ` (repo: ${tracker.repo})` : '';
@@ -146,8 +142,8 @@ Sync the tasks of every spec with **${tracker.provider}**${where}, using the ${t
 1. For each spec with a tasks.md, list its items in ${tracker.provider}: the ones labelled or tagged \`sdd:<SPEC-ID>\` (for example \`sdd:API-001-auth\`), or whose title starts with a task id of that spec. For each item keep: key (its id in the tracker), title and whether it is done/closed.
 2. Pass them as JSON on stdin: \`node .harness/scripts/sdd.js tracker plan\` with \`{"<SPEC-ID>": [{"key": "…", "title": "T1 …", "done": false}]}\`. It prints what goes in each direction.
 3. Conflicts, items missing in the tracker and new items there: ask the user, one by one. Never pick a side yourself and never delete anything.
-4. If the plan creates or updates items in the tracker, run \`node .harness/scripts/sdd.js gate request tracker\` and stop until the user approves.
-5. After approval, create the missing items (title "T<n> <title>", label/tag \`sdd:<SPEC-ID>\`, a short description) and update the ones the plan says, through the MCP. Keep the key of every item you create.
+4. If the plan creates or updates items in the tracker, show it to the user and ask; continue when they say yes.
+5. Then create the missing items (title "T<n> <title>", label/tag \`sdd:<SPEC-ID>\`, a short description) and update the ones the plan says, through the MCP. Keep the key of every item you create.
 6. \`node .harness/scripts/sdd.js tracker apply\` with \`{"<SPEC-ID>": {"links": {"T1": "<new key>"}, "conflicts": {"T3": "local" | "remote"}, "proposals": ["<accepted key>"]}}\` on stdin. It updates tasks.md; the spec is never touched.
 
 Only status, title and new tasks are synced. Never put tokens or secrets in any file.
@@ -157,23 +153,32 @@ Only status, title and new tasks are synced. Never put tokens or secrets in any 
 const hook = (event) => ({ type: 'command', command: `node "$CLAUDE_PROJECT_DIR/.harness/scripts/hook.js" ${event}` });
 
 /** Settings keys the harness adds (appended, so existing rules and hooks stay). */
-export function settingsAppends() {
+export function settingsAppends(config = {}) {
+  // The harness's own scripts and the project's verification commands run without a prompt each time.
+  const verify = Object.values(config.components ?? {}).flatMap((c) => Object.values(c.verify ?? {})).filter((c) => typeof c === 'string' && c.trim());
   return {
+    // RF-GAT-03: the commit is agreed with the user in the conversation when a story closes, so it is not asked twice.
+    'permissions.allow': [
+      'Bash(node .harness/scripts/sdd.js:*)', 'Bash(npx sdd-harness sync:*)', 'Bash(sdd-harness sync:*)',
+      'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git add:*)', 'Bash(git commit:*)',
+      ...verify.map((c) => `Bash(${c}:*)`),
+    ],
     'permissions.deny': [
-      'Bash(git commit:*)', 'Bash(git push:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)', 'Bash(git reset --hard:*)',
-      'Bash(git cherry-pick:*)', 'Bash(git revert:*)', 'Bash(git stash drop:*)', 'Bash(git branch -D:*)',
       'Edit(/.harness/**)', 'Write(/.harness/**)',
     ],
+    // RF-GAT-01/05/09: native confirmation, showing the command. No shell analysis of our own.
     'permissions.ask': [
+      'Bash(git push:*)', 'Bash(git rebase:*)', 'Bash(git merge:*)', 'Bash(git reset --hard:*)', 'Bash(git cherry-pick:*)',
+      'Bash(git stash drop:*)', 'Bash(git branch -D:*)', 'Bash(git tag:*)',
       'Bash(npm install:*)', 'Bash(npm i:*)', 'Bash(pnpm add:*)', 'Bash(yarn add:*)', 'Bash(bun add:*)', 'Bash(pip install:*)',
       'Bash(uv add:*)', 'Bash(poetry add:*)', 'Bash(cargo add:*)', 'Bash(go get:*)', 'Bash(composer require:*)',
       'Bash(dotnet add package:*)', 'Bash(gem install:*)',
+      'Edit(/harness.config.yaml)', 'Write(/harness.config.yaml)',
     ],
-    'hooks.PreToolUse': [{ matcher: 'Bash|Write|Edit|MultiEdit|NotebookEdit|Task|Agent', hooks: [hook('PreToolUse')] }],
+    'hooks.PreToolUse': [{ matcher: 'Write|Edit|MultiEdit|NotebookEdit|Task|Agent', hooks: [hook('PreToolUse')] }],
     'hooks.PostToolUse': [{ matcher: 'Write|Edit|MultiEdit|NotebookEdit|Task|Agent', hooks: [hook('PostToolUse')] }],
     'hooks.UserPromptSubmit': [{ hooks: [hook('UserPromptSubmit')] }],
     'hooks.SessionStart': [{ hooks: [hook('SessionStart')] }],
-    'hooks.SessionEnd': [{ hooks: [hook('SessionEnd')] }],
     'hooks.Stop': [{ hooks: [hook('Stop')] }],
   };
 }
@@ -211,7 +216,7 @@ export function generate(config, ctx) {
   if (local && ctx.tracked?.has(settings)) {
     notices.push({ code: 'toolNeedsTeam', params: { tool: id, file: settings } });
   } else {
-    add({ kind: 'json', path: settings, values: {}, appends: settingsAppends(), enforces: RULES });
+    add({ kind: 'json', path: settings, values: {}, appends: settingsAppends(config), enforces: RULES });
   }
   return { entries, notices };
 }

@@ -7,7 +7,7 @@ const CHECK_LINE = 'node .harness/scripts/checks.js pre-commit';
 
 const PRE_COMMIT = `#!/usr/bin/env node
 ${HEADER.js}
-// Runs the same checks as CI: docs whitelist, secrets, quick verification.
+// Looks for secrets and .env files in the staged changes.
 const { spawnSync } = require('child_process');
 const path = require('path');
 const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'checks.js'), 'pre-commit'], { stdio: 'inherit' });

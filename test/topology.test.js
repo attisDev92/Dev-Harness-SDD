@@ -72,9 +72,10 @@ test('workspace: specs per repo, cross-repo dependency and contract snapshot', a
   assert.deepEqual([source.repo, source.spec, source.path], ['api', 'API-001-auth', 'api/specs/API-001-auth/contracts/openapi.yaml']);
   assert.match(source.hash, /^[0-9a-f]{64}$/);
 
-  // Contracts are a protected zone: adapting to them needs approval (RF-TOP-10).
+  // Contracts are a protected zone: touching one raises an alert (RF-TOP-10).
   const hook = handleHook('PreToolUse', { cwd: root, session_id: 's', tool_name: 'Write', tool_input: { file_path: path.join(root, snap), content: 'x' } }, { env: {} });
-  assert.equal(hook.code, 2);
+  assert.equal(hook.code, 0);
+  assert.match(JSON.parse(hook.stdout).systemMessage, /zona protegida "contracts"/);
 
   // RF-TOP-08: the provider changes → stale; RF-TOP-07: sync updates it.
   fs.appendFileSync(path.join(root, 'api/specs/API-001-auth/contracts/openapi.yaml'), 'info: {title: v2}\n');

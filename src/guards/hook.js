@@ -1,33 +1,30 @@
 #!/usr/bin/env node
 // Claude Code hook dispatcher (RF-ADP-01/02). One entry point per event:
-//   node .harness/scripts/hook.js <PreToolUse|PostToolUse|UserPromptSubmit|SessionStart|SessionEnd|Stop>
-// It reads the hook payload from stdin and applies the neutral guards.
-// Exit 2 + stderr blocks (Claude reads the reason); stdout JSON asks the user.
-// Dependency-free.
+//   node .harness/scripts/hook.js <PreToolUse|PostToolUse|UserPromptSubmit|SessionStart|Stop>
+// It reads the hook payload from stdin. Alerts never stop the work; only the
+// harness itself is blocked (exit 2 + stderr). Dependency-free.
 
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { findProjectRoot, loadGuardSettings } from './project.js';
 import { isMainModule } from './args.js';
-import { loadFlow, saveFlow, touchLock, releaseLock, logEvent } from './state.js';
-import { checkShell } from './bash-guard.js';
-import { checkWrite, componentOf } from './files-guard.js';
-import { decide, parseDecision } from './flow.js';
+import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop } from './state.js';
+import { checkWrite } from './files-guard.js';
+import { parseDecision } from './flow.js';
 import { changeSnapshot, changedSince } from './verify.js';
-import { loadState as loadRetries, saveState as saveRetries, resetTask } from './retry.js';
 import { runtimeMessages, verdictText } from './runtime-messages.js';
-import { guardMessages } from './messages.js';
 import { matchesAny } from './glob.js';
-import { specRoots } from './tasks.js';
+import { statusLines } from './status.js';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const AGENT_TOOLS = new Set(['Task', 'Agent']);
+const DOC_FILE = /\.(md|mdx)$/i;
 const HARNESS_ROLES = new Set(['spec-reviewer', 'architect', 'frontend-dev', 'backend-dev', 'qa-tester', 'reviewer', 'debugger', 'doc-writer']);
 
 /**
  * @param {string} event
  * @param {object} payload hook input
- * @param {{ env?: object, cwd?: string, snapshot?: (root: string) => object }} [opts]
+ * @param {{ env?: object, cwd?: string, snapshot?: (root: string) => object, runSync?: (root: string) => { ok: boolean, output: string } }} [opts]
  * @returns {{ code: number, stdout?: string, stderr?: string }}
  */
 export function handleHook(event, payload, opts = {}) {
@@ -36,123 +33,114 @@ export function handleHook(event, payload, opts = {}) {
   const root = findProjectRoot(cwd);
   if (!root) return { code: 0 };
   const settings = loadGuardSettings(root);
-  const lang = env.HARNESS_LANG?.startsWith('es') ? 'es' : env.HARNESS_LANG?.startsWith('en') ? 'en' : settings.language ?? 'es';
-  const t = runtimeMessages(lang);
-  const legacy = guardMessages(lang);
-  const { state, rebuilt } = loadFlow(root, specRoots(settings));
-  const session = payload.session_id ?? 'unknown';
-  const save = () => saveFlow(root, state, settings.specsLanguage);
+  const t = runtimeMessages();
+  const runtime = loadRuntime(root);
+  const save = () => saveRuntime(root, runtime);
   const snapshot = opts.snapshot ?? changeSnapshot;
-  const blockWith = (text) => ({ code: 2, stderr: text });
+  const context = (text) => ({ code: 0, stdout: JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: event, additionalContext: text } }) });
+  // The same alert is not repeated for the same spec and pending tasks.
+  const alertOnce = (text, key) => {
+    if (runtime.alerted.includes(key)) return { code: 0 };
+    runtime.alerted.push(key);
+    save();
+    return context(text);
+  };
   const input = payload.tool_input ?? {};
   const tool = payload.tool_name;
 
   switch (event) {
     case 'PreToolUse': {
-      const writes = WRITE_TOOLS.has(tool) || (tool === 'Bash' && /sdd\.js/.test(input.command ?? ''));
-      // RF-ORQ-12: one session runs tasks at a time.
-      if (writes && (state.task || /sdd\.js["']?\s+next\b/.test(input.command ?? ''))) {
-        const lock = touchLock(root, session);
-        if (!lock.ok) return blockWith(t.hook.lockBusy(lock.holder));
-      }
-      let verdict = { decision: 'allow' };
-      if (tool === 'Bash') {
-        verdict = checkShell(input.command ?? '', { root, cwd, settings, state });
-      } else if (WRITE_TOOLS.has(tool)) {
-        const file = input.file_path ?? input.notebook_path ?? input.path;
-        if (file) verdict = checkWrite({ root, file: path.resolve(cwd, file), settings, state, input });
-      } else if (AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) {
-        state.subagent = { role: input.subagent_type, snapshot: snapshot(root), started: new Date().toISOString() };
+      if (AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) {
+        // Several subagents may run at once (frontend and backend): each one is tracked on its own.
+        runtime.subagents[payload.tool_use_id ?? input.subagent_type] = { role: input.subagent_type, snapshot: snapshot(root), started: new Date().toISOString() };
         save();
+        return { code: 0 };
       }
-      if (verdict.decision === 'block') return blockWith(verdictText({ ...verdict, allowed: settings.docsWhitelist }, lang, legacy));
-      if (verdict.decision === 'ask') {
-        return {
-          code: 0,
-          stdout: JSON.stringify({
-            hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: verdictText(verdict, lang, legacy) },
-          }),
-        };
+      if (!WRITE_TOOLS.has(tool)) return { code: 0 };
+      const file = input.file_path ?? input.notebook_path ?? input.path;
+      if (!file) return { code: 0 };
+      const flow = readFlow(root, settings);
+      const verdict = checkWrite({ root, file: path.resolve(cwd, file), settings, flow, input });
+      if (verdict.decision === 'block') return { code: 2, stderr: verdictText(verdict) };
+      if (verdict.decision === 'warn') {
+        const open = flow.tasks.filter((x) => !x.done).map((x) => x.id).join('+') || '-';
+        return alertOnce(verdictText(verdict), `${verdict.kind}:${verdict.zone ?? verdict.component ?? verdict.match}:${flow.spec?.id ?? '-'}:${open}`);
       }
       return { code: 0 };
     }
 
     case 'PostToolUse': {
-      if (WRITE_TOOLS.has(tool) && state.task) {
-        const file = input.file_path ?? input.notebook_path;
-        const rel = file ? path.relative(root, path.resolve(cwd, file)).split(path.sep).join('/') : '';
-        if (componentOf(rel, settings.components)) {
-          state.task.dirty = true;
-          save();
-        }
-        return { code: 0 };
+      if (WRITE_TOOLS.has(tool)) {
+        const file = input.file_path ?? input.notebook_path ?? '';
+        if (path.resolve(cwd, file) !== path.join(root, 'harness.config.yaml')) return { code: 0 };
+        // RF-GAT-09: the configuration is regenerated right after the user's change.
+        const r = (opts.runSync ?? runSync)(root);
+        logEvent(root, 'config-synced', { ok: r.ok });
+        return context(r.ok ? t.hook.configSynced(r.output) : t.hook.configSyncFailed(r.output));
       }
-      if (AGENT_TOOLS.has(tool) && state.subagent) {
-        // RF-DOM-03/04: compare what the subagent changed with its lanes.
-        const { role, snapshot: before } = state.subagent;
-        state.subagent = null;
-        const changed = changedSince(before, snapshot(root));
-        const lanes = settings.roles?.[role]?.writes ?? [];
-        const outside = changed.filter((f) => !matchesAny(f, lanes) && !f.startsWith('.harness/'));
-        if (changed.some((f) => componentOf(f, settings.components)) && state.task) state.task.dirty = true;
-        logEvent(state, 'subagent-finished', { role, changed: changed.length, outside: outside.length });
-        save();
-        if (outside.length) return blockWith(t.hook.lanes(role, outside));
-      }
-      return { code: 0 };
+      const key = payload.tool_use_id ?? input.subagent_type;
+      if (!AGENT_TOOLS.has(tool) || !runtime.subagents[key]) return { code: 0 };
+      // RF-DOM-03/04: compare what the subagent changed with its lanes.
+      const { role, snapshot: before } = runtime.subagents[key];
+      delete runtime.subagents[key];
+      const alone = Object.keys(runtime.subagents).length === 0;
+      const changed = changedSince(before, snapshot(root));
+      const lanes = settings.roles?.[role]?.writes ?? [];
+      const tooling = settings.protected?.tooling ?? [];
+      // While another subagent runs in parallel its files show up in the same diff, so lanes are only checked when this one ran alone.
+      const outside = alone ? changed.filter((f) => !matchesAny(f, lanes) && !f.startsWith('.harness/') && !DOC_FILE.test(f) && !matchesAny(f, tooling)) : [];
+      logEvent(root, 'subagent-finished', { role, changed: changed.length, outside: outside.length });
+      save();
+      return outside.length ? context(t.hook.lanes(role, outside)) : { code: 0 };
     }
 
     case 'UserPromptSubmit': {
+      // RF-GAT-08: the user answers a stop by talking ("sí", "continúa", "aprobado"…).
+      const pending = runtime.pending;
+      if (!pending) return { code: 0 };
       const decision = parseDecision(payload.prompt);
       if (!decision) return { code: 0 };
-      if (!state.gate) {
-        return /^\s*\/sdd:(approve|reject)/i.test(payload.prompt ?? '') ? { code: 0, stdout: t.hook.noGate() } : { code: 0 };
+      const flow = readFlow(root, settings);
+      const spec = flow.spec?.id === pending.spec ? flow.spec : null;
+      if (!spec) {
+        runtime.pending = null;
+        save();
+        return { code: 0 };
       }
-      const result = decide(state, decision);
-      Object.assign(state, result.state);
-      if (result.resetRetries) saveRetries(root, resetTask(loadRetries(root), result.resetRetries));
+      if (!decision.approved) return { code: 0, stdout: t.hook.changesRequested(pending.stop, spec.id) };
+      approveStop(root, spec, pending.stop);
+      runtime.pending = null;
       save();
-      const lines = [result.approved ? t.hook.approved(result.gate.kind, decision.text) : t.hook.rejected(result.gate.kind, decision.text)];
-      if (!result.approved && result.gate.kind === 'manual-test') lines.push(t.hook.triageFromKo());
-      return { code: 0, stdout: lines.join('\n') };
+      logEvent(root, 'stop-approved', { spec: spec.id, stop: pending.stop });
+      return { code: 0, stdout: t.hook.approvedByUser(pending.stop, spec.id, decision.text) };
     }
 
     case 'SessionStart': {
       // RF-ORQ-09: pick up where the last session left off.
-      const lines = [];
-      if (rebuilt) {
-        save();
-        lines.push(t.hook.rebuilt());
-      }
-      if (state.activeSpec || state.task || state.gate) {
-        const spec = state.specs[state.activeSpec] ?? {};
-        lines.push(t.hook.resumed([
-          `- ${t.status.spec}: ${state.activeSpec ?? t.status.none} (${t.status.phase}: ${spec.phase ?? t.status.none})`,
-          `- ${t.status.task}: ${state.task ? `${state.task.id} ${state.task.title ?? ''}`.trim() : t.status.none}`,
-          `- ${t.status.gate}: ${state.gate?.kind ?? t.status.none}`,
-          ...(state.triage ? [`- ${t.status.triage}: ${state.triage.task}`] : []),
-        ].join('\n')));
-      }
-      return { code: 0, stdout: lines.join('\n') };
+      const flow = readFlow(root, settings);
+      if (!flow.spec) return { code: 0 };
+      return { code: 0, stdout: t.hook.resumed(statusLines(root, settings, flow, runtime, { brief: true }).join('\n')) };
     }
 
-    case 'SessionEnd':
-      releaseLock(root, session);
-      return { code: 0 };
-
     case 'Stop': {
-      // RF-VER-01: never finish with unverified or failing changes. Blocking
-      // only once (stop_hook_active) avoids an endless loop.
-      if (payload.stop_hook_active || !state.task) return { code: 0 };
-      if (state.task.dirty || state.task.verify?.status === 'fail') {
-        return blockWith(t.hook.stopVerify(state.task.id, state.task.verify?.status === 'fail' ? state.task.verify.failing?.command : null));
-      }
-      return { code: 0 };
+      // RF-VER-01: never finish with failing verification. Once per failure, so it never loops.
+      if (payload.stop_hook_active) return { code: 0 };
+      const failing = Object.entries(runtime.verify ?? {}).find(([, v]) => v.status === 'fail' && !v.reminded);
+      if (!failing) return { code: 0 };
+      failing[1].reminded = true;
+      save();
+      return { code: 2, stderr: t.hook.stopVerify(failing[0], failing[1].command) };
     }
 
     default:
       return { code: 0 };
   }
+}
+
+function runSync(root) {
+  const r = spawnSync('sdd-harness', ['sync', '--yes'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32', windowsHide: true, timeout: 120000 });
+  const output = `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? r.error.message : ''}`.trim().split(/\r?\n/).slice(-15).join('\n');
+  return { ok: r.status === 0, output };
 }
 
 function readAll(stream) {
@@ -172,10 +160,8 @@ async function main() {
     const raw = await readAll(process.stdin);
     result = handleHook(event, raw.trim() ? JSON.parse(raw) : {});
   } catch (err) {
-    // Fail safe: an internal error blocks tool calls, but never breaks a session.
-    result = event === 'PreToolUse'
-      ? { code: 2, stderr: `Blocked: the harness hook failed (${err?.message ?? err}). Fail-safe: the action was not allowed.` }
-      : { code: 0, stderr: `sdd-harness hook error: ${err?.message ?? err}` };
+    // An internal error never blocks the work: the harness is a helper, not a wall.
+    result = { code: 0, stderr: `sdd-harness hook error: ${err?.message ?? err}` };
   }
   if (result.stdout) process.stdout.write(`${result.stdout}\n`);
   if (result.stderr) process.stderr.write(`${result.stderr}\n`);

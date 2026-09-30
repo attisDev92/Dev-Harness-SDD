@@ -1,48 +1,40 @@
 #!/usr/bin/env node
-// sdd.js: the deterministic side of the SDD flow. The /sdd:* commands tell the
-// agent to run it; every rule that can be checked by a script lives here
-// instead of in the prompt (RF-SDD-04/12/13/14/15/16/17, RF-ORQ-01..08,
-// RF-GAT-03/10..14, RF-RET-01..07, RF-VER-01/02). Dependency-free.
+// sdd.js: helpers of the SDD flow that the agent runs (pre-allowed, never
+// needed by the user). State lives in the markdown files: the `status` of
+// spec.md and the checkboxes of tasks.md (RF-SDD-18). Dependency-free.
 //
 // Exit codes: 0 ok, 2 refused (reason on stderr), 1 usage error.
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
-import { loadFlow, saveFlow, logEvent } from './state.js';
-import { requestGate } from './flow.js';
-import { specDirOf } from './state.js';
+import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, STOPS } from './state.js';
 import { importContract } from './contracts.js';
-import { listSpecs, specsDirFor, specRoots, specDependencies, resolveSpecRef, nextSpecId, nextAdrFile, slugify, parseTasks, selectNextTask, markTaskDone, taskProblems, parseRequirements, lintSpec, lintTasks, lintConstitution } from './tasks.js';
+import { listSpecs, specsDirFor, specRoots, nextSpecId, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
 import { runVerify } from './verify.js';
-import { loadState as loadRetries, saveState as saveRetries, recordFailure, resetTask } from './retry.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
 import { linkedTasks, planSync, applyLocal } from './tracker-sync.js';
+import { statusData, statusLines } from './status.js';
 
 const OK = 0;
 const USAGE = 1;
 const REFUSED = 2;
 
 const USAGE_TEXT = `usage: sdd.js <command>
-  status [--json]                 active spec, task, pending decision, blockers
+  status [--json]                 what happened and what comes next
   new-spec <name> [--component c] create specs/<PREFIX>-<NNN>-<name>/spec.md (--component only with specs.location per-repo)
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
-  gate request <kind> [--files a,b] [--adr f] [--summary s]
-  gate status
-  next                            start the next task
-  verify [--quick]                run the verification of the current task
-  task done <T#>                  close the current task
-  triage start | change start
-  validate [--json]               requirement → test coverage of the active spec
+  stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
+  approve                         record the pending stop (when the user chose "Approve" in a question)
+  next                            tasks that can start now, one per component (to delegate in parallel)
+  verify [--component c]          run the verification (all components without --component)
+  validate [--json]               requirement → test coverage; closes the spec when every task is done
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
-  tracker plan [--file f]         items read from the tracker (JSON on stdin) → sync plan
-  tracker apply [--file f]        after the "tracker" gate: links, pulls and decisions into tasks.md
-  commit-context                  changes per repository for /sdd:commit
-  lint <spec|tasks|constitution> [file]`;
+  tracker plan|apply [--file f]   sync tasks.md with the tracker (JSON on stdin)
+  commit-context                  changes per repository, to propose the commit`;
 
 export function roleFor(kind) {
   return kind === 'frontend' ? 'frontend-dev' : 'backend-dev';
@@ -56,25 +48,14 @@ function readTemplate(root, name) {
   }
 }
 
-function specPaths(root, id, state) {
-  const dir = path.join(root, specDirOf(state, id));
-  return { dir, spec: path.join(dir, 'spec.md'), plan: path.join(dir, 'plan.md'), tasks: path.join(dir, 'tasks.md'), progress: path.join(dir, 'progress.md') };
-}
-
-function read(file) {
-  try {
-    return readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-}
+const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
 
 /**
  * @param {string[]} argv
- * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function }} io
+ * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function, readStdin?: () => Promise<string> }} io
  */
 export async function runSdd(argv, io) {
-  const { flags, positional } = parseArgs(argv, { string: ['component', 'files', 'adr', 'summary', 'option', 'file'], boolean: ['json', 'quick'] });
+  const { flags, positional } = parseArgs(argv, { string: ['component', 'file'], boolean: ['json'] });
   const [command, ...rest] = positional;
   const root = findProjectRoot(io.cwd);
   const out = (s) => io.stdout.write(`${s}\n`);
@@ -84,49 +65,20 @@ export async function runSdd(argv, io) {
   };
   if (!root) return refuse('This project is not activated (no harness.config.yaml). Run "sdd-harness-init" first.');
   const settings = loadGuardSettings(root);
-  const lang = io.env.HARNESS_LANG?.startsWith('es') ? 'es' : io.env.HARNESS_LANG?.startsWith('en') ? 'en' : settings.language ?? 'es';
-  const t = runtimeMessages(lang);
-  const { state } = loadFlow(root, specRoots(settings));
-  const save = () => saveFlow(root, state, settings.specsLanguage);
+  const t = runtimeMessages();
+  const runtime = loadRuntime(root);
+  const save = () => saveRuntime(root, runtime);
+  const flow = readFlow(root, settings);
   const componentIds = Object.keys(settings.components);
 
   switch (command) {
     case 'status': {
-      const spec = state.specs[state.activeSpec] ?? null;
-      const blockers = [];
-      if (state.gate) blockers.push(`${t.status.gate}: ${state.gate.kind}`);
-      if (state.triage) blockers.push(`${t.status.triage}: ${state.triage.task}`);
-      if (state.task?.verify?.status === 'fail') blockers.push(`verify: ${state.task.verify.failing?.command}`);
-      // RF-TOP-05: dependencies on specs that do not exist.
-      if (state.activeSpec) {
-        for (const ref of specDependencies(read(specPaths(root, state.activeSpec, state).spec))) {
-          if (!resolveSpecRef(root, settings, ref)) blockers.push(t.status.missingDependency(ref));
-        }
-      }
-      const data = {
-        activeSpec: state.activeSpec,
-        phase: spec?.phase ?? null,
-        approved: spec?.approved ?? [],
-        constitution: state.constitution.approved,
-        task: state.task ? { id: state.task.id, component: state.task.component, verify: state.task.verify?.status ?? null } : null,
-        gate: state.gate?.kind ?? null,
-        triage: Boolean(state.triage),
-        blockers,
-        // RF-OBS-04: never estimated.
-        cost: null,
-      };
       if (flags.json) {
-        out(JSON.stringify(data, null, 2));
+        out(JSON.stringify(statusData(root, settings, flow, runtime), null, 2));
         return OK;
       }
-      const s = t.status;
-      out(s.title);
-      out(`  ${s.spec}: ${data.activeSpec ?? s.none}`);
-      out(`  ${s.phase}: ${data.phase ?? s.none} · ${s.approved}: ${data.approved.join(', ') || s.none}`);
-      out(`  ${s.task}: ${data.task ? `${data.task.id} (${data.task.component})` : s.none}`);
-      out(`  ${s.gate}: ${data.gate ?? s.none}`);
-      out(`  ${s.blocks}: ${blockers.join(' · ') || s.none}`);
-      out(`  ${s.cost}: ${s.notAvailable}`);
+      out(t.status.title);
+      statusLines(root, settings, flow, runtime).forEach(out);
       return OK;
     }
 
@@ -135,23 +87,21 @@ export async function runSdd(argv, io) {
       if (!name) return refuse(USAGE_TEXT);
       // A spec belongs to no component (its tasks do); the component only picks the repo when specs live per repo.
       let compId = flags.component;
-      if (!compId && settings.specs.location === 'per-repo') {
+      if (!compId && settings.specs.location === 'per-repo' && ['multi-repo', 'workspace'].includes(settings.topology)) {
         if (componentIds.length !== 1) return refuse(t.spec.componentRequired(componentIds));
         compId = componentIds[0];
       }
       const comp = compId ? settings.components[compId] : null;
       if (compId && !comp) return refuse(t.spec.unknownComponent(compId, componentIds));
       const id = nextSpecId(root, comp?.id_prefix ?? settings.specs.idPrefix, slugify(name), specRoots(settings));
-      const specsDir = specsDirFor(settings, compId);
-      const p = specPaths(root, id, { specs: { [id]: { dir: `${specsDir}/${id}` } } });
-      mkdirSync(p.dir, { recursive: true });
-      writeFileSync(p.spec, readTemplate(root, 'spec').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, id.split('-').slice(0, 2).join('-')).replace(/<(name|nombre)>/, name));
-      writeFileSync(p.progress, readTemplate(root, 'progress').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, id.split('-').slice(0, 2).join('-')));
-      state.activeSpec = id;
-      state.specs[id] = { phase: 'spec', approved: [], change: false, dir: path.relative(root, p.dir).split(path.sep).join('/') };
-      logEvent(state, 'spec-created', { id });
-      save();
-      out(t.spec.created(id, path.relative(root, p.spec).split(path.sep).join('/')));
+      const dir = path.join(root, specsDirFor(settings, compId), id);
+      const short = id.split('-').slice(0, 2).join('-');
+      mkdirSync(dir, { recursive: true });
+      const spec = readTemplate(root, 'spec').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, short).replace(/<(name|nombre)>/, name);
+      writeFileSync(path.join(dir, 'spec.md'), withStatus(spec, 'draft'));
+      writeFileSync(path.join(dir, 'progress.md'), readTemplate(root, 'progress').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, short));
+      logEvent(root, 'spec-created', { id });
+      out(t.spec.created(id, rel(root, path.join(dir, 'spec.md'))));
       return OK;
     }
 
@@ -159,155 +109,113 @@ export async function runSdd(argv, io) {
       const name = rest.join(' ');
       if (!name) return refuse(USAGE_TEXT);
       // ADRs live in the repository of the active spec (RF-TOP-02).
-      const specRepo = state.activeSpec ? path.posix.dirname(path.posix.dirname(specDirOf(state, state.activeSpec))) : '.';
-      const rel = nextAdrFile(root, slugify(name), specRepo === '.' ? 'docs/decisions' : `${specRepo}/docs/decisions`);
-      mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
-      const n = /ADR-(\d{4})/.exec(rel)[1];
-      writeFileSync(path.join(root, rel), readTemplate(root, 'adr').replace(/<NNNN>/, n).replace(/<(title|título)>/, name).replace(/<(PREFIX|PREFIJO)>-<NNN>/, state.activeSpec ?? '—'));
-      out(t.spec.adrCreated(rel));
+      const specRepo = flow.spec ? path.posix.dirname(path.posix.dirname(flow.spec.dir)) : '.';
+      const file = nextAdrFile(root, slugify(name), specRepo === '.' ? 'docs/decisions' : `${specRepo}/docs/decisions`);
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      const n = /ADR-(\d{4})/.exec(file)[1];
+      writeFileSync(path.join(root, file), readTemplate(root, 'adr').replace(/<NNNN>/, n).replace(/<(title|título)>/, name).replace(/<(PREFIX|PREFIJO)>-<NNN>/, flow.spec?.id ?? '—'));
+      out(t.spec.adrCreated(file));
       return OK;
     }
 
-    case 'gate': {
-      if (rest[0] === 'status') {
-        out(JSON.stringify(state.gate, null, 2));
-        return OK;
-      }
-      if (rest[0] !== 'request' || !rest[1]) return refuse(USAGE_TEXT);
-      const files = (flags.files ?? '').split(',').map((s) => s.trim().replace(/\\/g, '/')).filter(Boolean);
-      const r = requestGate(state, { kind: rest[1], files, adr: flags.adr, summary: flags.summary, option: flags.option });
-      if (!r.ok) return refuse(t.gate[r.code](r.params ?? {}));
-      Object.assign(state, r.state);
+    case 'stop': {
+      const stop = rest[0];
+      if (!STOPS[stop]) return refuse(t.stop.unknown(stop ?? ''));
+      if (!flow.spec) return refuse(t.next.noSpec());
+      runtime.pending = { spec: flow.spec.id, stop, at: new Date().toISOString() };
       save();
-      out(t.gate.requested(rest[1]));
+      logEvent(root, 'stop-requested', { spec: flow.spec.id, stop });
+      out(t.stop.requested(stop, flow.spec.id));
+      return OK;
+    }
+
+    case 'approve': {
+      const pending = runtime.pending;
+      if (!pending || !flow.spec || pending.spec !== flow.spec.id) return refuse(t.stop.nothingPending());
+      approveStop(root, flow.spec, pending.stop);
+      runtime.pending = null;
+      save();
+      logEvent(root, 'stop-approved', { spec: pending.spec, stop: pending.stop });
+      out(t.stop.approved(pending.stop, pending.spec));
       return OK;
     }
 
     case 'next': {
-      if (state.gate) return refuse(t.next.gatePending(state.gate.kind));
-      if (state.triage) return refuse(t.next.triage(state.triage.task));
-      if (state.task) return refuse(state.task.verify?.status === 'pass' && !state.task.manualApproved ? t.next.manualPending(state.task.id) : t.next.inProgress(state.task.id));
-      if (!state.activeSpec) return refuse(t.next.noSpec());
-      const spec = state.specs[state.activeSpec] ?? { approved: [] };
-      if (!spec.approved?.includes('tasks')) return refuse(t.next.tasksNotApproved());
-      const file = specPaths(root, state.activeSpec, state).tasks;
-      const tasks = parseTasks(read(file));
-      if (!tasks.length) return refuse(t.next.noTasks(path.relative(root, file)));
-      const task = selectNextTask(tasks);
-      if (!task) {
-        spec.phase = 'validate';
-        save();
+      // Informative: what can start now. Tasks of different components run in parallel.
+      if (!flow.spec) return refuse(t.next.noSpec());
+      if (flow.spec.status !== 'plan-approved') return refuse(t.next.notApproved(flow.spec.status));
+      if (!flow.tasks.length) return refuse(t.next.noTasks(`${flow.spec.dir}/tasks.md`));
+      const { ready, waiting } = taskQueue(flow.tasks);
+      if (!ready.length && !waiting.length) {
         out(t.next.allDone());
         return OK;
       }
-      const problems = taskProblems(task, settings.components);
-      if (problems.length) return refuse(t.next.problems(task.id, problems));
-      const comp = settings.components[task.component];
-      if (!comp.verify || !Object.keys(comp.verify).length) return refuse(t.next.noVerify(task.component));
-      const role = roleFor(comp.kind);
-      state.task = {
-        id: task.id, title: task.title, spec: state.activeSpec, component: task.component, role,
-        scope: task.scope, requirements: task.requirements, doneWhen: task.doneWhen, story: task.story ?? null,
-        started: new Date().toISOString(), dirty: false, verify: null, manualApproved: false,
-      };
-      state.granted = [];
-      logEvent(state, 'task-started', { task: task.id });
-      save();
-      out(t.next.started(task, role));
+      for (const task of ready) {
+        const problems = taskProblems(task, settings.components);
+        if (problems.length) {
+          out(t.next.problems(task.id, problems));
+          continue;
+        }
+        const comp = settings.components[task.component];
+        out(t.next.ready(task, roleFor(comp.kind)));
+        if (!comp.verify || !Object.keys(comp.verify).length) out(`  ${t.next.noVerify(task.component)}`);
+      }
+      if (ready.length) out(t.next.parallel());
+      if (waiting.length) out(t.next.waiting(waiting));
       return OK;
     }
 
     case 'verify': {
-      const compId = flags.component ?? state.task?.component;
-      if (!compId || !settings.components[compId]) return refuse(t.gate.noTask());
-      const result = runVerify(root, { path: settings.components[compId].path, ...settings.components[compId] }, { quick: flags.quick, run: io.run });
-      for (const r of result.results) out(`$ ${r.command}  → ${r.code === 0 ? 'ok' : `exit ${r.code}`}${r.code === 0 ? '' : `\n${r.output}`}`);
-      if (result.status === 'unconfigured') return refuse(t.verify.unconfigured(compId));
-      if (!state.task || flags.quick) return result.status === 'pass' ? OK : REFUSED;
-      if (result.status === 'pass') {
-        state.task.verify = { status: 'pass', at: new Date().toISOString() };
-        state.task.dirty = false;
-        logEvent(state, 'verify-pass', { task: state.task.id });
-        save();
-        out(t.verify.pass(compId));
-        return OK;
+      if (flags.component && !settings.components[flags.component]) return refuse(t.verify.pickComponent(componentIds));
+      const targets = flags.component ? [flags.component] : componentIds;
+      let failed = false;
+      for (const id of targets) {
+        const result = runVerify(root, settings.components[id], { run: io.run });
+        for (const r of result.results) out(`$ ${r.command}  → ${r.code === 0 ? 'ok' : `exit ${r.code}`}${r.code === 0 ? '' : `\n${r.output}`}`);
+        if (result.status === 'unconfigured') {
+          if (flags.component) return refuse(t.verify.unconfigured(id));
+          continue;
+        }
+        const at = new Date().toISOString();
+        if (result.status === 'pass') {
+          runtime.verify[id] = { status: 'pass', at };
+          out(t.verify.pass(id));
+        } else {
+          failed = true;
+          runtime.verify[id] = { status: 'fail', command: result.failing.command, at };
+          io.stderr.write(`${t.verify.fail(result.failing)}\n`);
+        }
+        logEvent(root, 'verify', { component: id, status: result.status });
       }
-      // RF-RET-07: the attempt counter is kept by this script, not by the model.
-      const retries = loadRetries(root);
-      const { state: nextRetries, verdict } = recordFailure(retries, { task: state.task.id, signature: result.signature, max: settings.retries.in_scope });
-      saveRetries(root, nextRetries);
-      state.task.verify = { status: 'fail', failing: result.failing, signature: result.signature, at: new Date().toISOString() };
-      if (verdict.decision === 'triage') state.triage = { task: state.task.id, reason: verdict.kind, started: new Date().toISOString() };
-      logEvent(state, 'verify-fail', { task: state.task.id, decision: verdict.decision });
       save();
-      io.stderr.write(`${t.verify.fail(result.failing, verdict)}\n`);
-      return REFUSED;
-    }
-
-    case 'task': {
-      const id = rest[1];
-      if (rest[0] !== 'done' || !id) return refuse(USAGE_TEXT);
-      if (!state.task || state.task.id !== id) return refuse(t.done.notCurrent(id));
-      if (state.task.verify?.status !== 'pass' || state.task.dirty) return refuse(t.done.needsVerify());
-      const file = specPaths(root, state.activeSpec, state).tasks;
-      const text = read(file) ?? '';
-      const tasks = parseTasks(text);
-      // RF-GAT-14: with story or spec granularity the manual test comes when the group is complete.
-      const remaining = tasks.filter((x) => !x.done && x.id !== id);
-      const groupDone = settings.manualTest === 'task'
-        || (settings.manualTest === 'spec' && remaining.length === 0)
-        || (settings.manualTest === 'story' && !remaining.some((x) => (x.story ?? null) === (state.task.story ?? null)));
-      if (groupDone && !state.task.manualApproved) return refuse(t.done.needsManual());
-      writeFileSync(file, markTaskDone(text, id));
-      const retries = loadRetries(root);
-      saveRetries(root, resetTask(retries, id));
-      logEvent(state, 'task-done', { task: id });
-      state.task = null;
-      state.granted = [];
-      if (!remaining.length) state.specs[state.activeSpec].phase = 'validate';
-      save();
-      out(t.done.done(id));
-      return OK;
-    }
-
-    case 'triage': {
-      if (rest[0] !== 'start') return refuse(USAGE_TEXT);
-      if (state.triage) return refuse(t.triage.already());
-      state.triage = { task: state.task?.id ?? null, reason: flags.summary ?? 'agent', started: new Date().toISOString() };
-      logEvent(state, 'triage-started', { task: state.triage.task });
-      save();
-      out(t.triage.started());
-      return OK;
-    }
-
-    case 'change': {
-      if (rest[0] !== 'start') return refuse(USAGE_TEXT);
-      if (!state.activeSpec) return refuse(t.next.noSpec());
-      state.specs[state.activeSpec] = { phase: 'spec', approved: [], ...state.specs[state.activeSpec], change: true };
-      logEvent(state, 'change-started', {});
-      save();
-      out(t.change.started(state.activeSpec));
-      return OK;
+      return failed ? REFUSED : OK;
     }
 
     case 'validate': {
-      if (!state.activeSpec) return refuse(t.next.noSpec());
-      const reqs = parseRequirements(read(specPaths(root, state.activeSpec, state).spec)).filter((r) => r.id.startsWith('RF'));
+      if (!flow.spec) return refuse(t.next.noSpec());
+      const reqs = parseRequirements(safeRead(path.join(root, flow.spec.dir, 'spec.md'))).filter((r) => r.id.startsWith('RF'));
       const index = testIndex(root, settings);
       const rows = reqs.map((r) => ({ id: r.id, tests: index.filter((f) => f.ids.has(r.id)).map((f) => f.file) }));
+      const allDone = flow.tasks.length > 0 && flow.tasks.every((x) => x.done);
+      if (allDone && flow.spec.status === 'plan-approved') {
+        const file = path.join(root, flow.spec.dir, 'spec.md');
+        writeFileSync(file, withStatus(readFileSync(file, 'utf8'), 'done'));
+        logEvent(root, 'spec-done', { spec: flow.spec.id });
+      }
       if (flags.json) {
-        out(JSON.stringify({ spec: state.activeSpec, requirements: rows }, null, 2));
+        out(JSON.stringify({ spec: flow.spec.id, requirements: rows, closed: allDone }, null, 2));
       } else {
         for (const r of rows) out(r.tests.length ? t.validate.covered(r.id, r.tests) : t.validate.uncovered(r.id));
         out(t.validate.summary(rows.filter((r) => r.tests.length).length, rows.length));
+        if (allDone) out(t.validate.closed(flow.spec.id));
       }
       return rows.every((r) => r.tests.length) ? OK : REFUSED;
     }
 
     case 'contract': {
       // RF-TOP-06: snapshot of a provider contract in the active spec.
-      if (rest[0] !== 'import' || !rest[1] || !state.activeSpec) return refuse(USAGE_TEXT);
-      const r = importContract(root, settings, { ref: rest[1], file: flags.file, targetDir: specPaths(root, state.activeSpec, state).dir });
+      if (rest[0] !== 'import' || !rest[1] || !flow.spec) return refuse(USAGE_TEXT);
+      const r = importContract(root, settings, { ref: rest[1], file: flags.file, targetDir: path.join(root, flow.spec.dir) });
       if (!r.ok) return refuse(t.contract[r.code](r.params ?? {}));
       out(t.contract.imported(r.snapshot, r.source));
       return OK;
@@ -337,8 +245,8 @@ export async function runSdd(argv, io) {
         let creates = 0;
         let updates = 0;
         for (const s of specs) {
-          const tasks = linkedTasks(read(path.join(root, s.dir, 'tasks.md')));
-          const items = (Array.isArray(remote) ? (s.id === state.activeSpec ? remote : []) : remote[s.id] ?? []).map((r) => ({ key: String(r.key), title: String(r.title ?? ''), done: Boolean(r.done) }));
+          const tasks = linkedTasks(safeRead(path.join(root, s.dir, 'tasks.md')));
+          const items = (Array.isArray(remote) ? (s.id === flow.spec?.id ? remote : []) : remote[s.id] ?? []).map((r) => ({ key: String(r.key), title: String(r.title ?? ''), done: Boolean(r.done) }));
           const plan = planSync({ tasks, remote: items, base: base.specs?.[s.id] ?? {} });
           if (![plan.create, plan.push, plan.pull, plan.conflicts, plan.missing, plan.proposals].some((l) => l.length)) continue;
           plans[s.id] = plan;
@@ -352,23 +260,20 @@ export async function runSdd(argv, io) {
           plan.missing.forEach((x) => out(t.tracker.missing(x)));
           plan.proposals.forEach((x) => out(t.tracker.proposal(x)));
         }
-        if (!Object.keys(plans).length) {
-          state.trackerPlan = null;
-          save();
+        runtime.trackerPlan = Object.keys(plans).length ? { provider, specs: plans } : null;
+        save();
+        if (!runtime.trackerPlan) {
           out(t.tracker.nothing);
           return OK;
         }
-        state.trackerPlan = { provider, specs: plans, remoteWrites: creates + updates, approved: false };
-        save();
-        out(creates + updates ? t.tracker.needsGate(creates, updates) : t.tracker.localOnly);
+        // RF-TRK-08: nothing is written to the tracker until the user says yes in the conversation.
+        out(creates + updates ? t.tracker.needsOk(creates, updates) : t.tracker.localOnly);
         return OK;
       }
 
       if (rest[0] === 'apply') {
-        const tp = state.trackerPlan;
+        const tp = runtime.trackerPlan;
         if (!tp) return refuse(t.tracker.noPlan);
-        // RF-TRK-08: nothing was written to the tracker without the user's approval.
-        if (tp.remoteWrites && !tp.approved) return refuse(t.tracker.notApproved);
         let decisions;
         try {
           decisions = await readInput();
@@ -378,7 +283,7 @@ export async function runSdd(argv, io) {
         let changed = 0;
         for (const s of specs.filter((x) => tp.specs[x.id])) {
           const file = path.join(root, s.dir, 'tasks.md');
-          const text = read(file);
+          const text = safeRead(file);
           const r = applyLocal(text, tp.specs[s.id], { provider: tp.provider, ...(decisions[s.id] ?? {}), base: base.specs?.[s.id] ?? {} });
           if (r.text !== text) { writeFileSync(file, r.text); changed += 1; }
           base.specs = { ...base.specs, [s.id]: r.base };
@@ -386,9 +291,9 @@ export async function runSdd(argv, io) {
         base.at = new Date().toISOString();
         mkdirSync(path.dirname(baseFile), { recursive: true });
         writeFileSync(baseFile, JSON.stringify(base, null, 2) + '\n');
-        state.trackerPlan = null;
-        logEvent(state, 'tracker-synced', { provider: tp.provider });
+        runtime.trackerPlan = null;
         save();
+        logEvent(root, 'tracker-synced', { provider: tp.provider });
         out(t.tracker.applied(changed));
         return OK;
       }
@@ -396,19 +301,8 @@ export async function runSdd(argv, io) {
     }
 
     case 'commit-context': {
-      out(JSON.stringify(commitContext(root, settings, state), null, 2));
+      out(JSON.stringify(commitContext(root, settings, flow), null, 2));
       return OK;
-    }
-
-    case 'lint': {
-      const kind = rest[0];
-      const file = rest[1] ? path.resolve(io.cwd, rest[1]) : kind === 'constitution' ? path.join(root, 'docs', 'constitution.md') : state.activeSpec ? specPaths(root, state.activeSpec, state)[kind] : null;
-      const text = file && read(file);
-      if (!text) return refuse(USAGE_TEXT);
-      const result = kind === 'spec' ? lintSpec(text) : kind === 'tasks' ? lintTasks(text, settings.components) : kind === 'constitution' ? lintConstitution(text) : null;
-      if (!result) return refuse(USAGE_TEXT);
-      out(JSON.stringify(result, null, 2));
-      return result.problems.length ? REFUSED : OK;
     }
 
     default:
@@ -422,7 +316,7 @@ const TEST_GLOBS = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '
 
 /** Test files and the requirement IDs they mention (RF-SDD-14/15). */
 function testIndex(root, settings) {
-  const out = [];
+  const found = [];
   const dirs = [...new Set(Object.values(settings.components).map((c) => String(c.path ?? '.')))];
   const seen = new Set();
   const walk = (dir, depth) => {
@@ -439,35 +333,34 @@ function testIndex(root, settings) {
         if (!SKIP_DIRS.has(e.name) && !e.name.startsWith('.')) walk(full, depth + 1);
         continue;
       }
-      const rel = path.relative(root, full).split(path.sep).join('/');
-      if (seen.has(rel) || !matchesAny(rel, TEST_GLOBS)) continue;
-      seen.add(rel);
-      const ids = new Set((read(full) ?? '').match(/\b(?:[A-Z][A-Z0-9]*-)?RF-[A-Z0-9-]*\d+\b/g)?.map((m) => m.replace(/^.*?(RF-)/, 'RF-')) ?? []);
-      if (ids.size) out.push({ file: rel, ids });
+      const file = rel(root, full);
+      if (seen.has(file) || !matchesAny(file, TEST_GLOBS)) continue;
+      seen.add(file);
+      const idSet = new Set((safeRead(full) ?? '').match(/\b(?:[A-Z][A-Z0-9]*-)?RF-[A-Z0-9-]*\d+\b/g)?.map((m) => m.replace(/^.*?(RF-)/, 'RF-')) ?? []);
+      if (idSet.size) found.push({ file, ids: idSet });
     }
   };
   for (const d of dirs) walk(path.resolve(root, d), 0);
-  return out;
+  return found;
 }
 
 /** RF-GAT-03/04, RF-TOP-11: what changed, repository by repository. */
-function commitContext(root, settings, state) {
+function commitContext(root, settings, flow) {
   const repos = new Set(['.']);
   if (['multi-repo', 'workspace'].includes(settings.topology)) {
     for (const c of Object.values(settings.components)) if (existsSync(path.join(root, c.path ?? '.', '.git'))) repos.add(c.path);
   }
-  const doneTasks = parseTasks(read(state.activeSpec ? specPaths(root, state.activeSpec, state).tasks : '') ?? '').filter((x) => x.done).map((x) => `${x.id} ${x.title}`);
   return {
     convention: settings.commits?.convention ?? 'conventional',
     language: settings.commits?.language ?? 'en',
-    spec: state.activeSpec,
-    tasksDone: doneTasks,
+    spec: flow.spec?.id ?? null,
+    tasksDone: flow.tasks.filter((x) => x.done).map((x) => `${x.id} ${x.title}`),
     repositories: [...repos].map((repo) => {
       const r = spawnSync('git', ['status', '--porcelain'], { cwd: path.resolve(root, repo), encoding: 'utf8', windowsHide: true });
       const files = (r.stdout ?? '').split(/\r?\n/).filter(Boolean).map((l) => l.slice(3));
       return { repo, files: repo === '.' ? files.filter((f) => ![...repos].some((x) => x !== '.' && f.startsWith(`${x}/`))) : files };
     }).filter((r) => r.files.length),
-    note: 'Propose one commit message per repository. Never run git commit: the user commits.',
+    note: 'Propose one commit per repository. Commit (git add + git commit) only after the user says yes; never push.',
   };
 }
 

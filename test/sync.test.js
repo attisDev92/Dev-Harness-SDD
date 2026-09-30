@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import path from 'node:path';
-import { FIXTURES, run, snapshot, git } from './fixtures.js';
+import { FIXTURES, run, snapshot, git, write } from './fixtures.js';
 
 const file = (root, p) => path.join(root, p);
 const read = (root, p) => fs.readFileSync(file(root, p), 'utf8');
@@ -29,17 +29,17 @@ test('RF-GEN-13: two syncs in a row change nothing, byte for byte', async (t) =>
 
 test('RF-GEN-09: a config change is shown as a diff before it is applied', async (t) => {
   const root = await activated(t);
-  edit(root, 'harness.config.yaml', (s) => s.replace('manual_test: task', 'manual_test: story'));
+  edit(root, 'harness.config.yaml', (s) => s.replace('manual_test: story', 'manual_test: task'));
   const declined = await run(['sync'], { cwd: root, answers: { apply: false } });
   assert.equal(declined.code, 1);
   assert.match(declined.stdout, /--- a\/AGENTS\.md\n\+\+\+ b\/AGENTS\.md/);
   // The monorepo fixture documents in Spanish, so the context is in Spanish.
-  assert.match(declined.stdout, /-- Tras cada tarea/);
-  assert.match(declined.stdout, /\+- Tras cada historia/);
-  assert.doesNotMatch(read(root, 'AGENTS.md'), /Tras cada historia/);
+  assert.match(declined.stdout, /-- Tras cada historia/);
+  assert.match(declined.stdout, /\+- Tras cada tarea/);
+  assert.doesNotMatch(read(root, 'AGENTS.md'), /Tras cada tarea/);
   const r = await run(['sync'], { cwd: root, answers: { apply: true } });
   assert.equal(r.code, 0, r.stderr);
-  assert.match(read(root, 'AGENTS.md'), /Tras cada historia/);
+  assert.match(read(root, 'AGENTS.md'), /Tras cada tarea/);
 });
 
 test('RF-GEN-10: sync --dry-run shows the diff and writes nothing', async (t) => {
@@ -48,7 +48,7 @@ test('RF-GEN-10: sync --dry-run shows the diff and writes nothing', async (t) =>
   const before = snapshot(root);
   const r = await run(['sync', '--dry-run'], { cwd: root });
   assert.equal(r.code, 0, r.stderr);
-  assert.match(r.stdout, /\+- Como máximo 1 intentos automáticos/);
+  assert.match(r.stdout, /\+- Una verificación que falla tiene como máximo 1 intentos/);
   assert.match(r.stdout, /"in_scope": 1/);
   assert.match(r.stdout, /Dry run: nothing was written/);
   assert.deepEqual(snapshot(root), before);
@@ -169,24 +169,11 @@ test('sync from a subdirectory works on the project root; outside a project it f
   assert.match(r2.stderr, /not activated/);
 });
 
-test('edge case 26: sync waits for a running agent session or cancels', async (t) => {
+test('edge case 26: sync runs in the middle of an agent session (the hook triggers it)', async (t) => {
   const root = await activated(t);
-  const { touchLock, releaseLock } = await import('../src/guards/state.js');
-  touchLock(root, 'agent-session');
+  write(root, { '.harness/state/runtime.json': JSON.stringify({ version: 2, pending: { spec: 'SPEC-001-x', stop: 'plan' }, verify: {}, alerted: [], subagents: {} }) });
+  edit(root, 'harness.config.yaml', (s) => s.replace('in_scope: 2', 'in_scope: 1'));
   const r = await run(['sync', '--yes'], { cwd: root });
-  assert.equal(r.code, 1);
-  assert.match(r.stderr, /An agent session \(agent-session\) is running tasks/);
-  const declined = await run(['sync'], { cwd: root, answers: { waitLock: false } });
-  assert.equal(declined.code, 1);
-
-  const { main } = await import('../src/cli/main.js');
-  const { createScriptedPrompter } = await import('../src/cli/prompt.js');
-  let stdout = '';
-  setTimeout(() => releaseLock(root, 'agent-session'), 150);
-  const code = await main(['sync'], {
-    stdout: { write: (s) => { stdout += s; } }, stderr: { write() {} }, env: { HARNESS_LANG: 'en' }, cwd: root,
-    readStdin: async () => '', prompter: createScriptedPrompter({ waitLock: true, apply: true }), lockPollMs: 20,
-  });
-  assert.equal(code, 0, stdout);
-  assert.match(stdout, /Nothing to change/);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(read(root, '.harness/state/runtime.json'), /"stop":"plan"/, 'the session state is untouched');
 });

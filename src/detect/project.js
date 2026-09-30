@@ -54,15 +54,17 @@ export function proposeProtected(components) {
   if (databases.has('prisma')) db.push('**/schema.prisma');
   if (databases.has('drizzle')) db.push('**/drizzle/**');
   if (ecosystems.has('python')) db.push('**/alembic/**');
-  const architecture = ['**/Dockerfile*', '**/docker-compose*.y*ml', '**/.env*', '.github/workflows/**', '**/eslint.config.*', '**/.eslintrc*'];
-  if (typescript) architecture.unshift('**/tsconfig*.json');
-  if (components.some((c) => c.frameworks?.includes('vite'))) architecture.push('**/vite.config.*');
-  if (components.some((c) => c.frameworks?.includes('next'))) architecture.push('**/next.config.*');
+  // Tooling only asks the user (no ADR, no task): lint, types, bundler and CI config.
+  const tooling = ['**/eslint.config.*', '**/.eslintrc*', '**/Dockerfile*', '.github/workflows/**'];
+  if (typescript) tooling.unshift('**/tsconfig*.json');
+  if (components.some((c) => c.frameworks?.includes('vite'))) tooling.push('**/vite.config.*');
+  if (components.some((c) => c.frameworks?.includes('next'))) tooling.push('**/next.config.*');
   return {
     deps,
     db,
     contracts: ['**/specs/**/contracts/**'],
-    architecture,
+    architecture: ['**/docker-compose*.y*ml', '**/.env*'],
+    tooling,
     security: ['**/auth/**', '**/*.auth.*', '**/security/**', '**/*cors*', '**/*csp*'],
   };
 }

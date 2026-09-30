@@ -14,7 +14,7 @@ import { getConfig, gitTopLevel, trackedFiles } from '../../engine/git.js';
 import { hashText, toLf } from '../../engine/text.js';
 import { compareVersions, makeReader } from './common.js';
 
-export const RULES = ['commits', 'deps', 'protected', 'docs', 'retries', 'verify', 'lanes'];
+export const RULES = ['commits', 'deps', 'protected', 'docs', 'verify', 'lanes'];
 
 /** Enforcement each tool can reach once its adapter exists (README table). */
 export const TOOL_PROFILE = {
@@ -27,7 +27,7 @@ const LEVEL_LABEL = {
   en: { strong: 'strong', 'medium-strong': 'medium-strong', medium: 'medium', weak: 'weak', none: 'instruction only' },
   es: { strong: 'fuerte', 'medium-strong': 'medio-fuerte', medium: 'medio', weak: 'débil', none: 'solo instrucción' },
 };
-const FLOW = ['constitution', 'spec', 'clarify', 'plan', 'tasks', 'next', 'validate', 'change', 'status', 'commit'];
+const FLOW = ['status', 'spec', 'next', 'docs', 'review', 'validate', 'commit'];
 
 function onPath(bin, env) {
   const dirs = String(env.PATH ?? env.Path ?? '').split(path.delimiter).filter(Boolean);

@@ -61,3 +61,12 @@
 - [x] T39 `LICENSE` (Apache-2.0) y `NOTICE`
 - [x] T40 Guías en español e inglés: uso, adaptadores y registro de skills (RNF-18)
 - [x] T41 Recorrido de validación RF por RF (criterio 8): `validation.md`
+
+## v0.8 — flujo ligero
+
+- [x] T42 Spec: dos paradas, aprobar hablando, commit por historia, tareas y configuración a mitad del desarrollo (RF-SDD-13/16/17/18/19, RF-ORQ-01/12/14, RF-GAT-*, RF-RET-*)
+- [x] T43 Estado en frontmatter y `tasks.md`; `sdd.js` reducido (`status`, `new-spec`, `new-adr`, `stop`, `approve`, `next`, `verify`, `validate`, `contract`, `tracker`, `commit-context`)
+- [x] T44 Hooks en modo aviso y auto-sync de configuración; eliminados `git-guard`, `shell`, `bash-guard`, `retry`, `cli` y el lock de sesión
+- [x] T45 Adaptador de Claude Code: skill `sdd`, siete `/sdd:*` informativos, permisos nativos
+- [x] T46 Plantillas, pre-commit solo de secretos, esquema (`gates.commits: per-story`), tests y documentación
+- [ ] T47 Demo del flujo ligero con Claude Code real (spec de media hora de principio a fin)

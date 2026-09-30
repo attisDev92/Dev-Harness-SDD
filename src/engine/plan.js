@@ -194,11 +194,13 @@ export async function planChanges({ desired, manifest, read, resolve }) {
           const i = arr.findIndex((x) => hashValue(x) === h);
           if (i !== -1) { arr.splice(i, 1); changed = true; }
         }
+        // Only what the harness added is its own: an item the user already had stays theirs when the harness is removed.
+        const owned = new Set((oldAppend?.items ?? []).filter((h) => wanted.has(h)));
         for (const item of items) {
-          if (!arr.some((x) => sameValue(x, item))) { arr.push(item); changed = true; }
+          if (!arr.some((x) => sameValue(x, item))) { arr.push(item); owned.add(hashValue(item)); changed = true; }
         }
         entry.appends ??= {};
-        entry.appends[key] = { items: [...wanted], created };
+        entry.appends[key] = { items: [...owned], created };
       }
       for (const [key, oldAppend] of Object.entries(old?.appends ?? {})) {
         if (key in appends) continue;

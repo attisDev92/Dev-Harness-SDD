@@ -21,21 +21,14 @@ Cubre: RF-INS-01…07, RF-GEN-12, RF-GAT-01/02, RF-MD-01/02, RF-RET-01/02/03/06/
 | `src/cli/main.js`, `src/cli/i18n.js` | INS-05, RNF-12; `config validate` (GEN-12) |
 | `src/cli/paths.js` | INS-02 (rechaza escribir en `~/.claude`, `~/.codex`, `~/.gemini`, `~/.config/opencode`…), INS-03 (caché propia, creada solo al necesitarla) |
 | `src/config/schema.js`, `src/config/load.js` | GEN-12, caso límite 5, RNF-05 |
-| `src/guards/shell.js` | Tokenizador tolerante de sh / cmd / PowerShell (base de GAT-02) |
-| `src/guards/git-guard.js` | GAT-01, GAT-02, caso límite 10 |
 | `src/guards/docs-guard.js`, `glob.js` | MD-01, MD-02 |
-| `src/guards/retry.js` | RET-01/02/03/06/07 |
-| `src/guards/cli.js` | Punto de entrada de los hooks: `sdd-harness guard <git\|docs\|retry>` o `node .harness/scripts/guard.js` |
+| `src/guards/hook.js` | Punto de entrada de los hooks de Claude Code (ver "Revisión v0.8") |
 
-## Interfaz de los guardianes
-
-- Entrada: payload JSON del hook por stdin (`tool_input.command`, `tool_input.file_path`, `args.*`, `cwd`) o texto plano; también `--command` / `--file`.
-- Salida: exit 0 permitido, exit 2 bloqueado (motivo en stderr, en el idioma del proyecto), exit 1 error de uso. `--json` añade el veredicto por stdout.
-- `retry record` devuelve `retry` (exit 0) o `triage` (exit 2). Un "mismo error" es la misma firma normalizada que el fallo anterior de la tarea; una vez en triage la tarea sigue detenida hasta `retry reset` (RET-06).
+> v0.8 eliminó `shell.js`, `git-guard.js`, `bash-guard.js`, `retry.js` y `cli.js` (`sdd-harness guard`): git y dependencias usan los permisos nativos de la herramienta.
 
 ## Estrategia de tests
 
-Un archivo por área, con los IDs de RF en el nombre de cada test. El guardián de git tiene una batería de evasión por categoría del caso límite 10 (encadenado, shells anidadas, PowerShell codificado, variables, alias, scripts intermedios, scripts de npm, npx, código en `node -e`/`python -c`). La instalación global real (INS-01) se ejecuta con `HARNESS_TEST_INSTALL=1`, activado en CI.
+Un archivo por área, con los IDs de RF en el nombre de cada test. La instalación global real (INS-01) se ejecuta con `HARNESS_TEST_INSTALL=1`, activado en CI.
 
 ## Límites conocidos
 
@@ -104,3 +97,21 @@ Cubre: RF-ADP-01/02/03/05/06 (Claude Code), RF-SDD-01…18, RF-ORQ-01…10 y 12,
 - El bloqueo de sesión (RF-ORQ-12) usa el `session_id` de los hooks; en herramientas sin hooks queda como instrucción.
 - La detección de escrituras por shell cubre los comandos habituales; un programa arbitrario que escriba archivos solo se detecta después, por la instantánea de carriles o por los git hooks.
 - Las skills propias de esta versión son `sdd-orchestrator`, `spec-generator`, `triage-report` y `adr`; el resto de RF-SKL-01 llega en v0.7.
+
+## Revisión v0.8: flujo ligero (30-09-2026)
+
+Al probarlo, una spec de media hora tardaba horas: 14 gates con `/sdd:approve`, uno pendiente cada vez; no se podía cambiar la configuración a mitad del desarrollo ni añadir tareas; el agente se negaba a hacer commit incluso cuando se lo pedía el usuario, porque varias instrucciones decían "nunca hagas commit"; y el harness reimplementaba en ~1000 líneas lo que Claude Code ya hace con sus permisos. Estas decisiones sustituyen a las de arriba cuando chocan.
+
+| Decisión | Alternativa descartada | Motivo |
+|---|---|---|
+| Dos paradas (spec; plan y tareas). El usuario responde hablando; el hook `UserPromptSubmit` reconoce las frases afirmativas y registra la aprobación | 14 gates con `/sdd:approve` | RF-SDD-13, RF-GAT-08. Menos turnos y ningún comando para avanzar |
+| Estado visible: `status` en el frontmatter de `spec.md` y casillas de `tasks.md`; `.harness/state/runtime.json` solo guarda la parada pendiente, el último verify, los avisos mostrados y los subagentes | `flow.json` más un espejo en `progress.md` | RF-SDD-18. Borrar `.harness/state` no pierde nada importante; sin estado oculto que se desincronice |
+| Git y dependencias con `permissions.ask` nativos; `git add`/`git commit` en `allow`, porque el commit se acuerda en la conversación al cerrar cada historia | Analizar shell, PowerShell, alias y scripts | RF-GAT-01/02/03. Usar lo que ya existe; no preguntar dos veces |
+| `harness.config.yaml` editable con la confirmación nativa; `PostToolUse` ejecuta `sdd-harness sync --yes` | Gate `config` | RF-GAT-09. Se puede cambiar a mitad del desarrollo |
+| Solo el componente es obligatorio en una tarea; el agente añade las que surgen ("añadida en implementación") | Tareas con alcance, RF y "Hecho cuando" obligatorios, cambios por `/sdd:change` | RF-SDD-12/19 |
+| Los `/sdd:*` que quedan (`status`, `spec`, `next`, `docs`, `review`, `validate`, `commit`) informan o lanzan trabajo en paralelo | 12 comandos de fase y aprobación | RF-ORQ-14 |
+| El hook `Stop` recuerda una sola vez cada verificación fallida | Bloquear el cierre con cualquier cambio sin verificar | RF-VER-01 sin frenar turnos de conversación |
+| El pre-commit solo busca secretos y `.env`; la lista blanca de docs y la verificación, en CI | Los mismos checks en pre-commit y CI | Un commit acordado con el usuario no falla por un lint |
+| Sin lock de sesión | Una sola sesión con tareas | RF-ORQ-12; el lock bloqueaba también el sync lanzado por el hook |
+
+Límite conocido: el auto-sync ejecuta el `sdd-harness` instalado en el PATH. Si la CLI global es más antigua que la del proyecto, se avisa y conviene actualizarla.

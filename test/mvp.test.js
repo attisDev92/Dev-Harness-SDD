@@ -27,9 +27,9 @@ test('RF-OBS-01/05: flow events go to .harness/logs/events.jsonl, which git igno
   await run(['init', '--yes'], { cwd: root });
   const io = { stdout: { write() {} }, stderr: { write() {} }, cwd: root, env: {} };
   await runSdd(['new-spec', 'login'], io);
-  await runSdd(['gate', 'request', 'spec'], io);
+  await runSdd(['stop', 'spec'], io);
   const events = read(root, '.harness/logs/events.jsonl').trim().split('\n').map((l) => JSON.parse(l));
-  assert.deepEqual(events.map((e) => e.event), ['spec-created', 'gate-requested']);
-  assert.deepEqual([events[1].spec, events[1].phase, events[1].kind], ['SPEC-001-login', 'spec', 'spec']);
+  assert.deepEqual(events.map((e) => e.event), ['spec-created', 'stop-requested']);
+  assert.deepEqual([events[1].spec, events[1].stop], ['SPEC-001-login', 'spec']);
   assert.match(read(root, '.git/info/exclude'), /\/\.harness\//);
 });

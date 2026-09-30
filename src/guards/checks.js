@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Checks shared by the git pre-commit hook and the CI template (RF-VER-03..06).
+// Checks of the git pre-commit hook and the CI template (RF-VER-03..06). The
+// pre-commit only looks for secrets, so a commit agreed with the user never
+// fails for anything else; CI adds the docs whitelist and the verification.
 //   node .harness/scripts/checks.js pre-commit
 //   node .harness/scripts/checks.js ci --range <base>...<head> [--full]
 // Exit 0 when everything passes, 1 otherwise. Dependency-free.
@@ -73,16 +75,17 @@ export function runChecks({ root, settings, mode, range, full = false, run, repo
   const added = names('A');
   const problems = [];
 
+  const ci = mode === 'range';
   // Documentation whitelist (RF-MD-01) for new documents.
-  for (const f of added.filter((x) => /\.(md|mdx)$/i.test(x))) {
+  for (const f of ci && settings.docsMode === 'whitelist' ? added.filter((x) => /\.(md|mdx)$/i.test(x)) : []) {
     if (!matchesAny(f, settings.docsWhitelist)) problems.push(`docs: ${f} is not in the documentation whitelist`);
   }
   // Secrets (RF-OBS-02 spirit, RNF-11).
   for (const f of changed.filter((x) => ENV_FILE.test(x))) problems.push(`secrets: ${f} must not be committed`);
   for (const hit of findSecrets(addedLines(git(repo, [...diffArgs, '-U0', '--no-color'])))) problems.push(`secrets: possible ${hit.kind} in ${toProject(hit.file)}`);
 
-  // Quick verification of the components with changes (full suite in CI).
-  const touched = new Set(changed.map((f) => componentOf(f, settings.components)?.id).filter(Boolean));
+  // Verification of the components with changes (CI only).
+  const touched = new Set((ci ? changed : []).map((f) => componentOf(f, settings.components)?.id).filter(Boolean));
   for (const id of touched) {
     const comp = settings.components[id];
     const result = runVerify(root, comp, { quick: !full, run });

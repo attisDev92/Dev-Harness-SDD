@@ -28,7 +28,7 @@ The interview detects and asks you to confirm:
 | Conventions and languages | What the project already declares (AGENTS.md, CONTRIBUTING.md, linters, commit history) |
 | Design, tracker, manual test | Design source, tracker (any), when you test |
 | Mode | `local`: the team sees nothing · `team`: the configuration is committed |
-| Git hooks, CI | Pre-commit with the same checks as CI · GitHub Actions template |
+| Git hooks, CI | Pre-commit that only refuses secrets · GitHub Actions template with docs and verification |
 | Protected zones | Which changes need your approval and an ADR |
 
 Before writing, it lists every file it will create or modify. Ctrl+C cancels without writing anything.
@@ -46,31 +46,43 @@ CLI messages are in Spanish; `--lang en` switches the ones that exist in English
 
 ## 3. The flow in Claude Code
 
-| Command | What happens | You |
-|---|---|---|
-| `/sdd:constitution` | Proposes 6–10 principles | Approve |
-| `/sdd:spec <idea>` | Interview (max. 6 questions) and an EARS spec | Approve |
-| `/sdd:clarify` | Spec review: gaps and contradictions | Approve |
-| `/sdd:plan` | Technical plan, contracts and ADRs | Approve |
-| `/sdd:tasks` | Tasks under 30 min with scope and "Done when" | Approve |
-| `/sdd:next` | One task: tests first, verification, review | Test by hand: `OK` or `KO <what failed>` |
-| `/sdd:validate` | Requirement by requirement: which test covers it | Approve |
-| `/sdd:change <change>` | Spec first, with a diff | Approve |
-| `/sdd:status` | Where we are and what blocks | — |
-| `/sdd:commit` | Proposes the message per repo | **You commit** |
-| `/sdd:tracker` | Syncs tasks.md with your tracker | Approve before it writes there |
+Tell the agent what you want to build ("I want an email login") and the `sdd` skill does the rest:
 
-You answer each decision with `/sdd:approve` or `/sdd:reject <reason>`. Only what you type counts: the agent cannot approve itself.
+1. **Spec**: an interview (max. 6 questions), EARS requirements and a review. 🛑 **Stop 1**: you approve the spec.
+2. **Plan and tasks**: the architect writes the plan, contracts, ADRs and `tasks.md` in one go. 🛑 **Stop 2**: you approve the plan with its tasks.
+3. **Implementation**: frontend and backend in parallel, tests first. After each task, verification and, in parallel, review and documentation.
+4. **When a story closes**: a manual test (a normal question) and the agent **proposes the commit**; if you say yes, it commits.
+5. **At the end**: requirement-by-requirement validation; the spec is marked `done`.
 
-## 4. What the harness blocks
+**To approve, just talk**: "yes", "continue", "approved", "go ahead" or the "Approve" button. Anything else counts as changes.
 
-- Commits, push, merge, rebase, tags and remote changes, even chained, inside another shell, through aliases or in scripts.
-- Installing or removing dependencies without your permission.
-- Protected zones without an approved ADR.
-- Documents outside the whitelist.
-- Code outside the current task or its scope, or during triage.
-- Finishing with red verification.
-- Editing `harness.config.yaml`, `.harness/` or generated files.
+Without stopping the flow:
+
+- **Tasks that come up**: the agent adds them to `tasks.md` ("added during implementation") and tells you.
+- **Requirement changes**: the spec is updated first (with a diff) and work goes on.
+- **`harness.config.yaml`**: change it whenever you want; Claude Code asks you to confirm the edit and the configuration is regenerated on its own.
+
+Optional shortcuts (none is needed to move on):
+
+| Command | What for |
+|---|---|
+| `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification and last commits |
+| `/sdd:spec <idea>` | Start a spec |
+| `/sdd:next` | Launch the ready tasks in parallel |
+| `/sdd:docs` | Bring the documentation up to date in the background |
+| `/sdd:review` | Review (and QA) of the changes, in parallel |
+| `/sdd:validate` | Requirement → test report |
+| `/sdd:commit` | Propose the commit now |
+| `/sdd:tracker` | Sync `tasks.md` with your tracker |
+
+The state is visible: `status` in the frontmatter of `spec.md` (`draft` → `spec-approved` → `plan-approved` → `done`) and the checkboxes of `tasks.md`.
+
+## 4. What the harness asks and what it blocks
+
+- **Asks (Claude Code's native confirmation)**: `git push`, `rebase`, `merge`, `reset --hard`, deleting branches, tags, installing dependencies and editing `harness.config.yaml`.
+- **Alerts, without stopping**: protected zones (with an ADR draft), code without a task or out of its scope, dependency or lockfile changes, a subagent writing outside its paths.
+- **Reminds once**: finishing with verification failing.
+- **Blocks**: only `.harness/`, generated files and the generated block of `AGENTS.md`/`CLAUDE.md`. The pre-commit only refuses secrets and `.env`.
 
 `sdd-harness doctor` tells you what is really enforced and what only by instruction.
 

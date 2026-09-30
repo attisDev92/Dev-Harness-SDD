@@ -28,7 +28,7 @@ La entrevista detecta y te pide confirmar:
 | Convenciones e idiomas | Lo que ya declara el proyecto (AGENTS.md, CONTRIBUTING.md, linters, historial de commits) |
 | Diseño, tracker, prueba manual | Fuente de diseño, tracker (cualquiera), cuándo pruebas tú |
 | Modo | `local`: el equipo no ve nada · `team`: la configuración se commitea |
-| Git hooks, CI | Pre-commit con los mismos checks que la CI · plantilla de GitHub Actions |
+| Git hooks, CI | Pre-commit que solo rechaza secretos · plantilla de GitHub Actions con docs y verificación |
 | Zonas protegidas | Qué cambios exigen tu aprobación y un ADR |
 
 Antes de escribir, enseña cada archivo que va a crear o modificar. Ctrl+C cancela sin escribir nada.
@@ -44,31 +44,43 @@ sdd-harness skills install  # skills de terceros verificadas que necesita tu sta
 
 ## 3. El flujo en Claude Code
 
-| Comando | Qué pasa | Tú |
-|---|---|---|
-| `/sdd:constitution` | Propone 6–10 principios | Apruebas |
-| `/sdd:spec <idea>` | Entrevista (máx. 6 preguntas) y spec en EARS | Apruebas |
-| `/sdd:clarify` | Revisión de la spec: huecos y contradicciones | Apruebas |
-| `/sdd:plan` | Plan técnico, contratos y ADRs | Apruebas |
-| `/sdd:tasks` | Tareas de < 30 min con alcance y "Hecho cuando" | Apruebas |
-| `/sdd:next` | Una tarea: tests primero, verificación, revisión | Pruebas a mano: `OK` o `KO <qué falló>` |
-| `/sdd:validate` | Requisito por requisito: qué test lo cubre | Apruebas |
-| `/sdd:change <cambio>` | Primero la spec, con diff | Apruebas |
-| `/sdd:status` | Dónde estamos y qué bloquea | — |
-| `/sdd:commit` | Propone el mensaje por repo | **Tú haces el commit** |
-| `/sdd:tracker` | Sincroniza tasks.md con tu tracker | Apruebas antes de escribir en él |
+Dile al agente lo que quieres construir ("quiero un login con email") y la skill `sdd` hace el resto:
 
-Respondes a cada decisión con `/sdd:approve` o `/sdd:reject <motivo>`. Solo cuenta lo que escribes tú: el agente no puede aprobarse a sí mismo.
+1. **Spec**: te entrevista (máx. 6 preguntas), escribe los requisitos en EARS y los revisa. 🛑 **Parada 1**: apruebas la spec.
+2. **Plan y tareas**: el architect escribe plan, contratos, ADRs y `tasks.md` de una vez. 🛑 **Parada 2**: apruebas el plan con sus tareas.
+3. **Implementación**: frontend y backend en paralelo, tests primero. Tras cada tarea, verificación y, en paralelo, revisión y documentación.
+4. **Al cerrar una historia**: prueba manual (una pregunta normal) y el agente **propone el commit**; si dices que sí, lo hace.
+5. **Al final**: validación requisito por requisito; la spec queda como `done`.
 
-## 4. Qué bloquea el harness
+**Para aprobar, habla normal**: "sí", "continúa", "aprobado", "dale" o el botón "Aprobar". Cualquier otra respuesta se toma como cambios.
 
-- Commits, push, merge, rebase, tags y cambios del remoto, aunque vengan encadenados, dentro de otra shell, por alias o en scripts.
-- Instalar o quitar dependencias sin tu permiso.
-- Tocar zonas protegidas sin un ADR aprobado.
-- Documentos fuera de la lista blanca.
-- Código fuera de la tarea en curso o de su alcance, o durante un triage.
-- Terminar con la verificación en rojo.
-- Editar `harness.config.yaml`, `.harness/` o los archivos generados.
+Sin parar el flujo:
+
+- **Tareas que surgen**: el agente las añade a `tasks.md` ("añadida en implementación") y te lo cuenta.
+- **Cambios de requisitos**: primero se actualiza la spec (con diff) y se sigue.
+- **`harness.config.yaml`**: puedes cambiarlo cuando quieras; Claude Code te pide confirmar la edición y la configuración se regenera sola.
+
+Atajos opcionales (ninguno hace falta para avanzar):
+
+| Comando | Para qué |
+|---|---|
+| `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, último verify y últimos commits |
+| `/sdd:spec <idea>` | Empezar una spec |
+| `/sdd:next` | Lanzar en paralelo las tareas listas |
+| `/sdd:docs` | Poner la documentación al día en segundo plano |
+| `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
+| `/sdd:validate` | Informe requisito → test |
+| `/sdd:commit` | Proponer el commit ahora |
+| `/sdd:tracker` | Sincronizar `tasks.md` con tu tracker |
+
+El estado es visible: `status` en el frontmatter de `spec.md` (`draft` → `spec-approved` → `plan-approved` → `done`) y las casillas de `tasks.md`.
+
+## 4. Qué pregunta y qué bloquea el harness
+
+- **Pregunta (confirmación nativa de Claude Code)**: `git push`, `rebase`, `merge`, `reset --hard`, borrar ramas, tags, instalar dependencias y editar `harness.config.yaml`.
+- **Avisa, sin parar**: zonas protegidas (con ADR en borrador), código sin tarea o fuera de su alcance, cambios en dependencias o lockfiles, un subagente que escribe fuera de sus rutas.
+- **Recuerda una vez**: terminar con la verificación en rojo.
+- **Bloquea**: solo `.harness/`, los archivos generados y el bloque generado de `AGENTS.md`/`CLAUDE.md`. El pre-commit solo rechaza secretos y `.env`.
 
 `sdd-harness doctor` te dice qué se aplica de verdad y qué solo por instrucción.
 
