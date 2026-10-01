@@ -44,7 +44,7 @@ test('RF-ADP-01 / RF-ORQ-14: /sdd:* shortcuts that inform or launch work, and th
   await run(['init', '--yes'], { cwd: root });
   const cmds = fs.readdirSync(path.join(root, '.claude/commands/sdd')).map((f) => f.replace('.md', '')).sort();
   assert.deepEqual(cmds, ['commit', 'docs', 'next', 'review', 'spec', 'status', 'validate'], 'no approve/reject: approving is talking');
-  assert.match(read(root, '.claude/commands/sdd/next.md'), /^---\ndescription: Launch in parallel every task that can start now/);
+  assert.match(read(root, '.claude/commands/sdd/next.md'), /^---\ndescription: Launch the tasks that can start now \(2 at once at most\)/);
   assert.match(read(root, '.claude/commands/sdd/status.md'), /last tasks closed/);
   // Nothing tells the agent it may never commit: it commits when the user says yes.
   assert.doesNotMatch(read(root, '.claude/agents/frontend-dev.md'), /Never commit/);

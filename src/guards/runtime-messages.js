@@ -17,7 +17,7 @@ const es = {
   stop: {
     unknown: (s) => `Parada desconocida "${s}". Usa spec o plan.`,
     requested: (stop, id) => `Parada "${stop}" de ${id} registrada. Pregunta al usuario si aprueba (AskUserQuestion con "Aprobar" como primera opción, o en texto). Una respuesta afirmativa ("sí", "continúa", "aprobado", "dale"…) queda registrada sola; si elige "Aprobar" en AskUserQuestion, ejecuta ${S} approve. Cualquier otra respuesta son cambios: aplícalos y vuelve a preguntar.`,
-    approved: (stop, id) => `Aprobado: ${stop} de ${id}. ${stop === 'spec' ? 'Siguiente: plan, contratos y tasks.md (subagente architect), y la parada "plan".' : 'Siguiente: implementar. Lanza en paralelo las tareas listas (' + S + ' next).'}`,
+    approved: (stop, id) => `Aprobado: ${stop} de ${id}. ${stop === 'spec' ? 'Siguiente: plan, contratos y tasks.md (subagente architect), y la parada "plan".' : 'Siguiente: implementar. Lanza las tareas listas, hasta 2 a la vez (' + S + ' next).'}`,
     nothingPending: () => 'No hay ninguna parada pendiente. Pide primero la aprobación al usuario.',
   },
   hook: {
@@ -25,6 +25,7 @@ const es = {
     changesRequested: (stop, id) => `El usuario no aprobó todavía ${stop} de ${id}: su mensaje son cambios o preguntas. Atiéndelos, actualiza los documentos y vuelve a pedir la aprobación.`,
     resumed: (s) => `sdd-harness: trabajo en curso.\n${s}`,
     stopVerify: (c, cmd) => `La última verificación de ${c} falló (${cmd}). Corrígela (hasta 2 intentos) o, si no es posible, inicia el triage con el debugger y díselo al usuario. Ninguna tarea se da por hecha con la verificación en rojo.`,
+    tooMany: (role, n) => `Aviso: lanzas ${role} con ${n} subagentes ya trabajando. El máximo son 2 a la vez, del rol que sea: no se les puede seguir la pista y el consumo de tokens se dispara. Espera a que termine uno antes de lanzar más.`,
     lanes: (role, files) => `El subagente ${role} cambió archivos fuera de sus rutas: ${files.join(', ')}. Revisa si es intencionado y cuéntaselo al usuario en tu resumen.`,
     configSynced: (out) => `harness.config.yaml cambió y la configuración se regeneró (sdd-harness sync).${out ? `\n${out}` : ''}`,
     configSyncFailed: (err) => `harness.config.yaml cambió, pero no se pudo regenerar la configuración: ${err}. Pide al usuario que ejecute "sdd-harness sync".`,
@@ -40,13 +41,14 @@ const es = {
       ...(t.requirements.length ? [`  Requisitos: ${t.requirements.join(', ')}`] : []),
       ...(t.doneWhen ? [`  Hecho cuando: ${t.doneWhen}`] : []),
     ].join('\n'),
-    parallel: () => 'Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje). Tests primero. Al terminar cada una: verify --component <id>, marca su casilla en tasks.md, y lanza reviewer y doc-writer en paralelo.',
+    parallel: () => 'Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje). Máximo 2 subagentes trabajando a la vez, del rol que sea. Tests primero. Al terminar cada una: verify --component <id>, marca su casilla en tasks.md, y lanza reviewer y doc-writer solo si hay hueco (si no, de uno en uno).',
+    queued: (ids) => `Sin hueco ahora (máximo 2 a la vez): ${ids.join(', ')}. Vuelve a llamar a next cuando termine una.`,
     waiting: (w) => `Esperando dependencias: ${w.map((x) => `${x.task.id} espera a ${x.on.join(', ')}`).join(' · ')}.`,
     problems: (t, ps) => `${t} necesita arreglo en tasks.md: ${ps.join(', ')}.`,
     noVerify: (c) => `El componente "${c}" no tiene comandos de verificación: añade components.${c}.verify a harness.config.yaml (RF-VER-02).`,
   },
   verify: {
-    pass: (c) => `La verificación de ${c} pasó. Marca las tareas terminadas en tasks.md; después reviewer y doc-writer en paralelo.`,
+    pass: (c) => `La verificación de ${c} pasó. Marca las tareas terminadas en tasks.md; después reviewer y doc-writer, en paralelo solo si no hay otro subagente trabajando (máximo 2 a la vez).`,
     fail: (f) => `La verificación falló: ${f.name} (${f.command}). Corrígela, hasta 2 intentos; si el error se repite o necesitas salirte del alcance, triage con el debugger y pregunta al usuario.`,
     unconfigured: (c) => `El componente "${c}" no tiene comandos de verificación (RF-VER-02).`,
     pickComponent: (all) => `Indica el componente: --component <${all.join('|')}>.`,

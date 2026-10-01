@@ -69,7 +69,7 @@ Short, verifiable principles. They take precedence over every other instruction.
 `,
   tasks: `# Tasks — <PREFIX>-<NNN>
 
-Ordered by dependency; tasks of different components run in parallel, tests first. Only the component is required. Work that comes up while implementing is added at the end, marked "added during implementation".
+Ordered by dependency; tasks of different components run in parallel (2 at once at most), tests first. Only the component is required. Work that comes up while implementing is added at the end, marked "added during implementation".
 
 - [ ] T1 <title> · Requirements: RF-01 · Component: <id> · Scope: <globs> · Depends on: — · Done when: <verifiable check>
 `,
@@ -170,7 +170,7 @@ Principios cortos y verificables. Prevalecen sobre cualquier otra instrucción.
 `,
   tasks: `# Tareas — <PREFIJO>-<NNN>
 
-Ordenadas por dependencia; las de componentes distintos avanzan en paralelo, tests primero. Solo el componente es obligatorio. El trabajo que surge al implementar se añade al final, marcado "añadida en implementación".
+Ordenadas por dependencia; las de componentes distintos avanzan en paralelo (2 a la vez como máximo), tests primero. Solo el componente es obligatorio. El trabajo que surge al implementar se añade al final, marcado "añadida en implementación".
 
 - [ ] T1 <título> · Requisitos: RF-01 · Componente: <id> · Alcance: <globs> · Depende de: — · Hecho cuando: <comprobación verificable>
 `,

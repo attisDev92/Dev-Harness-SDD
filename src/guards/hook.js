@@ -15,10 +15,12 @@ import { changeSnapshot, changedSince } from './verify.js';
 import { runtimeMessages, verdictText } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
 import { statusLines } from './status.js';
+import { MAX_PARALLEL } from './tasks.js';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const AGENT_TOOLS = new Set(['Task', 'Agent']);
-const DOC_FILE = /\.(md|mdx)$/i;
+const STALE_SUBAGENT_MS = 60 * 60 * 1000;
+const DOC_FILE =/\.(md|mdx)$/i;
 const HARNESS_ROLES = new Set(['spec-reviewer', 'architect', 'frontend-dev', 'backend-dev', 'qa-tester', 'reviewer', 'debugger', 'doc-writer']);
 
 /**
@@ -51,10 +53,12 @@ export function handleHook(event, payload, opts = {}) {
   switch (event) {
     case 'PreToolUse': {
       if (AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) {
-        // Several subagents may run at once (frontend and backend): each one is tracked on its own.
+        // Up to MAX_PARALLEL subagents may run at once (frontend and backend): each one is tracked on its own.
+        // A subagent that never reported back (crashed) stops counting after an hour.
+        const running = Object.values(runtime.subagents).filter((s) => Date.now() - Date.parse(s.started) < STALE_SUBAGENT_MS).length;
         runtime.subagents[payload.tool_use_id ?? input.subagent_type] = { role: input.subagent_type, snapshot: snapshot(root), started: new Date().toISOString() };
         save();
-        return { code: 0 };
+        return running >= MAX_PARALLEL ? context(t.hook.tooMany(input.subagent_type, running)) : { code: 0 };
       }
       if (!WRITE_TOOLS.has(tool)) return { code: 0 };
       const file = input.file_path ?? input.notebook_path ?? input.path;

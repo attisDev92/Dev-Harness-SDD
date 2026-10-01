@@ -44,10 +44,10 @@ You are the orchestrator, in the main session: you delegate to the subagents (th
 
 ## 3. Implement (status: plan-approved)
 
-1. \`sdd.js next\` lists what can start now. Delegate every listed task **in the same message** so frontend and backend work at once. Tests first.
+1. \`sdd.js next\` lists what can start now (2 tasks at most). Delegate the listed tasks **in the same message** so, for example, an API and a screen move at once. **Never more than 2 subagents working at the same time, whatever their role** (backend, frontend, qa, reviewer…): more cannot be followed and burn tokens. A task that depends on a running one waits. Tests first.
 2. When a subagent finishes: \`sdd.js verify --component <id>\`. If it fails, fix it (2 attempts at most). If it still fails, delegate to \`debugger\`, show its options and let the user choose.
-3. Green: tick the task in tasks.md, then delegate **in parallel** to \`reviewer\` and \`doc-writer\`. Fix the clear review findings inside the task; ask only if a finding changes the spec.
-4. Call \`next\` again: dependencies that finished unblock new tasks.
+3. Green: tick the task in tasks.md, then delegate to \`reviewer\` and \`doc-writer\`, in parallel only if no other subagent is working (otherwise one at a time, as slots free up). Fix the clear review findings inside the task; ask only if a finding changes the spec.
+4. Call \`next\` again: a free slot or a finished dependency unblocks new tasks.
 5. When a story (or the whole spec, per the configuration) is done: ${config.gates?.manual_test === 'none' ? 'no manual test is asked for.' : 'give the manual test (how to start it, URL or command, steps, test data, expected result per requirement) as a normal question. A failure starts the triage of that story; the rest go on.'} Then **propose the commit**: \`sdd.js commit-context\`, one message per repository with changes, following the project convention; if the user says yes, \`git add\` + \`git commit\`. Never push unless they ask.
 6. Last story done: \`sdd.js validate\` (requirement → test) and give the verdict; the spec is closed as \`done\`.
 

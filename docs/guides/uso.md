@@ -48,7 +48,7 @@ Dile al agente lo que quieres construir ("quiero un login con email") y la skill
 
 1. **Spec**: te entrevista (máx. 6 preguntas), escribe los requisitos en EARS y los revisa. 🛑 **Parada 1**: apruebas la spec.
 2. **Plan y tareas**: el architect escribe plan, contratos, ADRs y `tasks.md` de una vez. 🛑 **Parada 2**: apruebas el plan con sus tareas.
-3. **Implementación**: frontend y backend en paralelo, tests primero. Tras cada tarea, verificación y, en paralelo, revisión y documentación.
+3. **Implementación**: frontend y backend en paralelo (nunca más de 2 subagentes a la vez, del rol que sea), tests primero. Tras cada tarea, verificación y después revisión y documentación, en paralelo solo si hay hueco.
 4. **Al cerrar una historia**: prueba manual (una pregunta normal) y el agente **propone el commit**; si dices que sí, lo hace.
 5. **Al final**: validación requisito por requisito; la spec queda como `done`.
 
@@ -66,9 +66,9 @@ Atajos opcionales (ninguno hace falta para avanzar):
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, último verify y últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar en paralelo las tareas listas |
+| `/sdd:next` | Lanzar las tareas listas, hasta 2 a la vez |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
-| `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
+| `/sdd:review` | Revisión (y QA) de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |
 | `/sdd:commit` | Proponer el commit ahora |
 | `/sdd:tracker` | Sincronizar `tasks.md` con tu tracker |

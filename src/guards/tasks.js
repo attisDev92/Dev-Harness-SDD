@@ -142,26 +142,32 @@ export function parseTasks(text) {
   return tasks;
 }
 
+/** Most subagents working at once, whatever their role: more cannot be followed and burn tokens. */
+export const MAX_PARALLEL = 2;
+
 /**
- * Tasks of different components run in parallel; a task waits only for its own
- * dependencies (and for the task already running in its component).
- * @returns {{ ready: object[], waiting: { task: object, on: string[] }[] }}
+ * Tasks of different components run in parallel, at most MAX_PARALLEL at once;
+ * a task waits only for its own dependencies (and for the task already running
+ * in its component). Free tasks that do not fit go to `queued`.
+ * @returns {{ ready: object[], queued: object[], waiting: { task: object, on: string[] }[] }}
  */
 export function taskQueue(tasks, active = {}) {
   const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
   const busy = new Map(Object.values(active).map((t) => [t.component, t.id]));
+  const free = Math.max(0, MAX_PARALLEL - Object.keys(active).length);
   const ready = [];
+  const queued = [];
   const waiting = [];
   for (const task of tasks.filter((t) => !t.done && !active[t.id])) {
     const on = task.depends.filter((d) => !done.has(d));
     if (!on.length && busy.has(task.component)) on.push(busy.get(task.component));
     if (on.length) waiting.push({ task, on });
     else {
-      ready.push(task);
+      (ready.length < free ? ready : queued).push(task);
       busy.set(task.component, task.id);
     }
   }
-  return { ready, waiting };
+  return { ready, queued, waiting };
 }
 
 /** RF-ORQ-01: first pending task whose dependencies are all done. */

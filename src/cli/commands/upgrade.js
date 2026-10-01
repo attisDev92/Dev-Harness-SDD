@@ -21,6 +21,7 @@ export const CHANGES = {
   '0.6.0': ['Cualquier tracker: GitHub desde la CLI y el resto desde el agente con su MCP (/sdd:tracker)'],
   '0.7.0': ['Comando sdd-harness y atajo sdd-harness-init', 'Ocho skills propias más (clean-code, design-system, api-design…)', 'Git hooks en cada repo de un workspace'],
   '0.8.0': ['Flujo ligero: solo dos paradas (spec y plan+tareas) que se aprueban hablando ("sí", "continúa")', 'El agente propone el commit al cerrar cada historia y lo hace con tu OK', 'Tareas nuevas y cambios de harness.config.yaml en cualquier momento, con sync automático', 'Comandos /sdd:* solo informativos o para lanzar trabajo en paralelo (status, spec, next, docs, review, validate, commit)', 'Estado visible en spec.md (frontmatter) y tasks.md; sin lock de sesión ni gates'],
+  '0.8.1': ['Nunca más de 2 subagentes trabajando a la vez (backend, frontend, qa…): sdd.js next lista 2 como máximo y un tercer subagente produce un aviso'],
 };
 
 /**

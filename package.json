@@ -1,6 +1,6 @@
 {
   "name": "dev-harness-sdd",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Portable, human-in-the-loop harness for Spec-Driven Development with AI coding agents.",
   "license": "Apache-2.0",
   "repository": {

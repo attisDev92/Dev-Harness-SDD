@@ -37,7 +37,7 @@ const ROLE_TEXT = {
   },
   architect: {
     description: 'Technical plan, API contracts, ADR drafts and tasks.md for an approved spec, all in one go.',
-    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks run in parallel.',
+    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks can run in parallel (2 subagents at once at most).',
   },
   'frontend-dev': {
     description: 'Implements frontend tasks: UI, design system, components. Tests first. Use for tasks of frontend components.',
@@ -52,7 +52,7 @@ const ROLE_TEXT = {
     body: 'Write or extend tests that prove the requirements (put the requirement ID, e.g. RF-01, in the test name so the validation can find it). Report bugs with steps, expected and actual result.',
   },
   reviewer: {
-    description: 'Reviews finished work: spec compliance first, then quality and security. Read-only. Runs in parallel with doc-writer after verification passes.',
+    description: 'Reviews finished work: spec compliance first, then quality and security. Read-only. Runs with doc-writer after verification passes, as long as no more than 2 subagents work at once.',
     body: 'First check each requirement of the task against the code and tests. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line, most important first; change nothing.',
   },
   debugger: {
@@ -60,7 +60,7 @@ const ROLE_TEXT = {
     body: 'Follow the triage-report skill exactly. Do not modify any file.',
   },
   'doc-writer': {
-    description: 'Keeps the documentation current: spec, plan, tasks.md, README, CHANGELOG, ADRs, architecture docs. Runs in parallel with reviewer after each task.',
+    description: 'Keeps the documentation current: spec, plan, tasks.md, README, CHANGELOG, ADRs, architecture docs. Runs with reviewer after each task, as long as no more than 2 subagents work at once.',
     body: 'Read the changes (git diff) and update every document they affect: tick nothing, but keep spec/plan/tasks.md consistent with what was built (add tasks that came up, marked "added during implementation" in the specs language), README and CHANGELOG, ADRs and architecture docs. Keep them short and accurate. Report what you updated.',
   },
 };
@@ -108,9 +108,9 @@ const S = 'node .harness/scripts/sdd.js';
 const COMMANDS = {
   status: ['What happened and what comes next', '', `Run \`${S} status\` and summarise it for the user: the spec in progress and its state, the last tasks closed, what is pending and what can start now, tasks added during implementation, the last verification and the last commits. Suggest the next step in one line.`],
   spec: ['Start a new spec', '<short description>', `Load the sdd skill and start a new spec for: $ARGUMENTS`],
-  next: ['Launch in parallel every task that can start now', '', `Load the sdd skill and follow "Implement": \`${S} next\` lists the tasks that can start now (one per component); delegate them at the same time.`],
+  next: ['Launch the tasks that can start now (2 at once at most)', '', `Load the sdd skill and follow "Implement": \`${S} next\` lists the tasks that can start now (one per component, 2 at most); delegate them at the same time. Never more than 2 subagents working at once.`],
   docs: ['Bring the documentation up to date, in the background', '[what changed]', `Delegate to the doc-writer subagent: update every document affected by the recent changes (git diff) $ARGUMENTS. Keep working on anything else meanwhile, and summarise what it updated.`],
-  review: ['Review the recent changes, in parallel', '[scope]', `Delegate at the same time to the reviewer subagent (spec compliance, quality, security) and, when there are tests to add, to qa-tester, over the recent changes (git diff) $ARGUMENTS. Summarise the findings, most important first, and fix the clear ones inside the task.`],
+  review: ['Review the recent changes', '[scope]', `Delegate at the same time to the reviewer subagent (spec compliance, quality, security) and, when there are tests to add, to qa-tester (never more than 2 subagents working at once), over the recent changes (git diff) $ARGUMENTS. Summarise the findings, most important first, and fix the clear ones inside the task.`],
   validate: ['Validate the spec requirement by requirement', '', `Run \`${S} verify\` and \`${S} validate\`. Give, for each requirement: the test that covers it and its result; requirements without a test are "not covered". End with a verdict.`],
   commit: ['Propose the commit now', '', `Run \`${S} commit-context\`. Propose one commit message per repository with changes, following its convention and language, referencing specs and tasks, and ask the user. If they say yes, run git add and git commit. Never push unless they ask.`],
 };

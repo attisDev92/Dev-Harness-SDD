@@ -36,7 +36,7 @@ Primero la spec. Subagentes para frontend y backend. Guardarraíles determinista
 
 Implementa el flujo de Spec-Driven Development:
 
-**Spec → Plan y tareas → Implementación (frontend y backend en paralelo, tests primero) → Validación, con la documentación siempre al día. Un cambio va primero a la spec y luego al código.**
+**Spec → Plan y tareas → Implementación (frontend y backend en paralelo, máximo 2 subagentes a la vez, tests primero) → Validación, con la documentación siempre al día. Un cambio va primero a la spec y luego al código.**
 
 Sobre ese flujo añade subagentes de frontend y backend, un agente de QA, un revisor, un depurador y un documentador, coordinados por un orquestador. **Solo se detiene dos veces**, para aprobar la spec y el plan, y respondes hablando ("sí", "continúa"). Lo demás avanza y se cuenta en los resúmenes.
 
@@ -142,7 +142,7 @@ Los comandos `/sdd:*` son **atajos opcionales** para ver qué pasó o lanzar tra
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, última verificación, últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar en paralelo las tareas listas (frontend ∥ backend) |
+| `/sdd:next` | Lanzar las tareas listas, hasta 2 a la vez (p. ej. una API y una pantalla) |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
 | `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |
@@ -225,7 +225,7 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 | 🔁 **Sin bucles infinitos** | Máximo **2** intentos de corrección. Después, informe del depurador → tú eliges |
 | 🧑 **Pruebas lo que importa** | URL, pasos y datos de prueba con la granularidad que elijas (`task`, `story`, `spec` o `none`) |
 | 🗂️ **Documentación siempre al día** | Se puede escribir cualquier `.md`; los agentes deben actualizar todo documento que un cambio afecte. La lista blanca es opcional (`gates.docs: whitelist`) |
-| ⚡ **Agentes en paralelo** | Las tareas de frontend y backend avanzan a la vez; una tarea solo espera a su propio `Depends on` |
+| ⚡ **Hasta 2 agentes a la vez** | Frontend, backend, QA… avanzan en paralelo, pero nunca más de 2 subagentes a la vez (para poder seguirles la pista y no disparar los tokens); una tarea solo espera a su propio `Depends on` |
 | 🧱 **Cada agente en su carril** | Propiedad de rutas por agente, verificada con `git diff` al terminar cada subagente (un aviso, y solo si trabajó solo) |
 | ✅ **Nada se da por hecho con tests en rojo** | El hook de parada se lo recuerda al agente una vez si la última verificación falló |
 

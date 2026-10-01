@@ -29,7 +29,7 @@ const USAGE_TEXT = `usage: sdd.js <command>
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
   stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
   approve                         record the pending stop (when the user chose "Approve" in a question)
-  next                            tasks that can start now, one per component (to delegate in parallel)
+  next                            tasks that can start now, one per component, at most 2 at once
   verify [--component c]          run the verification (all components without --component)
   validate [--json]               requirement → test coverage; closes the spec when every task is done
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
@@ -141,12 +141,12 @@ export async function runSdd(argv, io) {
     }
 
     case 'next': {
-      // Informative: what can start now. Tasks of different components run in parallel.
+      // Informative: what can start now. Tasks of different components run in parallel, at most MAX_PARALLEL.
       if (!flow.spec) return refuse(t.next.noSpec());
       if (flow.spec.status !== 'plan-approved') return refuse(t.next.notApproved(flow.spec.status));
       if (!flow.tasks.length) return refuse(t.next.noTasks(`${flow.spec.dir}/tasks.md`));
-      const { ready, waiting } = taskQueue(flow.tasks);
-      if (!ready.length && !waiting.length) {
+      const { ready, queued, waiting } = taskQueue(flow.tasks);
+      if (!ready.length && !queued.length && !waiting.length) {
         out(t.next.allDone());
         return OK;
       }
@@ -161,6 +161,7 @@ export async function runSdd(argv, io) {
         if (!comp.verify || !Object.keys(comp.verify).length) out(`  ${t.next.noVerify(task.component)}`);
       }
       if (ready.length) out(t.next.parallel());
+      if (queued.length) out(t.next.queued(queued.map((x) => x.id)));
       if (waiting.length) out(t.next.waiting(waiting));
       return OK;
     }

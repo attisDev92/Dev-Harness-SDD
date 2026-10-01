@@ -213,11 +213,11 @@ Notación EARS: **CUANDO** (evento), **SI … ENTONCES** (no deseado), **MIENTRA
 ### 5.11 Orquestación y roles (ORQ)
 
 - **RF-ORQ-01:** EL SISTEMA ofrecerá una skill orquestadora (`sdd`) que se activa por lenguaje natural, lee el estado de los `.md` y ejecuta el siguiente paso lógico.
-- **RF-ORQ-02:** EL SISTEMA ejecutará en paralelo las tareas de componentes distintos: una tarea espera solo a sus propias dependencias (`Depends on`). `/sdd:next` lanza todas las que están listas.
+- **RF-ORQ-02:** EL SISTEMA ejecutará en paralelo las tareas de componentes distintos: una tarea espera solo a sus propias dependencias (`Depends on`). Nunca habrá más de 2 subagentes trabajando a la vez, del rol que sea (backend, frontend, qa, revisor…), y solo con tareas que no se bloqueen entre sí. `/sdd:next` lanza como máximo 2 de las que están listas y lista el resto como "sin hueco"; un tercer subagente lanzado igualmente produce un aviso, no un bloqueo.
 - **RF-ORQ-03:** EL SISTEMA delegará la implementación al rol que corresponde al componente de la tarea.
 - **RF-ORQ-04:** EL SISTEMA hará que el rol implementador escriba los tests de la tarea antes que el código.
 - **RF-ORQ-05:** CUANDO la implementación termine, EL SISTEMA ejecutará los comandos de verificación del componente.
-- **RF-ORQ-06:** CUANDO la verificación pase, EL SISTEMA lanzará en paralelo el rol `reviewer` (cumplimiento de la spec, luego calidad y seguridad) y el rol `doc-writer` (documentos afectados). También se pueden lanzar con `/sdd:review` y `/sdd:docs`.
+- **RF-ORQ-06:** CUANDO la verificación pase, EL SISTEMA lanzará el rol `reviewer` (cumplimiento de la spec, luego calidad y seguridad) y el rol `doc-writer` (documentos afectados), en paralelo solo si no hay otro subagente trabajando (tope de RF-ORQ-02) y, si lo hay, de uno en uno según queden huecos. También se pueden lanzar con `/sdd:review` y `/sdd:docs`.
 - **RF-ORQ-07:** SI el revisor encuentra incumplimientos, ENTONCES EL SISTEMA los corregirá dentro de la tarea y los contará en el resumen; solo preguntará si la corrección cambia la spec.
 - **RF-ORQ-08:** EL SISTEMA registrará en `progress.md` las decisiones tomadas y los avisos relevantes.
 - **RF-ORQ-09:** CUANDO se abra una sesión nueva en un proyecto con una spec en curso, EL SISTEMA mostrará automáticamente un resumen del estado leído de los `.md`.

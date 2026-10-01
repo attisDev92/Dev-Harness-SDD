@@ -8,6 +8,7 @@ import { runSdd } from '../src/guards/sdd.js';
 import { handleHook } from '../src/guards/hook.js';
 import { loadRuntime, specStatus } from '../src/guards/state.js';
 import { parseDecision } from '../src/guards/flow.js';
+import { parseTasks, taskQueue, MAX_PARALLEL } from '../src/guards/tasks.js';
 import { run, write, git } from './fixtures.js';
 import { tempDir } from './helpers.js';
 
@@ -183,7 +184,7 @@ test('frontend and backend tasks are listed together; a task waits only for its 
   const next = await sdd(root, 'next');
   assert.equal(next.code, 0, next.stderr);
   assert.match(next.stdout, /T1 Login endpoint {2}→ {2}backend-dev[\s\S]*T2 Login screen {2}→ {2}frontend-dev/);
-  assert.match(next.stdout, /Delégalas a la vez/);
+  assert.match(next.stdout, /Delégalas a la vez[^\n]*Máximo 2 subagentes/);
   assert.match(next.stdout, /T3 espera a T1, T2/);
 
   // Both write at the same time, each inside its own scope, with no alert.
@@ -195,6 +196,36 @@ test('frontend and backend tasks are listed together; a task waits only for its 
   assert.equal((await sdd(root, 'verify', '--component', 'api')).code, 0);
   assert.equal((await sdd(root, 'verify')).code, 2, 'web still fails');
   assert.deepEqual([loadRuntime(root).verify.api.status, loadRuntime(root).verify.web.status], ['pass', 'fail']);
+});
+
+test('RF-ORQ-02: never more than 2 tasks at once; the rest wait for a free slot, not for a dependency', () => {
+  const tasks = parseTasks(`- [ ] T1 API · Component: api · Depends on: —
+- [ ] T2 Screen · Component: web · Depends on: —
+- [ ] T3 Jobs · Component: jobs · Depends on: —
+- [ ] T4 Connect · Component: web · Depends on: T1
+`);
+  assert.equal(MAX_PARALLEL, 2);
+  const q = taskQueue(tasks);
+  assert.deepEqual([q.ready.map((x) => x.id), q.queued.map((x) => x.id), q.waiting.map((x) => x.task.id)], [['T1', 'T2'], ['T3'], ['T4']]);
+  // One finishes: a slot frees up. Two running: nothing else starts.
+  const running = { T1: tasks[0], T2: tasks[1] };
+  assert.deepEqual(taskQueue(tasks, running).ready, []);
+  assert.deepEqual(taskQueue(tasks, { T1: tasks[0] }).ready.map((x) => x.id), ['T2']);
+});
+
+test('RF-ORQ-02: a third subagent is warned about, not blocked', async (t) => {
+  const root = await project(t);
+  const launch = (id, role) => hook(root, 'PreToolUse', { tool_use_id: id, tool_name: 'Task', tool_input: { subagent_type: role, prompt: 'x' } }, { snapshot: () => ({}) });
+  assert.equal(launch('a', 'backend-dev').stdout, undefined);
+  assert.equal(launch('b', 'frontend-dev').stdout, undefined);
+  const third = launch('c', 'qa-tester');
+  assert.equal(third.code, 0);
+  assert.match(alertOf(third), /lanzas qa-tester con 2 subagentes ya trabajando\. El máximo son 2 a la vez/);
+  // A subagent that never reported back stops counting after an hour.
+  const runtime = loadRuntime(root);
+  for (const s of Object.values(runtime.subagents)) s.started = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  fs.writeFileSync(path.join(root, '.harness/state/runtime.json'), JSON.stringify(runtime));
+  assert.equal(launch('d', 'reviewer').stdout, undefined);
 });
 
 test('RF-VER-02: a component without verification commands is pointed out, not blocked', async (t) => {
