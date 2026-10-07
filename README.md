@@ -271,6 +271,8 @@ specs:
 components:
   web: { path: ./web-app, stack: "react+vite+ts" }
   api: { path: ./api,     stack: "nestjs+postgres" }
+  # verify.eval (optional): AI evaluations (retrieval, LLM as judge). They cost money and are not
+  # deterministic: they do not run on every verify, only when a story closes (sdd.js verify --eval).
 
 design:
   source: none                 # none | tokens-in-code | penpot | figma

@@ -106,7 +106,7 @@ export function runChecks(root, { version, env = process.env }) {
   }
 
   for (const [id, c] of Object.entries(config.components ?? {})) {
-    if (!c.verify || !Object.keys(c.verify).length) add('warn', 'verify', ['noVerify', id], { action: ['noVerifyAction'] });
+    if (!['lint', 'typecheck', 'test', 'e2e'].some((k) => c.verify?.[k])) add('warn', 'verify', ['noVerify', id], { action: ['noVerifyAction'] });
   }
   for (const tool of config.tools ?? []) {
     const bin = TOOL_PROFILE[tool]?.bin;

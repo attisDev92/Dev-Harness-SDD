@@ -83,6 +83,7 @@ const L = {
     compOwner: (role) => `Implemented by: \`${role}\`. Other roles only read here, except \`qa-tester\` in test files.`,
     compPrefix: (p) => `Spec IDs: \`${p}-NNN\`.`,
     compVerify: 'Verification (run from this directory):',
+    evalNote: 'AI evaluations: only when a story closes, with `sdd.js verify --eval`; they cost money and are not deterministic',
     compStack: (s) => `Stack: ${s || 'not detected'}.`,
   },
   es: {
@@ -117,6 +118,7 @@ const L = {
     compOwner: (role) => `Lo implementa: \`${role}\`. El resto de roles solo lee aquí, salvo \`qa-tester\` en los archivos de test.`,
     compPrefix: (p) => `IDs de spec: \`${p}-NNN\`.`,
     compVerify: 'Verificación (ejecutar desde este directorio):',
+    evalNote: 'evaluaciones de IA: solo al cerrar una historia, con `sdd.js verify --eval`; cuestan dinero y no son deterministas',
     compStack: (s) => `Stack: ${s || 'no detectado'}.`,
   },
 };
@@ -126,7 +128,7 @@ export function contextStrings(lang) {
 }
 
 function verifyCell(v, t) {
-  const cmds = ['lint', 'typecheck', 'test', 'e2e'].filter((k) => v?.[k]).map((k) => `${k}: \`${v[k]}\``);
+  const cmds = ['lint', 'typecheck', 'test', 'e2e', 'eval'].filter((k) => v?.[k]).map((k) => `${k}: \`${v[k]}\``);
   return cmds.length ? cmds.join('<br>') : t.notConfigured;
 }
 
@@ -256,6 +258,7 @@ export function componentContext(config, id) {
     t.compVerify,
     '',
     ...(verify.length ? verify.map((k) => `- ${k}: \`${c.verify[k]}\``) : [`- ${t.notConfigured}`]),
+    ...(c.verify?.eval ? [`- eval: \`${c.verify.eval}\` (${t.evalNote})`] : []),
     ...(parts.some((p) => hints[p]) ? ['', ...parts.filter((p) => hints[p]).map((p) => `- ${hints[p]}`)] : []),
   ].join('\n');
 }

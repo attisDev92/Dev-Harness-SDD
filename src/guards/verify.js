@@ -16,11 +16,15 @@ function tail(text, lines = 60) {
 
 /**
  * Runs the configured commands of one component, stopping at the first
- * failure. `quick` runs only lint and typecheck (pre-commit).
+ * failure. `quick` runs only lint and typecheck (pre-commit). `evals` runs
+ * only `verify.eval`: AI evaluations cost money and are not deterministic, so
+ * they never run with the rest, only when a story closes.
  * @returns {{ status: 'pass' | 'fail' | 'unconfigured', results: { name: string, command: string, code: number, output: string }[], failing?: { name: string, command: string } }}
  */
-export function runVerify(root, component, { quick = false, run = defaultRun } = {}) {
-  const commands = VERIFY_ORDER.filter((k) => component.verify?.[k] && (!quick || QUICK.includes(k)));
+export function runVerify(root, component, { quick = false, evals = false, run = defaultRun } = {}) {
+  const commands = evals
+    ? ['eval'].filter((k) => component.verify?.[k])
+    : VERIFY_ORDER.filter((k) => component.verify?.[k] && (!quick || QUICK.includes(k)));
   if (!commands.length) return { status: quick ? 'pass' : 'unconfigured', results: [] };
   const cwd = path.resolve(root, component.path ?? '.');
   const results = [];

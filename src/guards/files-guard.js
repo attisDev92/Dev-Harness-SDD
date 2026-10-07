@@ -9,7 +9,7 @@ import path from 'node:path';
 import { matchesAny, globToRegExp } from './glob.js';
 import { checkDocWrite } from './docs-guard.js';
 
-const TEST_FILE = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**'];
+const TEST_FILE = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**', '**/evals/**', '**/*.eval.*'];
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies', 'bundledDependencies', 'overrides', 'resolutions'];
 const BEGIN = '<!-- harness:begin -->';
 const END = '<!-- harness:end -->';

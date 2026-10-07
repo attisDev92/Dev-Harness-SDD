@@ -53,6 +53,9 @@ const es = {
     pass: (c) => `La verificación de ${c} pasó. Marca las tareas terminadas en tasks.md; después reviewer y doc-writer, en paralelo solo si no hay otro subagente trabajando (máximo 2 a la vez).`,
     fail: (f) => `La verificación falló: ${f.name} (${f.command}). Corrígela, hasta 2 intentos; si el error se repite o necesitas salirte del alcance, triage con el debugger y pregunta al usuario.`,
     unconfigured: (c) => `El componente "${c}" no tiene comandos de verificación (RF-VER-02).`,
+    noEval: () => 'Ningún componente tiene verify.eval: no hay evaluaciones que correr.',
+    evalPass: (c) => `Evaluaciones de ${c}: pasan. Cuéntalo al usuario con la propuesta de commit.`,
+    evalFail: (c) => `Evaluaciones de ${c}: no pasan. No son deterministas y cuestan dinero: no las repitas para que pasen ni corrijas a ciegas. Enseña el resultado al usuario con la propuesta de commit y que decida.`,
     pickComponent: (all) => `Indica el componente: --component <${all.join('|')}>.`,
   },
   spec: {

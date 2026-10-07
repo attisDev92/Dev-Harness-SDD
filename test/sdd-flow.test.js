@@ -105,6 +105,21 @@ test('new-spec skips the numbers used on other branches; --id on one of them is 
   assert.match(fixed.stdout, /SVC-001 ya existe en la rama dev2/);
 });
 
+test('verify.eval: AI evaluations run only with --eval, never in the normal verify', async (t) => {
+  const root = await project(t, CONFIG.replace('verify: {test: node check.js}', 'verify: {test: node check.js, eval: node eval.js}'), {
+    'pass.flag': '',
+    'eval.js': "import fs from 'node:fs';\nfs.appendFileSync('evals.log', 'run\\n');\nconsole.log('score 0.82');\n",
+  });
+  const ran = () => (fs.existsSync(path.join(root, 'evals.log')) ? fs.readFileSync(path.join(root, 'evals.log'), 'utf8').split('\n').filter(Boolean).length : 0);
+  assert.equal((await sdd(root, 'verify')).code, 0);
+  assert.equal(ran(), 0, 'the normal verify does not run the evaluations');
+  const ev = await sdd(root, 'verify', '--eval');
+  assert.equal(ev.code, 0, ev.stderr);
+  assert.match(ev.stdout, /score 0\.82[\s\S]*Evaluaciones de svc: pasan/);
+  assert.equal(ran(), 1);
+  assert.match(fs.readFileSync(path.join(root, '.agents/skills/sdd/SKILL.md'), 'utf8'), /verify --eval/);
+});
+
 test('RF-SDD-13: two stops, approved by talking; the status lives in spec.md', async (t) => {
   const root = await project(t);
   // No spec, no task: an alert, never a block, and only once.

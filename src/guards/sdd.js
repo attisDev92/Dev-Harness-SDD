@@ -13,7 +13,7 @@ import { findProjectRoot, loadGuardSettings } from './project.js';
 import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, STOPS } from './state.js';
 import { importContract } from './contracts.js';
 import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
-import { runVerify } from './verify.js';
+import { runVerify, VERIFY_ORDER } from './verify.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
 import { linkedTasks, planSync, applyLocal } from './tracker-sync.js';
@@ -32,7 +32,8 @@ const USAGE_TEXT = `usage: sdd.js <command>
   stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
   approve                         record the pending stop (when the user chose "Approve" in a question)
   next                            tasks that can start now, one per component, at most 2 at once
-  verify [--component c]          run the verification (all components without --component)
+  verify [--component c] [--eval] run the verification (all components without --component);
+                                  --eval runs only verify.eval, once when a story closes
   validate [--json]               requirement → test coverage; closes the spec when every task is done
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
   tracker plan|apply [--file f]   sync tasks.md with the tracker (JSON on stdin)
@@ -57,7 +58,7 @@ const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
  * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function, readStdin?: () => Promise<string> }} io
  */
 export async function runSdd(argv, io) {
-  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id'], boolean: ['json'] });
+  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id'], boolean: ['json', 'eval'] });
   const [command, ...rest] = positional;
   const root = findProjectRoot(io.cwd);
   const out = (s) => io.stdout.write(`${s}\n`);
@@ -72,6 +73,24 @@ export async function runSdd(argv, io) {
   const save = () => saveRuntime(root, runtime);
   const flow = readFlow(root, settings);
   const componentIds = Object.keys(settings.components);
+
+  // AI evaluations: informative, outside the verification loop and its retries.
+  const runEvals = (ids) => {
+    const targets = ids.filter((id) => settings.components[id].verify?.eval);
+    if (!targets.length) {
+      out(t.verify.noEval());
+      return OK;
+    }
+    let failed = false;
+    for (const id of targets) {
+      const result = runVerify(root, settings.components[id], { evals: true, run: io.run });
+      for (const r of result.results) out(`$ ${r.command}  → ${r.code === 0 ? 'ok' : `exit ${r.code}`}\n${r.output}`);
+      if (result.status === 'fail') failed = true;
+      out(result.status === 'pass' ? t.verify.evalPass(id) : t.verify.evalFail(id));
+      logEvent(root, 'eval', { component: id, status: result.status });
+    }
+    return failed ? REFUSED : OK;
+  };
 
   switch (command) {
     case 'status': {
@@ -175,7 +194,7 @@ export async function runSdd(argv, io) {
         }
         const comp = settings.components[task.component];
         out(t.next.ready(task, roleFor(comp.kind)));
-        if (!comp.verify || !Object.keys(comp.verify).length) out(`  ${t.next.noVerify(task.component)}`);
+        if (!VERIFY_ORDER.some((k) => comp.verify?.[k])) out(`  ${t.next.noVerify(task.component)}`);
       }
       if (ready.length) out(t.next.parallel());
       if (queued.length) out(t.next.queued(queued.map((x) => x.id)));
@@ -185,6 +204,7 @@ export async function runSdd(argv, io) {
 
     case 'verify': {
       if (flags.component && !settings.components[flags.component]) return refuse(t.verify.pickComponent(componentIds));
+      if (flags.eval) return runEvals(flags.component ? [flags.component] : componentIds);
       const targets = flags.component ? [flags.component] : componentIds;
       let failed = false;
       for (const id of targets) {
@@ -330,7 +350,7 @@ export async function runSdd(argv, io) {
 }
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', 'vendor', '.harness', 'target', '.venv', 'venv']);
-const TEST_GLOBS = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**', '**/test_*.py', '**/*_test.go'];
+const TEST_GLOBS = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**', '**/evals/**', '**/*.eval.*', '**/test_*.py', '**/*_test.go'];
 
 /** Test files and the requirement IDs they mention (RF-SDD-14/15). */
 function testIndex(root, settings) {

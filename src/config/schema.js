@@ -53,7 +53,7 @@ export const schema = obj(
           id_prefix: str({ pattern: ID_PREFIX, hint: 'API, WEB…' }),
           stack: str(),
           kind: oneOf(COMPONENT_KINDS),
-          verify: obj({ lint: str(), typecheck: str(), test: str(), e2e: str() }),
+          verify: obj({ lint: str(), typecheck: str(), test: str(), e2e: str(), eval: str() }),
         },
         ['path'],
       ),
