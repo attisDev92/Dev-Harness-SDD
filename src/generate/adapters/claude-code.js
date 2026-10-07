@@ -53,7 +53,7 @@ const ROLE_TEXT = {
   },
   reviewer: {
     description: 'Reviews finished work: spec compliance first, then quality and security. Read-only. Runs with doc-writer after verification passes, as long as no more than 2 subagents work at once.',
-    body: 'First check each requirement of the task against the code and tests. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line, most important first; change nothing.',
+    body: 'First check each requirement of the task against the code and tests. If the changes include migrations or schema files, check that every table and column they create, change or drop is in the data model of plan.md; report any that is not. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line, most important first; change nothing.',
   },
   debugger: {
     description: 'Root-cause triage when a fix does not work after 2 attempts. Reports options; never fixes.',
