@@ -112,6 +112,8 @@ export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [
       if (hit.section && /package\.json$/.test(rel) && after !== null && !depsChanged(current, after)) continue;
       return warn('depsEdit', rel);
     }
+    // A migration of the data model in the approved plan was approved at its stop: no alert, only the task checks.
+    if (hit.zone === 'db' && flow.spec?.status === 'plan-approved' && planHasDataModel(root, flow.spec)) continue;
     return warn('protectedZone', rel, { zone: hit.zone });
   }
 
@@ -125,6 +127,14 @@ export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [
   // Tasks without a scope cover their whole component.
   if (open.some((x) => !(x.scope ?? []).length) || matchesAny(rel, scope) || matchesAny(inner, scope) || matchesAny(inner, TEST_FILE)) return allow;
   return warn('outOfScope', rel, { task: open.map((x) => x.id).join(', '), scope });
+}
+
+/** True when plan.md of the spec has a "Data model" section with content. */
+function planHasDataModel(root, spec) {
+  if (!spec.dir) return false;
+  const plan = (safeRead(path.join(root, spec.dir, 'plan.md')) ?? '').replace(/\r\n?/g, '\n');
+  const m = /^##\s+(Data model|Modelo de datos)\s*\n([\s\S]*?)(?=^##\s|(?![\s\S]))/im.exec(plan);
+  return Boolean(m && m[2].replace(/<!--[\s\S]*?-->/g, '').trim());
 }
 
 function safeRead(file) {

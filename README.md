@@ -190,7 +190,7 @@ The harness bundles its own skills and installs curated third-party skills **on 
 | `backend-architecture` | backend, architect | Layers, boundaries, dependency direction, error handling, validation at the edges |
 | `api-design` | backend, architect | REST conventions, pagination, a consistent error format, versioning, contract-first |
 | `secure-coding` | backend, reviewer | OWASP-based checklist: authN/authZ, input handling, secrets, headers |
-| `db-migrations` | backend | Safe migrations (expand/contract, reversible). Every schema change gets an ADR draft |
+| `db-migrations` | backend | Safe migrations (expand/contract, reversible). A migration in the data model of the approved plan needs no ADR or new approval; ADRs only for structural decisions |
 | `testing-strategy` | QA | Test pyramid, test data, avoiding flaky tests, one or more tests per RF |
 | `triage-report` | debugger | Fixed report format: error, reproduction, hypotheses, 2–3 options, recommendation. Then stop |
 | `adr` | architect | Architecture Decision Records with the discarded alternatives |

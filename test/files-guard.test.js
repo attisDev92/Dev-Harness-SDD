@@ -92,6 +92,19 @@ test('protected zones raise an alert, never a block', (t) => {
   assert.deepEqual([v.decision, v.kind, v.zone], ['warn', 'protectedZone', 'db']);
 });
 
+test('a migration of the data model in the approved plan raises no alert', (t) => {
+  const root = project(t);
+  const migration = 'apps/api/migrations/002.sql';
+  const withScope = implementing([{ ...T2, scope: ['apps/api/src/auth/**', 'apps/api/migrations/**'] }]);
+  fs.mkdirSync(path.join(root, 'specs', 'API-001-login'), { recursive: true });
+  const plan = (model) => fs.writeFileSync(path.join(root, 'specs', 'API-001-login', 'plan.md'), `# Plan\n\n## Data model\n\n${model}\n## Decisions\n`);
+  plan('');
+  assert.equal(check(root, migration, withScope).kind, 'protectedZone', 'an empty data model approves nothing');
+  plan('- users (id, email, password_hash)\n');
+  assert.equal(check(root, migration, withScope).decision, 'allow');
+  assert.equal(check(root, migration, { spec: spec('spec-approved'), tasks: [T2] }).kind, 'protectedZone', 'the plan is not approved yet');
+});
+
 test('code without a pending task, or outside its scope, raises an alert; tasks of two components run side by side', (t) => {
   const root = project(t);
   const f = 'apps/api/src/auth/login.ts';

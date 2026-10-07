@@ -78,7 +78,7 @@ El estado es visible: `status` en el frontmatter de `spec.md` (`draft` → `spec
 ## 4. Qué pregunta y qué bloquea el harness
 
 - **Pregunta (confirmación nativa de Claude Code)**: `git push`, `rebase`, `merge`, `reset --hard`, borrar ramas, tags, instalar dependencias y editar `harness.config.yaml`.
-- **Avisa, sin parar**: zonas protegidas (con ADR en borrador), código sin tarea o fuera de su alcance, cambios en dependencias o lockfiles, un subagente que escribe fuera de sus rutas.
+- **Avisa, sin parar**: zonas protegidas (con ADR en borrador, salvo las migraciones que ya están en el modelo de datos del plan aprobado), código sin tarea o fuera de su alcance, cambios en dependencias o lockfiles, un subagente que escribe fuera de sus rutas.
 - **Recuerda una vez**: terminar con la verificación en rojo.
 - **Bloquea**: solo `.harness/`, los archivos generados y el bloque generado de `AGENTS.md`/`CLAUDE.md`. El pre-commit solo rechaza secretos y `.env`.
 

@@ -123,7 +123,7 @@ Then stop. The orchestrator shows the report and the user chooses.
 `,
     adr: `---
 name: adr
-description: Writes Architecture Decision Records with the discarded alternatives. Use it for stack, architecture, database or security decisions, and for any change in a protected zone.
+description: Writes Architecture Decision Records with the discarded alternatives. Use it for stack, architecture, database or security decisions, and for changes in a protected zone, except migrations already in the data model of the approved plan.
 ---
 
 # ADR

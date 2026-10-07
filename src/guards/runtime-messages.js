@@ -10,7 +10,9 @@ const es = {
     docBlocked: (v) => `Bloqueado: "${v.match}" no está en la lista blanca de documentación (gates.docs: whitelist). Permitidos: ${(v.allowed ?? []).join(', ')}. Si el usuario lo pidió, añádelo a docs_whitelist en harness.config.yaml.`,
     needsApproval: (v) => `Aviso: escribes ${v.match} y la spec todavía no está aprobada. Si el usuario ya dijo que sí, registra la aprobación (${S} approve); si no, pregúntale antes de seguir.`,
     depsEdit: (v) => `Aviso: ${v.match} cambia dependencias o un lockfile. Menciónalo en tu resumen.`,
-    protectedZone: (v) => `Aviso: ${v.match} está en la zona protegida "${v.zone}". Sigue si es lo que pidió el usuario, deja la decisión en un ADR en borrador (${S} new-adr <nombre>) y cuéntala en tu resumen.`,
+    protectedZone: (v) => v.zone === 'db'
+      ? `Aviso: ${v.match} cambia el esquema y no hay un plan aprobado con modelo de datos que lo recoja. Si es parte de la spec, añádelo al modelo de datos de plan.md y cuéntalo en tu resumen. Crea un ADR (${S} new-adr <nombre>) solo si es una decisión estructural: motor de base de datos, multi-tenant, particionado, o borrar o transformar datos existentes.`
+      : `Aviso: ${v.match} está en la zona protegida "${v.zone}". Sigue si es lo que pidió el usuario, deja la decisión en un ADR en borrador (${S} new-adr <nombre>) y cuéntala en tu resumen.`,
     noTask: (v) => `Aviso: ${v.match} es código del componente "${v.component}" y no hay ninguna tarea pendiente suya. Si es trabajo nuevo, añádelo a tasks.md como tarea "añadida en implementación" (y a la spec si cambia un requisito) y sigue.`,
     outOfScope: (v) => `Aviso: ${v.match} está fuera del alcance de ${v.task} (${(v.scope ?? []).join(', ')}). Si es parte de la tarea, amplía su alcance en tasks.md; si es trabajo nuevo, añade una tarea. Sigue.`,
   },

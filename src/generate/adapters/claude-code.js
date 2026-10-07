@@ -37,7 +37,7 @@ const ROLE_TEXT = {
   },
   architect: {
     description: 'Technical plan, API contracts, ADR drafts and tasks.md for an approved spec, all in one go.',
-    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks can run in parallel (2 subagents at once at most).',
+    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy, and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). The data model lists the tables and columns the spec creates or changes: approving the plan approves those migrations, so they need no ADR; tasks that write migrations include the migration path in their scope. Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks can run in parallel (2 subagents at once at most).',
   },
   'frontend-dev': {
     description: 'Implements frontend tasks: UI, design system, components. Tests first. Use for tasks of frontend components.',
@@ -45,7 +45,7 @@ const ROLE_TEXT = {
   },
   'backend-dev': {
     description: 'Implements backend tasks: API, domain, persistence. Tests first. Use for tasks of backend or other non-UI components.',
-    body: 'Implement the task you are given. Write the tests first, then the code. Validate input at the edges, keep layers separate, follow the component AGENTS.md. A schema or migration change gets an ADR draft (adr skill). If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
+    body: 'Implement the task you are given. Write the tests first, then the code. Validate input at the edges, keep layers separate, follow the component AGENTS.md. A migration that is in the data model of the approved plan needs no ADR and no new approval; one that is not goes into the data model of plan.md and your report. An ADR draft only for structural database decisions (db-migrations skill). If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
   },
   'qa-tester': {
     description: 'Unit, integration and end-to-end tests, and reproducible bug reports.',

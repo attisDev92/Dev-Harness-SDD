@@ -80,7 +80,7 @@ The state is visible: `status` in the frontmatter of `spec.md` (`draft` → `spe
 ## 4. What the harness asks and what it blocks
 
 - **Asks (Claude Code's native confirmation)**: `git push`, `rebase`, `merge`, `reset --hard`, deleting branches, tags, installing dependencies and editing `harness.config.yaml`.
-- **Alerts, without stopping**: protected zones (with an ADR draft), code without a task or out of its scope, dependency or lockfile changes, a subagent writing outside its paths.
+- **Alerts, without stopping**: protected zones (with an ADR draft, except migrations already in the data model of the approved plan), code without a task or out of its scope, dependency or lockfile changes, a subagent writing outside its paths.
 - **Reminds once**: finishing with verification failing.
 - **Blocks**: only `.harness/`, generated files and the generated block of `AGENTS.md`/`CLAUDE.md`. The pre-commit only refuses secrets and `.env`.
 

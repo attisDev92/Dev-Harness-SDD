@@ -125,7 +125,9 @@ export function practiceSkills(config) {
     out['db-migrations'] = skill('db-migrations', 'Migraciones de base de datos seguras y reversibles. Úsala en cualquier cambio de esquema.', `
 # Migraciones de base de datos
 
-- **Todo cambio de esquema pasa por un gate**: las migraciones son zona protegida. Propón el cambio con un ADR y espera la aprobación.
+- **El plan aprobado ya aprueba su modelo de datos**: una migración que aparece en el modelo de datos del plan aprobado no pide otra aprobación ni un ADR. Impleméntala.
+- **Lo que no está en el plan**: añádelo al modelo de datos de plan.md y cuéntalo en tu resumen.
+- **ADR solo para decisiones estructurales**: elegir o cambiar el motor de base de datos, la estrategia multi-tenant, el particionado, desnormalizar, o borrar o transformar datos existentes. Crear tablas o añadir columnas no lo es.
 - **Reversible**: cada migración tiene su vuelta atrás probada.
 - **Expand / contract** para no romper lo que está en producción:
   1. Expandir: añade columnas o tablas nuevas, compatibles con el código actual.

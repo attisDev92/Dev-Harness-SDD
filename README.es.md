@@ -190,7 +190,7 @@ El harness incluye sus propias skills e instala skills de terceros curadas **baj
 | `backend-architecture` | backend, architect | Capas, fronteras, dirección de dependencias, manejo de errores, validación en los bordes |
 | `api-design` | backend, architect | Convenciones REST, paginación, formato de error consistente, versionado, contrato primero |
 | `secure-coding` | backend, reviewer | Checklist basado en OWASP: autenticación y autorización, entradas, secretos, cabeceras |
-| `db-migrations` | backend | Migraciones seguras (expand/contract, reversibles). Todo cambio de esquema lleva un borrador de ADR |
+| `db-migrations` | backend | Migraciones seguras (expand/contract, reversibles). Una migración del modelo de datos del plan aprobado no pide ADR ni otra aprobación; el ADR queda para decisiones estructurales |
 | `testing-strategy` | QA | Pirámide de tests, datos de prueba, evitar tests inestables, uno o más tests por RF |
 | `triage-report` | debugger | Informe fijo: error, reproducción, hipótesis, 2–3 opciones, recomendación. Luego se detiene |
 | `adr` | architect | Registros de decisiones de arquitectura con las alternativas descartadas |

@@ -257,13 +257,13 @@ test('RF-VER-02: a component without verification commands is pointed out, not b
   assert.match(next.stdout, /no tiene comandos de verificación/);
 });
 
-test('RF-GAT-07: a protected zone alerts and points to an ADR draft', async (t) => {
+test('RF-GAT-07: a schema change outside the approved data model alerts; an ADR only for structural decisions', async (t) => {
   const root = await project(t);
   const spec = await approved(root);
   fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
   const alerted = writeTool(root, 'src/migrations/001.sql');
   assert.equal(alerted.code, 0, 'a protected zone never blocks');
-  assert.match(alertOf(alerted), /zona protegida "db".*new-adr/s);
+  assert.match(alertOf(alerted), /cambia el esquema.*modelo de datos de plan\.md.*new-adr.*solo si es una decisión estructural/s);
   const adr = await sdd(root, 'new-adr', 'Add health table');
   assert.match(adr.stdout, /docs\/decisions\/ADR-0001-add-health-table\.md/);
 });
