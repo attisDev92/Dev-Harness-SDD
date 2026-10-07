@@ -66,13 +66,21 @@ export function specDependencies(text) {
   return [...out];
 }
 
-/** RF-SDD-04: next free three-digit number within `prefix`. */
-export function nextSpecId(root, prefix, slug, roots = ['specs']) {
-  const used = listSpecs(root, roots)
+/** Numbers already used within `prefix`. */
+export function usedSpecNumbers(root, prefix, roots = ['specs']) {
+  return listSpecs(root, roots)
     .map((s) => SPEC_DIR_RE.exec(s.id))
     .filter((m) => m[1] === prefix)
     .map((m) => Number(m[2]));
-  const n = (used.length ? Math.max(...used) : 0) + 1;
+}
+
+/**
+ * RF-SDD-04: next free three-digit number within `prefix`, or `number` when
+ * given (several developers on different branches agree on it beforehand).
+ */
+export function nextSpecId(root, prefix, slug, roots = ['specs'], number) {
+  const used = usedSpecNumbers(root, prefix, roots);
+  const n = number ?? (used.length ? Math.max(...used) : 0) + 1;
   return `${prefix}-${String(n).padStart(3, '0')}-${slug}`;
 }
 

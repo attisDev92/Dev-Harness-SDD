@@ -12,7 +12,7 @@ import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
 import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, STOPS } from './state.js';
 import { importContract } from './contracts.js';
-import { listSpecs, specsDirFor, specRoots, nextSpecId, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
+import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
 import { runVerify } from './verify.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
@@ -25,7 +25,9 @@ const REFUSED = 2;
 
 const USAGE_TEXT = `usage: sdd.js <command>
   status [--json]                 what happened and what comes next
-  new-spec <name> [--component c] create specs/<PREFIX>-<NNN>-<name>/spec.md (--component only with specs.location per-repo)
+  new-spec <name> [--component c] [--id NNN]
+                                  create specs/<PREFIX>-<NNN>-<name>/spec.md (--component only with specs.location per-repo;
+                                  --id fixes the number, agreed beforehand when several developers create specs on other branches)
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
   stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
   approve                         record the pending stop (when the user chose "Approve" in a question)
@@ -55,7 +57,7 @@ const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
  * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function, readStdin?: () => Promise<string> }} io
  */
 export async function runSdd(argv, io) {
-  const { flags, positional } = parseArgs(argv, { string: ['component', 'file'], boolean: ['json'] });
+  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id'], boolean: ['json'] });
   const [command, ...rest] = positional;
   const root = findProjectRoot(io.cwd);
   const out = (s) => io.stdout.write(`${s}\n`);
@@ -93,7 +95,14 @@ export async function runSdd(argv, io) {
       }
       const comp = compId ? settings.components[compId] : null;
       if (compId && !comp) return refuse(t.spec.unknownComponent(compId, componentIds));
-      const id = nextSpecId(root, comp?.id_prefix ?? settings.specs.idPrefix, slugify(name), specRoots(settings));
+      const prefix = comp?.id_prefix ?? settings.specs.idPrefix;
+      let number;
+      if (flags.id !== undefined) {
+        if (!/^\d{1,3}$/.test(flags.id) || Number(flags.id) === 0) return refuse(t.spec.idInvalid(flags.id));
+        number = Number(flags.id);
+        if (usedSpecNumbers(root, prefix, specRoots(settings)).includes(number)) return refuse(t.spec.idTaken(`${prefix}-${String(number).padStart(3, '0')}`));
+      }
+      const id = nextSpecId(root, prefix, slugify(name), specRoots(settings), number);
       const dir = path.join(root, specsDirFor(settings, compId), id);
       const short = id.split('-').slice(0, 2).join('-');
       mkdirSync(dir, { recursive: true });

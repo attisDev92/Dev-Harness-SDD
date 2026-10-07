@@ -326,6 +326,8 @@ Specs, contracts and docs are *your* project artifacts. `init` asks whether they
 | Any topology (default) | `specs/` at the root, one project prefix (`SPEC-004`) |
 | Multi-repo / workspace with `specs.location: per-repo` | **Each repo owns its specs.** `new-spec --component <id>` picks the repo, and a component may define its own optional `id_prefix` (`API-004`) |
 
+**Several developers on different branches.** `new-spec` takes the next free number of the current branch, so two specs created at the same time on different branches would get the same number. Agree on the number beforehand and pass it with `new-spec <name> --id <NNN>` (for example, by telling the agent "create the spec with id 7"). If the number already exists on the branch, the harness refuses it.
+
 In a brand-new empty monorepo, `init` asks for each component's path (e.g. `apps/web`, `apps/api`) and kind, and offers to add another. A spec belongs to the project, not to a component: a full-stack feature is one spec whose tasks each declare their `Component`.
 
 Cross-repo references use stable IDs (`depends_on: api#API-004`). The **provider owns the contract**, and consumers keep a snapshot with origin metadata:

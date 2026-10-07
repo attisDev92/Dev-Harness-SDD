@@ -21,6 +21,11 @@ test('workspace: by default the specs live at the root with one project prefix, 
   assert.equal((await run(['workspace', 'init', '--yes'], { cwd: root })).code, 0);
   assert.match((await sdd(root, 'new-spec', 'auth')).stdout, /specs\/SPEC-001-auth\/spec\.md/);
   assert.match((await sdd(root, 'new-spec', 'login')).stdout, /specs\/SPEC-002-login\/spec\.md/);
+  // Several developers: the number agreed beforehand, never one already used.
+  assert.match((await sdd(root, 'new-spec', 'pagos', '--id', '7')).stdout, /specs\/SPEC-007-pagos\/spec\.md/);
+  assert.equal((await sdd(root, 'new-spec', 'otra', '--id', '002')).code, 2);
+  assert.equal((await sdd(root, 'new-spec', 'otra', '--id', 'abc')).code, 2);
+  assert.match((await sdd(root, 'new-spec', 'perfil')).stdout, /specs\/SPEC-008-perfil\/spec\.md/);
 });
 
 test('workspace: specs per repo, cross-repo dependency and contract snapshot', async (t) => {

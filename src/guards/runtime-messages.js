@@ -57,6 +57,8 @@ const es = {
     created: (id, file) => `Spec ${id} creada: ${file}. Entrevista al usuario con una pregunta cada vez (6 como máximo), complétala y pide la parada "spec".`,
     unknownComponent: (c, all) => `Componente desconocido "${c}". Usa uno de: ${all.join(', ')}.`,
     componentRequired: (all) => `Las specs viven en cada repo (specs.location: per-repo) y hay varios componentes: indica --component <${all.join('|')}>.`,
+    idInvalid: (v) => `--id "${v}" no es válido: usa un número de 1 a 999 (por ejemplo --id 7 o --id 007).`,
+    idTaken: (id) => `${id} ya existe en esta rama. Elige otro número con --id, acordado con el resto del equipo.`,
     adrCreated: (f) => `Borrador de ADR creado: ${f}`,
   },
   status: {

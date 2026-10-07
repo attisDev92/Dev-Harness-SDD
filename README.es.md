@@ -327,6 +327,8 @@ Las specs, los contratos y los docs son artefactos *de tu proyecto*. `init` te p
 | Cualquier topología (por defecto) | `specs/` en la raíz, con un prefijo único del proyecto (`SPEC-004`) |
 | Varios repos / workspace con `specs.location: per-repo` | **Cada repo es dueño de sus specs.** `new-spec --component <id>` elige el repo y un componente puede definir su propio `id_prefix` opcional (`API-004`) |
 
+**Varios desarrolladores en ramas distintas.** `new-spec` toma el siguiente número libre de la rama actual, así que dos specs creadas a la vez en ramas distintas saldrían con el mismo número. Acordad el número antes y pasadlo con `new-spec <nombre> --id <NNN>` (por ejemplo, diciéndole al agente "crea la spec con el id 7"). Si el número ya existe en la rama, el harness lo rechaza.
+
 Las referencias entre repos usan IDs estables (`depends_on: api#API-004`). **El proveedor es dueño del contrato**, y los consumidores guardan un snapshot con metadatos de origen:
 
 ```
