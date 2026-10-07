@@ -85,6 +85,26 @@ test('RF-GAT-08: answers in plain words; "yes, but…" is a change', () => {
   }
 });
 
+test('new-spec skips the numbers used on other branches; --id on one of them is an alert', async (t) => {
+  const root = await project(t);
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'base');
+  // Dev 2 creates SVC-001 on its own branch and commits it.
+  git(root, 'checkout', '-q', '-b', 'dev2');
+  await sdd(root, 'new-spec', 'pagos');
+  git(root, 'add', '-A');
+  git(root, 'commit', '-q', '-m', 'spec');
+  git(root, 'checkout', '-q', '-');
+  assert.equal(fs.existsSync(path.join(root, 'specs/SVC-001-pagos')), false);
+  // Dev 1, on the other branch, does not get SVC-001.
+  const next = await sdd(root, 'new-spec', 'login');
+  assert.match(next.stdout, /specs\/SVC-002-login\/spec\.md/);
+  assert.match(next.stdout, /SVC-001 \(dev2\)/);
+  const fixed = await sdd(root, 'new-spec', 'perfil', '--id', '1');
+  assert.equal(fixed.code, 0);
+  assert.match(fixed.stdout, /SVC-001 ya existe en la rama dev2/);
+});
+
 test('RF-SDD-13: two stops, approved by talking; the status lives in spec.md', async (t) => {
   const root = await project(t);
   // No spec, no task: an alert, never a block, and only once.

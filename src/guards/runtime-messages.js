@@ -59,6 +59,8 @@ const es = {
     componentRequired: (all) => `Las specs viven en cada repo (specs.location: per-repo) y hay varios componentes: indica --component <${all.join('|')}>.`,
     idInvalid: (v) => `--id "${v}" no es válido: usa un número de 1 a 999 (por ejemplo --id 7 o --id 007).`,
     idTaken: (id) => `${id} ya existe en esta rama. Elige otro número con --id, acordado con el resto del equipo.`,
+    idOnBranch: (id, ref) => `Aviso: ${id} ya existe en la rama ${ref}. Si no es la misma spec, acordad otro número antes de fusionar.`,
+    skipped: (list) => `Números saltados porque ya existen en otras ramas: ${list.join(', ')}.`,
     adrCreated: (f) => `Borrador de ADR creado: ${f}`,
   },
   status: {

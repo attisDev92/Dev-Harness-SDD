@@ -83,7 +83,7 @@ description: Interviews the user and writes a spec with numbered EARS requiremen
 
 ## Writing a spec
 
-1. \`node .harness/scripts/sdd.js new-spec <short name> [--component <id>] [--id <NNN>]\` creates the folder and the template (status: draft). Pass \`--id\` only when the user gives the number: in a team, specs created at the same time on other branches would take the same next number, so the number is agreed beforehand.
+1. \`node .harness/scripts/sdd.js new-spec <short name> [--component <id>] [--id <NNN>]\` creates the folder and the template (status: draft). It skips the numbers already used on other local and remote branches, so with a remote run \`git fetch\` first. Pass \`--id\` only when the user gives the number agreed with the team.
 2. Ask one question at a time, six at most: goal, actors, main flows, rules and limits, errors, what is out of scope. Skip what the user already said.
 3. Fill in the template:
    - Requirements in EARS, numbered \`RF-01\`, \`RF-02\`… and verifiable:

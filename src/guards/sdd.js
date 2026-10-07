@@ -12,7 +12,7 @@ import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
 import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, STOPS } from './state.js';
 import { importContract } from './contracts.js';
-import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
+import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
 import { runVerify } from './verify.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
@@ -96,21 +96,29 @@ export async function runSdd(argv, io) {
       const comp = compId ? settings.components[compId] : null;
       if (compId && !comp) return refuse(t.spec.unknownComponent(compId, componentIds));
       const prefix = comp?.id_prefix ?? settings.specs.idPrefix;
+      const local = usedSpecNumbers(root, prefix, specRoots(settings));
+      // Numbers on other branches: skipped when picking the next one, an alert when fixed with --id.
+      const elsewhere = branchSpecNumbers(root, prefix, specRoots(settings));
+      for (const n of local) elsewhere.delete(n);
+      const short = (n) => `${prefix}-${String(n).padStart(3, '0')}`;
       let number;
       if (flags.id !== undefined) {
         if (!/^\d{1,3}$/.test(flags.id) || Number(flags.id) === 0) return refuse(t.spec.idInvalid(flags.id));
         number = Number(flags.id);
-        if (usedSpecNumbers(root, prefix, specRoots(settings)).includes(number)) return refuse(t.spec.idTaken(`${prefix}-${String(number).padStart(3, '0')}`));
+        if (local.includes(number)) return refuse(t.spec.idTaken(short(number)));
       }
-      const id = nextSpecId(root, prefix, slugify(name), specRoots(settings), number);
+      const id = nextSpecId(root, prefix, slugify(name), specRoots(settings), number, [...elsewhere.keys()]);
       const dir = path.join(root, specsDirFor(settings, compId), id);
-      const short = id.split('-').slice(0, 2).join('-');
+      const shortId = id.split('-').slice(0, 2).join('-');
       mkdirSync(dir, { recursive: true });
-      const spec = readTemplate(root, 'spec').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, short).replace(/<(name|nombre)>/, name);
+      const spec = readTemplate(root, 'spec').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, shortId).replace(/<(name|nombre)>/, name);
       writeFileSync(path.join(dir, 'spec.md'), withStatus(spec, 'draft'));
-      writeFileSync(path.join(dir, 'progress.md'), readTemplate(root, 'progress').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, short));
+      writeFileSync(path.join(dir, 'progress.md'), readTemplate(root, 'progress').replace(/<(PREFIX|PREFIJO)>-<NNN>/g, shortId));
       logEvent(root, 'spec-created', { id });
       out(t.spec.created(id, rel(root, path.join(dir, 'spec.md'))));
+      if (number !== undefined && elsewhere.has(number)) out(t.spec.idOnBranch(short(number), elsewhere.get(number)));
+      const skipped = [...elsewhere].filter(([n]) => number === undefined && n > Math.max(0, ...local)).sort(([a], [b]) => a - b);
+      if (skipped.length) out(t.spec.skipped(skipped.map(([n, ref]) => `${short(n)} (${ref})`)));
       return OK;
     }
 

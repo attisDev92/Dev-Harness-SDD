@@ -2,6 +2,7 @@
 // RF-GAT-12, edge case 14). Dependency-free.
 
 import { existsSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 export const SPEC_DIR_RE = /^([A-Z][A-Z0-9]{1,9})-(\d{3})-([a-z0-9][a-z0-9-]*)$/;
@@ -74,12 +75,38 @@ export function usedSpecNumbers(root, prefix, roots = ['specs']) {
     .map((m) => Number(m[2]));
 }
 
+const gitOut = (cwd, args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
+  return r.status === 0 ? r.stdout : '';
+};
+
+/**
+ * Numbers within `prefix` committed on any local or remote branch (remotes as
+ * of the last fetch), so specs created at the same time on other branches do
+ * not take the same number. Map of number → first branch where it was found.
+ */
+export function branchSpecNumbers(root, prefix, roots = ['specs']) {
+  const found = new Map();
+  for (const rel of roots) {
+    const cwd = path.join(root, path.dirname(rel));
+    if (!existsSync(cwd)) continue;
+    const refs = gitOut(cwd, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']).split(/\r?\n/).filter((r) => r && !r.endsWith('/HEAD'));
+    for (const ref of refs) {
+      for (const line of gitOut(cwd, ['ls-tree', '-d', '--name-only', ref, '--', `${path.basename(rel)}/`]).split(/\r?\n/)) {
+        const m = SPEC_DIR_RE.exec(path.posix.basename(line));
+        if (m && m[1] === prefix && !found.has(Number(m[2]))) found.set(Number(m[2]), ref.replace(/^refs\/(heads|remotes)\//, ''));
+      }
+    }
+  }
+  return found;
+}
+
 /**
  * RF-SDD-04: next free three-digit number within `prefix`, or `number` when
  * given (several developers on different branches agree on it beforehand).
  */
-export function nextSpecId(root, prefix, slug, roots = ['specs'], number) {
-  const used = usedSpecNumbers(root, prefix, roots);
+export function nextSpecId(root, prefix, slug, roots = ['specs'], number, elsewhere = []) {
+  const used = [...usedSpecNumbers(root, prefix, roots), ...elsewhere];
   const n = number ?? (used.length ? Math.max(...used) : 0) + 1;
   return `${prefix}-${String(n).padStart(3, '0')}-${slug}`;
 }
