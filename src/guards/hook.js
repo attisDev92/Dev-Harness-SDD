@@ -39,7 +39,16 @@ export function handleHook(event, payload, opts = {}) {
   const runtime = loadRuntime(root);
   const save = () => saveRuntime(root, runtime);
   const snapshot = opts.snapshot ?? changeSnapshot;
-  const context = (text) => ({ code: 0, stdout: JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: event, additionalContext: text } }) });
+  const isAgy = payload.toolCall !== undefined || payload.conversationId !== undefined;
+  
+  const context = (text) => isAgy 
+    ? { code: 0, stdout: JSON.stringify({ decision: 'allow', reason: text }) }
+    : { code: 0, stdout: JSON.stringify({ systemMessage: text, hookSpecificOutput: { hookEventName: event, additionalContext: text } }) };
+    
+  const blockHook = (reason) => isAgy
+    ? { code: 0, stdout: JSON.stringify({ decision: 'deny', reason }) }
+    : { code: 2, stderr: reason };
+
   // The same alert is not repeated for the same spec and pending tasks.
   const alertOnce = (text, key) => {
     if (runtime.alerted.includes(key)) return { code: 0 };
@@ -47,25 +56,26 @@ export function handleHook(event, payload, opts = {}) {
     save();
     return context(text);
   };
-  const input = payload.tool_input ?? {};
-  const tool = payload.tool_name;
+  const input = isAgy ? (payload.toolCall?.args ?? {}) : (payload.tool_input ?? {});
+  const tool = isAgy ? payload.toolCall?.name : payload.tool_name;
+
+  const agySubagentRole = isAgy && tool === 'invoke_subagent' ? input.Subagents?.[0]?.Role : null;
 
   switch (event) {
     case 'PreToolUse': {
-      if (AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) {
-        // Up to MAX_PARALLEL subagents may run at once (frontend and backend): each one is tracked on its own.
-        // A subagent that never reported back (crashed) stops counting after an hour.
+      if ((AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) || (tool === 'invoke_subagent' && HARNESS_ROLES.has(agySubagentRole))) {
+        const subType = input.subagent_type ?? agySubagentRole;
         const running = Object.values(runtime.subagents).filter((s) => Date.now() - Date.parse(s.started) < STALE_SUBAGENT_MS).length;
-        runtime.subagents[payload.tool_use_id ?? input.subagent_type] = { role: input.subagent_type, snapshot: snapshot(root), started: new Date().toISOString() };
+        runtime.subagents[payload.tool_use_id ?? subType] = { role: subType, snapshot: snapshot(root), started: new Date().toISOString() };
         save();
-        return running >= MAX_PARALLEL ? context(t.hook.tooMany(input.subagent_type, running)) : { code: 0 };
+        return running >= MAX_PARALLEL ? context(t.hook.tooMany(subType, running)) : { code: 0 };
       }
-      if (!WRITE_TOOLS.has(tool)) return { code: 0 };
-      const file = input.file_path ?? input.notebook_path ?? input.path;
+      if (!WRITE_TOOLS.has(tool) && tool !== 'write_to_file' && tool !== 'replace_file_content') return { code: 0 };
+      const file = input.file_path ?? input.notebook_path ?? input.path ?? input.TargetFile;
       if (!file) return { code: 0 };
       const flow = readFlow(root, settings);
       const verdict = checkWrite({ root, file: path.resolve(cwd, file), settings, flow, input });
-      if (verdict.decision === 'block') return { code: 2, stderr: verdictText(verdict) };
+      if (verdict.decision === 'block') return blockHook(verdictText(verdict));
       if (verdict.decision === 'warn') {
         const open = flow.tasks.filter((x) => !x.done).map((x) => x.id).join('+') || '-';
         return alertOnce(verdictText(verdict), `${verdict.kind}:${verdict.zone ?? verdict.component ?? verdict.match}:${flow.spec?.id ?? '-'}:${open}`);
@@ -73,17 +83,18 @@ export function handleHook(event, payload, opts = {}) {
       return { code: 0 };
     }
 
+
     case 'PostToolUse': {
-      if (WRITE_TOOLS.has(tool)) {
-        const file = input.file_path ?? input.notebook_path ?? '';
+      if (WRITE_TOOLS.has(tool) || tool === 'write_to_file' || tool === 'replace_file_content') {
+        const file = input.file_path ?? input.notebook_path ?? input.TargetFile ?? '';
         if (path.resolve(cwd, file) !== path.join(root, 'harness.config.yaml')) return { code: 0 };
         // RF-GAT-09: the configuration is regenerated right after the user's change.
         const r = (opts.runSync ?? runSync)(root);
         logEvent(root, 'config-synced', { ok: r.ok });
         return context(r.ok ? t.hook.configSynced(r.output) : t.hook.configSyncFailed(r.output));
       }
-      const key = payload.tool_use_id ?? input.subagent_type;
-      if (!AGENT_TOOLS.has(tool) || !runtime.subagents[key]) return { code: 0 };
+      const key = payload.tool_use_id ?? input.subagent_type ?? agySubagentRole;
+      if ((!AGENT_TOOLS.has(tool) && tool !== 'invoke_subagent') || !runtime.subagents[key]) return { code: 0 };
       // RF-DOM-03/04: compare what the subagent changed with its lanes.
       const { role, snapshot: before } = runtime.subagents[key];
       delete runtime.subagents[key];
@@ -99,6 +110,7 @@ export function handleHook(event, payload, opts = {}) {
     }
 
     case 'UserPromptSubmit': {
+      if (isAgy) return { code: 0 }; // Antigravity uses 'sdd.js approve' via agent action instead of prompt intercept
       // RF-GAT-08: the user answers a stop by talking ("sí", "continúa", "aprobado"…).
       const pending = runtime.pending;
       if (!pending) return { code: 0 };
@@ -119,11 +131,17 @@ export function handleHook(event, payload, opts = {}) {
       return { code: 0, stdout: t.hook.approvedByUser(pending.stop, spec.id, decision.text) };
     }
 
+    case 'PreInvocation':
     case 'SessionStart': {
+      if (isAgy && payload.invocationNum && payload.invocationNum > 1) return { code: 0 };
       // RF-ORQ-09: pick up where the last session left off.
       const flow = readFlow(root, settings);
       if (!flow.spec) return { code: 0 };
-      return { code: 0, stdout: t.hook.resumed(statusLines(root, settings, flow, runtime, { brief: true }).join('\n')) };
+      const text = t.hook.resumed(statusLines(root, settings, flow, runtime, { brief: true }).join('\n'));
+      if (isAgy) {
+        return { code: 0, stdout: JSON.stringify({ injectSteps: [{ ephemeralMessage: text }] }) };
+      }
+      return { code: 0, stdout: text };
     }
 
     case 'Stop': {
@@ -133,7 +151,11 @@ export function handleHook(event, payload, opts = {}) {
       if (!failing) return { code: 0 };
       failing[1].reminded = true;
       save();
-      return { code: 2, stderr: t.hook.stopVerify(failing[0], failing[1].command) };
+      const reason = t.hook.stopVerify(failing[0], failing[1].command);
+      if (isAgy) {
+        return { code: 0, stdout: JSON.stringify({ decision: 'continue', reason }) };
+      }
+      return { code: 2, stderr: reason };
     }
 
     default:

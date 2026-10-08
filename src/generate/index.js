@@ -4,6 +4,7 @@ import { generateCore, finalize } from './core.js';
 import { generateGitHooks, generateCi } from './githooks.js';
 import { ownSkills } from './skills.js';
 import * as claudeCode from './adapters/claude-code.js';
+import * as antigravity from './adapters/antigravity.js';
 
 /**
  * Tool adapter interface (RF-ADP-06). A new tool only needs a module with:
@@ -21,7 +22,7 @@ import * as claudeCode from './adapters/claude-code.js';
  * @typedef {{ id: string, RULES: string[], generate: (config: object, ctx: { tracked: Set<string>, skills: Record<string, string> }) => { entries: object[], notices: object[] } }} Adapter
  */
 /** @type {Record<string, Adapter>} */
-export const ADAPTERS = { [claudeCode.id]: claudeCode };
+export const ADAPTERS = { [claudeCode.id]: claudeCode, [antigravity.id]: antigravity };
 
 /**
  * @param {object} config

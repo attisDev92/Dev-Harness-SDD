@@ -21,7 +21,7 @@ export const TOOL_PROFILE = {
   'claude-code': { level: 'strong', bin: 'claude', adapter: 'v0.3', invoke: (c) => `/sdd:${c}` },
   opencode: { level: 'medium-strong', bin: 'opencode', adapter: 'v0.5', invoke: (c) => `/sdd-${c}` },
   codex: { level: 'medium', bin: 'codex', adapter: 'v0.5', invoke: (c) => `$sdd-${c}` },
-  antigravity: { level: 'weak', bin: 'antigravity', adapter: 'v0.6', invoke: (c) => `/sdd-${c}` },
+  antigravity: { level: 'strong', bin: 'agy', adapter: 'v2.0', invoke: (c) => `/sdd:${c}` },
 };
 const LEVEL_LABEL = {
   en: { strong: 'strong', 'medium-strong': 'medium-strong', medium: 'medium', weak: 'weak', none: 'instruction only' },

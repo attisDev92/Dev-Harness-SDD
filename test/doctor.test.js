@@ -43,13 +43,12 @@ test('RF-DOC-02: real enforcement per tool, rule by rule, never overstated', asy
   const claude = json.tools.find((x) => x.tool === 'claude-code');
   assert.deepEqual([claude.potential, claude.current], ['strong', 'strong']);
   assert.deepEqual(Object.values(claude.rules), Array(6).fill('deterministic'));
-  // Antigravity has no adapter yet (v0.6): its rules are instruction-only and doctor says so.
   const anti = json.tools.find((x) => x.tool === 'antigravity');
-  assert.deepEqual([anti.potential, anti.current, anti.adapter], ['weak', 'none', 'v0.6']);
-  assert.deepEqual(Object.values(anti.rules), Array(6).fill('instruction'));
+  assert.deepEqual([anti.potential, anti.current, anti.adapter], ['strong', 'strong', 'v2.0']);
+  assert.deepEqual(Object.values(anti.rules), Array(6).fill('deterministic'));
   const text = await run(['doctor'], { cwd: root, env });
   assert.match(text.stdout, /claude-code: current strong · potential strong/);
-  assert.match(text.stdout, /antigravity: current instruction only · potential weak\n {4}adapter arrives in v0\.6/);
+  assert.match(text.stdout, /antigravity: current strong · potential strong/);
   // RF-ADP-04
   assert.match(text.stdout, /Antigravity: keep git commit\/push\/merge\/rebase\/reset and package installs out of the terminal allowlist/);
 });
@@ -80,7 +79,7 @@ test('RF-DOC-03: invocation syntax for each enabled tool', async (t) => {
   const root = await activated(t, ['--tools', 'claude-code,opencode,codex,antigravity']);
   const json = JSON.parse((await run(['doctor', '--json'], { cwd: root })).stdout);
   const inv = Object.fromEntries(json.tools.map((x) => [x.tool, x.invocation.spec]));
-  assert.deepEqual(inv, { 'claude-code': '/sdd:spec', opencode: '/sdd-spec', codex: '$sdd-spec', antigravity: '/sdd-spec' });
+  assert.deepEqual(inv, { 'claude-code': '/sdd:spec', opencode: '/sdd-spec', codex: '$sdd-spec', antigravity: '/sdd:spec' });
 });
 
 test('RF-DOC-04/05: problems come with cause and fix; errors exit 1, warnings do not', async (t) => {

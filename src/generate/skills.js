@@ -35,12 +35,12 @@ You are the orchestrator, in the main session: you delegate to the subagents (th
 
 - First spec of the project and no \`docs/constitution.md\`: propose 6–10 principles from .harness/templates/constitution.md; they are approved at the same stop as the spec.
 - Follow the spec-generator skill: \`sdd.js new-spec <name>\`, one question at a time (6 at most), EARS requirements, \`[NEEDS CLARIFICATION]\` for gaps. Then delegate a review to \`spec-reviewer\` and fix what it finds that the user already answered.
-- **Stop 1:** \`sdd.js stop spec\`, show a short summary (requirements, open questions, reviewer findings) and ask with AskUserQuestion: "Aprobar" / "Cambiar algo". A yes in plain words ("sí", "continúa", "aprobado", "dale") is recorded by the harness on its own; if they pick "Aprobar" in the question, run \`sdd.js approve\`. Anything else is a change: apply it and ask again.
+- **Stop 1:** \`sdd.js stop spec\`, show a short summary (requirements, open questions, reviewer findings) and ask the user (use the \`ask_question\` tool if available, otherwise just ask conversationally): "Aprobar" / "Cambiar algo". A yes in plain words ("sí", "continúa", "aprobado", "dale") is recorded by the harness on its own; if they pick "Aprobar" using the tool, run \`sdd.js approve\` yourself. Anything else is a change: apply it and ask again.
 
 ## 2. Plan and tasks (status: spec-approved)
 
 - Delegate to \`architect\`: plan.md, contracts/ when several components are involved, ADR drafts for stack or architecture decisions, and tasks.md, all at once.
-- **Stop 2:** \`sdd.js stop plan\`, summarise the plan and the task list (by component and story) and ask the same way.
+- **Stop 2:** \`sdd.js stop plan\`, summarise the plan and the task list (by component and story) and ask the same way as Stop 1.
 
 ## 3. Implement (status: plan-approved)
 

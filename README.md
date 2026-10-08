@@ -88,33 +88,58 @@ flowchart LR
 
 ---
 
-## ⚡ Quick start
+## ⚡ Quick Start and Recommended Flow
 
-**Requirements:** Node.js ≥ 24 (LTS), Git, and at least one supported agent tool.
+**Requirements:** Node.js ≥ 24 (LTS), Git, and at least one supported agent tool (e.g., Claude Code or Antigravity).
 
 ```bash
 # 1. Install the CLI once (global, nothing else is installed globally)
 npm install -g github:attisDev92/Dev-Harness-SDD
-
-# 2. Enable it in a project
-cd my-project
-sdd-harness-init        # short interview → generates config for THIS project only
-
-# 3. Check everything is wired
-sdd-harness doctor
 ```
 
-Then open your agent tool in the project and just say what you want:
+**Recommended Setup Flow:**
+1. **Create folders**: Create your project folder (or repositories if there are several).
+2. **Open Agent**: Start your AI agent (`agy`, `claude`, etc.) inside the folder.
+3. **Initialize**: Run `sdd-harness-init`. It will conduct a short interview and generate the config for THIS project only.
+4. **Basic Project (Optional)**: Ask the agent to initialize the basic structure of your project in each repo.
+5. **Restart Agent**: Exit the agent (`Ctrl+D` or `/exit`) and start it again. This ensures the agent recognizes the new harness configuration, the created stack, and git.
+6. **Verify**: Run `sdd-harness doctor` to check that everything is correctly wired.
 
-```
-I want a user login with email and password
-```
+Then, just say what you want:
+> "I want a user login with email and password"
 
 To remove it from a project:
-
 ```bash
 sdd-harness remove      # deletes only generated, unmodified files. Never touches specs/ or docs/
 ```
+
+---
+
+## 👥 Team Usage (Cloning a repo with Harness)
+
+If another developer already installed the harness in **team mode** and pushed the code to the repository:
+1. When cloning the repo, you **do not need to start from scratch** with `init`.
+2. Simply run:
+   ```bash
+   sdd-harness sync
+   ```
+   This will locally regenerate all adapters, guards, and git hooks the project needs based on the existing `harness.config.yaml` in the repo.
+3. Check the status with `sdd-harness doctor`.
+
+---
+
+## 🔄 Harness Updates
+
+When a new version of `sdd-harness` is released and you want to update your project:
+1. Update your global CLI:
+   ```bash
+   npm update -g dev-harness-sdd
+   ```
+2. Go to your project folder and run:
+   ```bash
+   sdd-harness upgrade
+   ```
+   The harness will show you the release notes, display the diff of the generated files that will change, and safely update the recorded version.
 
 ---
 
