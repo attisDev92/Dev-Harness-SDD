@@ -41,9 +41,29 @@ export function withJsHeader(source) {
   return `${HEADER.js}\n${text}`;
 }
 
+/**
+ * Quotes every unquoted scalar of the YAML frontmatter (`key: value`) as a
+ * double-quoted string. Values such as "x: y", "[scope]" or "<arg>" are not
+ * valid plain YAML and stricter parsers drop the whole agent/skill.
+ */
+export function quoteFrontmatter(text) {
+  const t = toLf(text);
+  if (!t.startsWith('---\n')) return t;
+  const end = t.indexOf('\n---\n', 4);
+  if (end === -1) return t;
+  const head = t.slice(4, end).split('\n').map((line) => {
+    const m = /^([A-Za-z0-9_-]+):[ \t]+(.+)$/.exec(line);
+    if (!m) return line;
+    const v = m[2].trim();
+    if (/^(["']).*\1$/.test(v)) return line;
+    return `${m[1]}: ${JSON.stringify(v)}`;
+  }).join('\n');
+  return `---\n${head}${t.slice(end)}`;
+}
+
 /** GEN-07 header for markdown; after the YAML front matter when there is one. */
 export function withMdHeader(text) {
-  const t = toLf(text);
+  const t = quoteFrontmatter(text);
   if (t.startsWith('---\n')) {
     const end = t.indexOf('\n---\n', 4);
     if (end !== -1) return `${t.slice(0, end + 5)}${HEADER.md}\n${t.slice(end + 5)}`;
