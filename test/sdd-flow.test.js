@@ -346,3 +346,51 @@ test('/sdd:status: what happened, what is pending and the last commits', async (
   const json = JSON.parse((await sdd(root, 'status', '--json')).stdout);
   assert.deepEqual([json.spec, json.status, json.pending], ['SVC-001-login', 'plan-approved', null]);
 });
+
+test('focus and --spec: allow selecting active spec when multiple exist', async (t) => {
+  const root = await project(t);
+  const s1 = await approved(root, 'login');
+  const s2 = await approved(root, 'checkout');
+  fs.writeFileSync(path.join(root, 'specs', s1, 'tasks.md'), TASKS);
+  fs.writeFileSync(path.join(root, 'specs', s2, 'tasks.md'), TASKS.replace('T1', 'T10').replace('T2', 'T20'));
+
+  // Without focus or --spec, s2 is more recent, but focus pins s1
+  const f = await sdd(root, 'focus', s1);
+  assert.equal(f.code, 0);
+  assert.match(f.stdout, new RegExp(`Spec en curso fijada: ${s1}`));
+
+  const next = await sdd(root, 'next');
+  assert.match(next.stdout, /T1 Health endpoint/);
+
+  // --spec overrides focus temporarily
+  const nextS2 = await sdd(root, 'next', '--spec', s2);
+  assert.match(nextS2.stdout, /T10 Health endpoint/);
+
+  // Clear focus restores automatic detection
+  const cleared = await sdd(root, 'focus', '--clear');
+  assert.equal(cleared.code, 0);
+});
+
+test('done and brief commands: brief returns compact context; done marks task and records note in progress.md', async (t) => {
+  const root = await project(t);
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  fs.writeFileSync(specFile(root, spec), `---\nstatus: plan-approved\n---\n- **RF-01:** Health check 200.\n`);
+
+  const br = await sdd(root, 'brief', 'T1');
+  assert.equal(br.code, 0);
+  assert.match(br.stdout, /Brief: T1/);
+  assert.match(br.stdout, /Alcance permitido: src\/\*\*/);
+  assert.match(br.stdout, /RF-01:?\*\*?\s*Health check 200/);
+
+  const d = await sdd(root, 'done', 'T1', '--note', 'Implemented endpoint');
+  assert.equal(d.code, 0);
+  assert.match(d.stdout, /Tarea T1 marcada como hecha en tasks\.md/);
+
+  const tasksContent = fs.readFileSync(path.join(root, 'specs', spec, 'tasks.md'), 'utf8');
+  assert.match(tasksContent, /- \[x\] T1/);
+
+  const progContent = fs.readFileSync(path.join(root, 'specs', spec, 'progress.md'), 'utf8');
+  assert.match(progContent, /T1: Implemented endpoint/);
+});
+

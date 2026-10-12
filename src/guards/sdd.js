@@ -10,9 +10,9 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { parseArgs, isMainModule } from './args.js';
 import { findProjectRoot, loadGuardSettings } from './project.js';
-import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, STOPS } from './state.js';
+import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, findSpec, STOPS } from './state.js';
 import { importContract } from './contracts.js';
-import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskProblems, parseRequirements } from './tasks.js';
+import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskBatch, taskProblems, parseRequirements, markTaskDone } from './tasks.js';
 import { runVerify, VERIFY_ORDER } from './verify.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
@@ -24,20 +24,25 @@ const USAGE = 1;
 const REFUSED = 2;
 
 const USAGE_TEXT = `usage: sdd.js <command>
-  status [--json]                 what happened and what comes next
+  status [--spec S] [--json]      what happened and what comes next
+  focus [SPEC-ID|--clear]         pin the active spec (or clear to auto-detect)
   new-spec <name> [--component c] [--id NNN]
                                   create specs/<PREFIX>-<NNN>-<name>/spec.md (--component only with specs.location per-repo;
                                   --id fixes the number, agreed beforehand when several developers create specs on other branches)
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
   stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
   approve                         record the pending stop (when the user chose "Approve" in a question)
-  next                            tasks that can start now, one per component, at most 2 at once
-  verify [--component c] [--eval] run the verification (all components without --component);
+  next [--spec S]                 tasks that can start now, one per component, at most 2 at once
+  brief <TID> [--spec S]          compact task context (task, scope, requirements) without full files
+  done <TID> [--spec S] [--note "..."]
+                                  tick task checkbox in tasks.md and record note in progress.md
+  verify [--component c] [--tests] [--eval]
+                                  run verification: --tests omits e2e (fast task loop);
                                   --eval runs only verify.eval, once when a story closes
-  validate [--json]               requirement → test coverage; closes the spec when every task is done
+  validate [--spec S] [--json]    requirement → test coverage; closes the spec when every task is done
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
   tracker plan|apply [--file f]   sync tasks.md with the tracker (JSON on stdin)
-  commit-context                  changes per repository, to propose the commit`;
+  commit-context [--story H1]     changes per repository, to propose the commit`;
 
 export function roleFor(kind) {
   return kind === 'frontend' ? 'frontend-dev' : 'backend-dev';
@@ -58,7 +63,7 @@ const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
  * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function, readStdin?: () => Promise<string> }} io
  */
 export async function runSdd(argv, io) {
-  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id'], boolean: ['json', 'eval'] });
+  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id', 'spec', 'story', 'note'], boolean: ['json', 'eval', 'tests', 'clear'] });
   const [command, ...rest] = positional;
   const root = findProjectRoot(io.cwd);
   const out = (s) => io.stdout.write(`${s}\n`);
@@ -71,7 +76,7 @@ export async function runSdd(argv, io) {
   const t = runtimeMessages();
   const runtime = loadRuntime(root);
   const save = () => saveRuntime(root, runtime);
-  const flow = readFlow(root, settings);
+  const flow = readFlow(root, settings, { spec: flags.spec });
   const componentIds = Object.keys(settings.components);
 
   // AI evaluations: informative, outside the verification loop and its retries.
@@ -100,6 +105,26 @@ export async function runSdd(argv, io) {
       }
       out(t.status.title);
       statusLines(root, settings, flow, runtime).forEach(out);
+      return OK;
+    }
+
+    case 'focus': {
+      if (flags.clear) {
+        runtime.focus = null;
+        save();
+        out(t.focus.cleared());
+        return OK;
+      }
+      const target = rest[0];
+      if (!target) {
+        out(runtime.focus ? `Focus: ${runtime.focus}` : t.focus.cleared());
+        return OK;
+      }
+      const spec = findSpec(listSpecs(root, specRoots(settings)), target, { includeDone: true });
+      if (!spec) return refuse(t.focus.notFound(target));
+      runtime.focus = spec.id;
+      save();
+      out(t.focus.set(spec.id));
       return OK;
     }
 
@@ -181,7 +206,7 @@ export async function runSdd(argv, io) {
       if (!flow.spec) return refuse(t.next.noSpec());
       if (flow.spec.status !== 'plan-approved') return refuse(t.next.notApproved(flow.spec.status));
       if (!flow.tasks.length) return refuse(t.next.noTasks(`${flow.spec.dir}/tasks.md`));
-      const { ready, queued, waiting } = taskQueue(flow.tasks);
+      const { ready, queued, waiting } = taskQueue(flow.tasks, {}, flow.externalDone);
       if (!ready.length && !queued.length && !waiting.length) {
         out(t.next.allDone());
         return OK;
@@ -194,11 +219,70 @@ export async function runSdd(argv, io) {
         }
         const comp = settings.components[task.component];
         out(t.next.ready(task, roleFor(comp.kind)));
+        const batch = taskBatch(task, flow.tasks, flow.externalDone);
+        if (batch.length > 1) {
+          out(t.next.batch(batch.map((x) => x.id)));
+        }
         if (!VERIFY_ORDER.some((k) => comp.verify?.[k])) out(`  ${t.next.noVerify(task.component)}`);
       }
       if (ready.length) out(t.next.parallel());
       if (queued.length) out(t.next.queued(queued.map((x) => x.id)));
       if (waiting.length) out(t.next.waiting(waiting));
+      return OK;
+    }
+
+    case 'brief': {
+      if (!flow.spec) return refuse(t.next.noSpec());
+      const tid = rest[0];
+      if (!tid) return refuse(USAGE_TEXT);
+      const task = flow.tasks.find((t) => t.id === tid);
+      if (!task) return refuse(t.brief.notFound(tid));
+      const comp = settings.components[task.component];
+      const role = comp ? roleFor(comp.kind) : 'unknown';
+      const specContent = safeRead(path.join(root, flow.spec.dir, 'spec.md')) ?? '';
+      const allReqs = parseRequirements(specContent);
+      const reqMap = new Map(allReqs.map((r) => [r.id, r.text]));
+      out(`# Brief: ${task.id} (${flow.spec.id})`);
+      out(`Rol: ${role} | Componente: ${task.component ?? '—'}`);
+      out(`Título: ${task.title}`);
+      if (task.tags?.length) out(`Etiquetas: ${task.tags.map((x) => `[${x}]`).join(' ')}`);
+      if (task.scope.length) out(`Alcance permitido: ${task.scope.join(', ')}`);
+      if (task.doneWhen) out(`Hecho cuando: ${task.doneWhen}`);
+      if (task.depends.length) out(`Dependencias: ${task.depends.join(', ')}`);
+      if (task.requirements.length) {
+        out('Requisitos asociados:');
+        for (const rid of task.requirements) {
+          out(`- **${rid}:** ${reqMap.get(rid) ?? '—'}`);
+        }
+      }
+      return OK;
+    }
+
+    case 'done': {
+      if (!flow.spec) return refuse(t.next.noSpec());
+      const tid = rest[0];
+      if (!tid) return refuse(USAGE_TEXT);
+      const task = flow.tasks.find((t) => t.id === tid);
+      if (!task) return refuse(t.done.notFound(tid));
+      if (task.done) return out(t.done.alreadyDone(tid));
+      const tasksFile = path.join(root, flow.spec.dir, 'tasks.md');
+      const currentTasks = safeRead(tasksFile) ?? '';
+      const updatedTasks = markTaskDone(currentTasks, tid);
+      writeFileSync(tasksFile, updatedTasks);
+
+      const note = flags.note ?? rest.slice(1).join(' ');
+      if (note) {
+        const progressFile = path.join(root, flow.spec.dir, 'progress.md');
+        const prog = safeRead(progressFile) ?? '';
+        const today = new Date().toISOString().slice(0, 10);
+        const row = `| ${today} | ${tid}: ${note.replace(/\|/g, '/')} | orchestrator |\n`;
+        const updatedProg = prog.includes('## Decisiones')
+          ? prog.replace(/(## Decisiones\s*\n\s*\|[^\n]+\|\s*\n\s*\|[^\n]+\|\s*\n)/, `$1${row}`)
+          : `${prog}\n${row}`;
+        writeFileSync(progressFile, updatedProg);
+      }
+      logEvent(root, 'task-done', { spec: flow.spec.id, task: tid, note: note || undefined });
+      out(t.done.marked(tid, note));
       return OK;
     }
 
@@ -208,7 +292,7 @@ export async function runSdd(argv, io) {
       const targets = flags.component ? [flags.component] : componentIds;
       let failed = false;
       for (const id of targets) {
-        const result = runVerify(root, settings.components[id], { run: io.run });
+        const result = runVerify(root, settings.components[id], { tests: flags.tests, run: io.run });
         for (const r of result.results) out(`$ ${r.command}  → ${r.code === 0 ? 'ok' : `exit ${r.code}`}${r.code === 0 ? '' : `\n${r.output}`}`);
         if (result.status === 'unconfigured') {
           if (flags.component) return refuse(t.verify.unconfigured(id));
@@ -339,7 +423,7 @@ export async function runSdd(argv, io) {
     }
 
     case 'commit-context': {
-      out(JSON.stringify(commitContext(root, settings, flow), null, 2));
+      out(JSON.stringify(commitContext(root, settings, flow, { story: flags.story }), null, 2));
       return OK;
     }
 
@@ -383,16 +467,18 @@ function testIndex(root, settings) {
 }
 
 /** RF-GAT-03/04, RF-TOP-11: what changed, repository by repository. */
-function commitContext(root, settings, flow) {
+function commitContext(root, settings, flow, { story } = {}) {
   const repos = new Set(['.']);
   if (['multi-repo', 'workspace'].includes(settings.topology)) {
     for (const c of Object.values(settings.components)) if (existsSync(path.join(root, c.path ?? '.', '.git'))) repos.add(c.path);
   }
+  const filtered = story ? flow.tasks.filter((x) => x.story === story) : flow.tasks;
   return {
     convention: settings.commits?.convention ?? 'conventional',
     language: settings.commits?.language ?? 'en',
     spec: flow.spec?.id ?? null,
-    tasksDone: flow.tasks.filter((x) => x.done).map((x) => `${x.id} ${x.title}`),
+    story: story ?? null,
+    tasksDone: filtered.filter((x) => x.done).map((x) => `${x.id} ${x.title}`),
     repositories: [...repos].map((repo) => {
       const r = spawnSync('git', ['status', '--porcelain'], { cwd: path.resolve(root, repo), encoding: 'utf8', windowsHide: true });
       const files = (r.stdout ?? '').split(/\r?\n/).filter(Boolean).map((l) => l.slice(3));

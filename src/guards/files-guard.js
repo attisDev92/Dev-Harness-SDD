@@ -120,13 +120,15 @@ export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [
   // RF-ORQ-13: code without a pending task, or outside its scope, is an alert.
   const comp = componentOf(rel, settings.components);
   if (!comp || /(^|\/)(specs|docs)\//.test(rel) || /\.(md|mdx)$/i.test(rel)) return allow;
-  const open = (flow.tasks ?? []).filter((x) => !x.done && x.component === comp.id);
-  if (flow.spec?.status !== 'plan-approved' || !open.length) return warn('noTask', rel, { component: comp.id });
+  const allOpen = flow.open ?? (flow.spec?.status === 'plan-approved' ? (flow.tasks ?? []).filter((x) => !x.done) : []);
+  const open = allOpen.filter((x) => x.component === comp.id);
+  if (!open.length) return warn('noTask', rel, { component: comp.id });
   const inner = comp.dir ? rel.slice(comp.dir.length + 1) : rel;
   const scope = open.flatMap((x) => x.scope ?? []);
   // Tasks without a scope cover their whole component.
   if (open.some((x) => !(x.scope ?? []).length) || matchesAny(rel, scope) || matchesAny(inner, scope) || matchesAny(inner, TEST_FILE)) return allow;
-  return warn('outOfScope', rel, { task: open.map((x) => x.id).join(', '), scope });
+  const formatTask = (x) => (x.spec && flow.spec?.id && x.spec !== flow.spec.id ? `${x.spec}#${x.id}` : x.id);
+  return warn('outOfScope', rel, { task: open.map(formatTask).slice(0, 3).join(', '), scope });
 }
 
 /** True when plan.md of the spec has a "Data model" section with content. */

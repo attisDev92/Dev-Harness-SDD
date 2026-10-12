@@ -138,10 +138,18 @@ const FIELD_KEYS = {
   component: 'component', componente: 'component',
   scope: 'scope', alcance: 'scope',
   'depends on': 'depends', 'depende de': 'depends',
+  // Waiting for a task of another spec is a dependency like any other (SPEC-003#T12).
+  'waits for': 'depends', 'espera a': 'depends',
   'done when': 'done', 'hecho cuando': 'done',
   story: 'story', historia: 'story',
 };
 const TASK_RE = /^(\s*)- \[( |x|X)\] (T\d+)\b\s*(.*)$/;
+/** Tags in the title: [security] gets its own review, [mechanical] may use a lighter model. */
+const TAGS = { seguridad: 'security', security: 'security', 'mecánica': 'mechanical', mecanica: 'mechanical', mechanical: 'mechanical' };
+/** A task line longer than this carries notes that belong in progress.md. */
+export const LONG_TASK = 400;
+/** A dependency on a task of another spec: "SPEC-003#T12" or "SPEC-003-name#T12". */
+export const EXTERNAL_DEP_RE = /^([A-Z][A-Z0-9]{1,9}-\d{3}[a-z0-9-]*)#(T\d+)$/;
 
 const list = (value) =>
   String(value ?? '')
@@ -152,7 +160,7 @@ const list = (value) =>
 
 /**
  * Parses "- [ ] T3 Title · Requirements: RF-01 · Component: api · Scope: `src/**` · Depends on: T1 · Done when: …".
- * @returns {{ id: string, done: boolean, title: string, requirements: string[], component?: string, scope: string[], depends: string[], doneWhen?: string, story?: string, line: number }[]}
+ * @returns {{ id: string, done: boolean, title: string, requirements: string[], component?: string, scope: string[], depends: string[], doneWhen?: string, story?: string, tags: string[], length: number, line: number }[]}
  */
 export function parseTasks(text) {
   const tasks = [];
@@ -160,14 +168,15 @@ export function parseTasks(text) {
     const m = TASK_RE.exec(line);
     if (!m) return;
     const [title, ...fields] = m[4].split(/\s+·\s+/);
-    const task = { id: m[3], done: m[2] !== ' ', title: title.trim(), requirements: [], scope: [], depends: [], line: index };
+    const tags = [...new Set([...title.matchAll(/\[([^\]\s]+)\]/g)].map((x) => TAGS[x[1].toLowerCase()]).filter(Boolean))];
+    const task = { id: m[3], done: m[2] !== ' ', title: title.trim(), requirements: [], scope: [], depends: [], tags, length: line.length, line: index };
     for (const field of fields) {
       const f = /^([^:]+):\s*(.*)$/.exec(field.trim());
       if (!f) continue;
       const key = FIELD_KEYS[f[1].trim().toLowerCase()];
       if (key === 'requirements') task.requirements = list(f[2]);
       else if (key === 'scope') task.scope = list(f[2]);
-      else if (key === 'depends') task.depends = list(f[2]);
+      else if (key === 'depends') task.depends = [...new Set([...task.depends, ...list(f[2])])];
       else if (key === 'component') task.component = f[2].replace(/`/g, '').trim();
       else if (key === 'done') task.doneWhen = f[2].trim();
       else if (key === 'story') task.story = f[2].trim();
@@ -179,14 +188,17 @@ export function parseTasks(text) {
 
 /** Most subagents working at once, whatever their role: more cannot be followed and burn tokens. */
 export const MAX_PARALLEL = 2;
+/** Most tasks one subagent takes in a row (one cold start for all of them). */
+export const MAX_BATCH = 3;
 
 /**
  * Tasks of different components run in parallel, at most MAX_PARALLEL at once;
  * a task waits only for its own dependencies (and for the task already running
  * in its component). Free tasks that do not fit go to `queued`.
+ * `externalDone(ref)` answers for dependencies on other specs ("SPEC-003#T12").
  * @returns {{ ready: object[], queued: object[], waiting: { task: object, on: string[] }[] }}
  */
-export function taskQueue(tasks, active = {}) {
+export function taskQueue(tasks, active = {}, externalDone = () => false) {
   const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
   const busy = new Map(Object.values(active).map((t) => [t.component, t.id]));
   const free = Math.max(0, MAX_PARALLEL - Object.keys(active).length);
@@ -194,7 +206,7 @@ export function taskQueue(tasks, active = {}) {
   const queued = [];
   const waiting = [];
   for (const task of tasks.filter((t) => !t.done && !active[t.id])) {
-    const on = task.depends.filter((d) => !done.has(d));
+    const on = task.depends.filter((d) => (EXTERNAL_DEP_RE.test(d) ? !externalDone(d) : !done.has(d)));
     if (!on.length && busy.has(task.component)) on.push(busy.get(task.component));
     if (on.length) waiting.push({ task, on });
     else {
@@ -203,6 +215,29 @@ export function taskQueue(tasks, active = {}) {
     }
   }
   return { ready, queued, waiting };
+}
+
+/**
+ * Tasks that go with `head` to the same subagent: the next pending tasks of
+ * the same component whose dependencies are all done or already in the batch.
+ * Tasks of one component never run in parallel, so batching them loses no
+ * parallelism and saves a cold start per task. A [security] task goes alone:
+ * it gets its own review.
+ */
+export function taskBatch(head, tasks, externalDone = () => false, max = MAX_BATCH) {
+  const batch = [head];
+  if (head.tags?.includes('security')) return batch;
+  const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
+  const inBatch = new Set([head.id]);
+  for (const t of tasks) {
+    if (batch.length >= max) break;
+    if (t.done || inBatch.has(t.id) || t.component !== head.component || t.tags?.includes('security')) continue;
+    const ok = t.depends.every((d) => (EXTERNAL_DEP_RE.test(d) ? externalDone(d) : done.has(d) || inBatch.has(d)));
+    if (!ok) continue;
+    batch.push(t);
+    inBatch.add(t.id);
+  }
+  return batch;
 }
 
 /** RF-ORQ-01: first pending task whose dependencies are all done. */
@@ -294,7 +329,7 @@ export function lintTasks(text, components) {
   if (!tasks.length) problems.push({ code: 'noTasks' });
   for (const task of tasks) {
     for (const code of taskProblems(task, components)) problems.push({ code, task: task.id });
-    for (const dep of task.depends) if (!ids.has(dep)) problems.push({ code: 'unknownDependency', task: task.id, dep });
+    for (const dep of task.depends) if (!ids.has(dep) && !EXTERNAL_DEP_RE.test(dep)) problems.push({ code: 'unknownDependency', task: task.id, dep });
   }
   return { tasks: tasks.length, problems };
 }

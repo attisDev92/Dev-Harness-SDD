@@ -13,8 +13,8 @@ const es = {
     protectedZone: (v) => v.zone === 'db'
       ? `Aviso: ${v.match} cambia el esquema y no hay un plan aprobado con modelo de datos que lo recoja. Si es parte de la spec, añádelo al modelo de datos de plan.md y cuéntalo en tu resumen. Crea un ADR (${S} new-adr <nombre>) solo si es una decisión estructural: motor de base de datos, multi-tenant, particionado, o borrar o transformar datos existentes.`
       : `Aviso: ${v.match} está en la zona protegida "${v.zone}". Sigue si es lo que pidió el usuario, deja la decisión en un ADR en borrador (${S} new-adr <nombre>) y cuéntala en tu resumen.`,
-    noTask: (v) => `Aviso: ${v.match} es código del componente "${v.component}" y no hay ninguna tarea pendiente suya. Si es trabajo nuevo, añádelo a tasks.md como tarea "añadida en implementación" (y a la spec si cambia un requisito) y sigue.`,
-    outOfScope: (v) => `Aviso: ${v.match} está fuera del alcance de ${v.task} (${(v.scope ?? []).join(', ')}). Si es parte de la tarea, amplía su alcance en tasks.md; si es trabajo nuevo, añade una tarea. Sigue.`,
+    noTask: (v) => `Aviso: ${v.match} es código del componente "${v.component}" y no hay ninguna tarea pendiente suya. Si es trabajo nuevo, añade una tarea "añadida en implementación" o menciónalo en tu resumen. Sigue.`,
+    outOfScope: (v) => `Aviso: ${v.match} está fuera del alcance de ${v.task} (${(v.scope ?? []).join(', ')}). Menciónalo en tu resumen y sigue.`,
   },
   stop: {
     unknown: (s) => `Parada desconocida "${s}". Usa spec o plan.`,
@@ -43,11 +43,25 @@ const es = {
       ...(t.requirements.length ? [`  Requisitos: ${t.requirements.join(', ')}`] : []),
       ...(t.doneWhen ? [`  Hecho cuando: ${t.doneWhen}`] : []),
     ].join('\n'),
-    parallel: () => 'Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje). Máximo 2 subagentes trabajando a la vez, del rol que sea. Tests primero. Al terminar cada una: verify --component <id>, marca su casilla en tasks.md, y lanza reviewer y doc-writer solo si hay hueco (si no, de uno en uno).',
+    batch: (ids) => `  Lote recomendado: ${ids.join(' → ')} (un solo subagente para todas).`,
+    parallel: () => 'Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje). Máximo 2 subagentes trabajando a la vez. Tests primero. Al terminar: sdd.js verify --component <id> --tests, luego sdd.js done <id>.',
     queued: (ids) => `Sin hueco ahora (máximo 2 a la vez): ${ids.join(', ')}. Vuelve a llamar a next cuando termine una.`,
     waiting: (w) => `Esperando dependencias: ${w.map((x) => `${x.task.id} espera a ${x.on.join(', ')}`).join(' · ')}.`,
     problems: (t, ps) => `${t} necesita arreglo en tasks.md: ${ps.join(', ')}.`,
     noVerify: (c) => `El componente "${c}" no tiene comandos de verificación: añade components.${c}.verify a harness.config.yaml (RF-VER-02).`,
+  },
+  done: {
+    notFound: (id) => `Tarea ${id} no encontrada en tasks.md.`,
+    alreadyDone: (id) => `La tarea ${id} ya estaba marcada como hecha.`,
+    marked: (id, note) => `Tarea ${id} marcada como hecha en tasks.md.${note ? ` Nota registrada en progress.md.` : ''}`,
+  },
+  focus: {
+    set: (id) => `Spec en curso fijada: ${id}.`,
+    cleared: () => 'Foco automático activado (siguiente spec según avance).',
+    notFound: (id) => `Spec "${id}" no encontrada.`,
+  },
+  brief: {
+    notFound: (id) => `Tarea ${id} no encontrada.`,
   },
   verify: {
     pass: (c) => `La verificación de ${c} pasó. Marca las tareas terminadas en tasks.md; después reviewer y doc-writer, en paralelo solo si no hay otro subagente trabajando (máximo 2 a la vez).`,

@@ -77,8 +77,8 @@ export function handleHook(event, payload, opts = {}) {
       const verdict = checkWrite({ root, file: path.resolve(cwd, file), settings, flow, input });
       if (verdict.decision === 'block') return blockHook(verdictText(verdict));
       if (verdict.decision === 'warn') {
-        const open = flow.tasks.filter((x) => !x.done).map((x) => x.id).join('+') || '-';
-        return alertOnce(verdictText(verdict), `${verdict.kind}:${verdict.zone ?? verdict.component ?? verdict.match}:${flow.spec?.id ?? '-'}:${open}`);
+        const target = verdict.zone ?? verdict.component ?? verdict.match;
+        return alertOnce(verdictText(verdict), `${verdict.kind}:${target}:${flow.spec?.id ?? '-'}`);
       }
       return { code: 0 };
     }

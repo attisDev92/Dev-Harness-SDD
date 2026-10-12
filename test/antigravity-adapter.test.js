@@ -12,9 +12,10 @@ suite('Antigravity Adapter', () => {
     };
     const { entries } = antigravity.generate({}, ctx);
 
-    // Skills
+    // Skills and role skills
     assert.ok(entries.some((e) => e.path === '.agents/skills/sdd/SKILL.md'));
     assert.ok(entries.some((e) => e.path === '.agents/skills/clean-code/SKILL.md'));
+    assert.ok(entries.some((e) => e.path === '.agents/skills/role-reviewer/SKILL.md'));
 
     // Workflows
     assert.ok(entries.some((e) => e.path === '.agents/workflows/sdd-status.md'));

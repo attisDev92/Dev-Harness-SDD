@@ -26,7 +26,7 @@ export function statusData(root, settings, flow, runtime) {
     pending: spec && runtime.pending?.spec === spec.id ? runtime.pending.stop : null,
     done: done.map((x) => x.id),
     open: open.map((x) => x.id),
-    ready: spec?.status === 'plan-approved' ? taskQueue(tasks).ready.map((x) => x.id) : [],
+    ready: spec?.status === 'plan-approved' ? taskQueue(tasks, {}, flow.externalDone).ready.map((x) => x.id) : [],
     added: tasks.filter((x) => ADDED_RE.test(x.title)).map((x) => x.id),
     verify: runtime.verify ?? {},
     warnings,

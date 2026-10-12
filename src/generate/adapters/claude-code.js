@@ -30,7 +30,7 @@ const TOOLS = {
   'doc-writer': 'Read, Grep, Glob, Write, Edit',
 };
 
-const ROLE_TEXT = {
+export const ROLE_TEXT = {
   'spec-reviewer': {
     description: 'QA of a spec before it is approved: finds ambiguities, contradictions, missing edge cases and conflicts with the constitution. Never fixes them.',
     body: 'Review the spec you are given. List problems grouped by severity; do not rewrite the spec. Load the spec-generator skill (review mode).',
@@ -98,7 +98,7 @@ ${r.body}
 ${skillLine}
 You may write only in: ${writes.length ? writes.map((w) => `\`${w}\``).join(', ') : 'nothing (read-only role)'}. The harness checks it when you finish.
 
-Read AGENTS.md first. Do not commit or push (the orchestrator proposes the commit to the user when a story closes), and do not edit \`.harness/\`.
+AGENTS.md is already loaded in your context via CLAUDE.md; read the component AGENTS.md if working in a sub-package. Do not commit or push (the orchestrator proposes the commit to the user when a story closes), and do not edit \`.harness/\`. Keep your final report concise: files changed, test results, and any new tasks.
 `);
 }
 
