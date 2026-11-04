@@ -25,6 +25,9 @@ export const DEFAULT_SPEC_PREFIX = 'SPEC';
 
 export const DEFAULT_RETRIES = Object.freeze({ in_scope: 2, protected: 0 });
 
+/** Most subagents working at once unless harness.config.yaml says otherwise (orchestration.max_parallel). */
+export const DEFAULT_MAX_PARALLEL = 2;
+
 /** Nearest ancestor of `start` that holds harness.config.yaml, or null. */
 export function findProjectRoot(start = process.cwd()) {
   let dir = path.resolve(start);
@@ -60,6 +63,8 @@ export function loadGuardSettings(root) {
     components: data.components && typeof data.components === 'object' ? data.components : {},
     roles: data.roles && typeof data.roles === 'object' ? data.roles : {},
     manualTest: ['task', 'story', 'spec', 'none'].includes(data.manual_test) ? data.manual_test : 'story',
+    decisions: data.decisions === 'interview' ? 'interview' : 'summary',
+    maxParallel: Number.isInteger(data.max_parallel) && data.max_parallel >= 1 ? data.max_parallel : DEFAULT_MAX_PARALLEL,
     specsLanguage: data.specs_language === 'es' ? 'es' : 'en',
     docsLanguage: data.docs_language === 'es' ? 'es' : 'en',
     commits: data.commits ?? { convention: 'conventional' },

@@ -13,11 +13,12 @@ import { findProjectRoot, loadGuardSettings } from './project.js';
 import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, findSpec, STOPS } from './state.js';
 import { importContract } from './contracts.js';
 import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskBatch, taskProblems, parseRequirements, markTaskDone } from './tasks.js';
-import { runVerify, VERIFY_ORDER } from './verify.js';
+import { runVerify, VERIFY_ORDER, componentDigest } from './verify.js';
 import { runtimeMessages } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
 import { linkedTasks, planSync, applyLocal } from './tracker-sync.js';
 import { statusData, statusLines } from './status.js';
+import { pendingDecisions } from './decisions.js';
 
 const OK = 0;
 const USAGE = 1;
@@ -32,13 +33,17 @@ const USAGE_TEXT = `usage: sdd.js <command>
   new-adr <name>                  create docs/decisions/ADR-<NNNN>-<name>.md
   stop <spec|plan>                ask the user to approve; their "yes" is recorded by the hook
   approve                         record the pending stop (when the user chose "Approve" in a question)
-  next [--spec S]                 tasks that can start now, one per component, at most 2 at once
-  brief <TID> [--spec S]          compact task context (task, scope, requirements) without full files
+  next [--spec S]                 tasks that can start now, one per component, at most max_parallel at once
+  brief <TID> [--spec S]          compact task context (task, scope, requirements, rules) to hand to the subagent
   done <TID> [--spec S] [--note "..."]
-                                  tick task checkbox in tasks.md and record note in progress.md
+                                  tick the task in tasks.md (only with a green, current verification) and note it in progress.md
   verify [--component c] [--tests] [--eval]
                                   run verification: --tests omits e2e (fast task loop);
                                   --eval runs only verify.eval, once when a story closes
+  decisions [--json] [--resolve <key>]
+                                  decisions pending from the user (clarifications, ADR drafts, added tasks, alerts)
+  pause                           let active subagents finish and launch nothing new (end or suspend a session)
+  resume                          lift the pause
   validate [--spec S] [--json]    requirement → test coverage; closes the spec when every task is done
   contract import <repo#SPEC> [--file f]  snapshot a provider contract into the active spec
   tracker plan|apply [--file f]   sync tasks.md with the tracker (JSON on stdin)
@@ -63,7 +68,7 @@ const rel = (root, p) => path.relative(root, p).split(path.sep).join('/');
  * @param {{ stdout: { write(s: string): void }, stderr: { write(s: string): void }, cwd: string, env: object, run?: Function, readStdin?: () => Promise<string> }} io
  */
 export async function runSdd(argv, io) {
-  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id', 'spec', 'story', 'note'], boolean: ['json', 'eval', 'tests', 'clear'] });
+  const { flags, positional } = parseArgs(argv, { string: ['component', 'file', 'id', 'spec', 'story', 'note', 'resolve'], boolean: ['json', 'eval', 'tests', 'clear'] });
   const [command, ...rest] = positional;
   const root = findProjectRoot(io.cwd);
   const out = (s) => io.stdout.write(`${s}\n`);
@@ -183,6 +188,21 @@ export async function runSdd(argv, io) {
       const stop = rest[0];
       if (!STOPS[stop]) return refuse(t.stop.unknown(stop ?? ''));
       if (!flow.spec) return refuse(t.next.noSpec());
+      // gates.decisions: interview → the spec is not put up for approval with questions still open,
+      // and every pending decision is listed so the agent asks about it first.
+      const decisions = pendingDecisions(root, settings, flow, runtime);
+      if (settings.decisions === 'interview') {
+        const open = decisions.filter((d) => d.kind === 'clarification');
+        if (stop === 'spec' && open.length) {
+          open.forEach((d) => out(t.decisions.item(d)));
+          return refuse(t.stop.openClarifications(open.length, flow.spec.id));
+        }
+        if (decisions.length) {
+          out(t.decisions.title(flow.spec.id, decisions.length));
+          decisions.forEach((d) => out(t.decisions.item(d)));
+          out(t.decisions.interview());
+        }
+      }
       runtime.pending = { spec: flow.spec.id, stop, at: new Date().toISOString() };
       save();
       logEvent(root, 'stop-requested', { spec: flow.spec.id, stop });
@@ -197,16 +217,64 @@ export async function runSdd(argv, io) {
       runtime.pending = null;
       save();
       logEvent(root, 'stop-approved', { spec: pending.spec, stop: pending.stop });
-      out(t.stop.approved(pending.stop, pending.spec));
+      out(t.stop.approved(pending.stop, pending.spec, settings.maxParallel));
+      return OK;
+    }
+
+    case 'pause': {
+      // The user wants to end or suspend the session: what runs finishes, nothing new starts.
+      const at = new Date().toISOString();
+      if (runtime.paused) return out(t.pause.already(runtime.paused.at.slice(0, 16).replace('T', ' '))), OK;
+      runtime.paused = { at };
+      save();
+      logEvent(root, 'paused', { spec: flow.spec?.id ?? null });
+      const active = Object.values(runtime.subagents ?? {}).filter((s) => Date.now() - Date.parse(s.started) < 60 * 60 * 1000).length;
+      out(t.pause.on(active));
+      return OK;
+    }
+
+    case 'resume': {
+      if (!runtime.paused) return out(t.pause.notPaused()), OK;
+      runtime.paused = null;
+      save();
+      logEvent(root, 'resumed', { spec: flow.spec?.id ?? null });
+      out(t.pause.off());
+      return OK;
+    }
+
+    case 'decisions': {
+      if (!flow.spec) return refuse(t.next.noSpec());
+      if (flags.resolve) {
+        const key = String(flags.resolve);
+        const match = pendingDecisions(root, settings, flow, runtime).find((d) => d.key === key);
+        if (!match) return refuse(t.decisions.unknown(key));
+        if (match.kind === 'alert') {
+          runtime.decided = [...new Set([...(runtime.decided ?? []), key])].slice(-50);
+          save();
+        }
+        logEvent(root, 'decision-resolved', { spec: flow.spec.id, key });
+        out(t.decisions.resolved(key));
+        return OK;
+      }
+      const decisions = pendingDecisions(root, settings, flow, runtime);
+      if (flags.json) {
+        out(JSON.stringify({ spec: flow.spec.id, mode: settings.decisions, decisions }, null, 2));
+        return OK;
+      }
+      if (!decisions.length) return out(t.decisions.none()), OK;
+      out(t.decisions.title(flow.spec.id, decisions.length));
+      decisions.forEach((d) => out(t.decisions.item(d)));
+      out(settings.decisions === 'interview' ? t.decisions.interview() : t.decisions.summary());
       return OK;
     }
 
     case 'next': {
-      // Informative: what can start now. Tasks of different components run in parallel, at most MAX_PARALLEL.
+      // Informative: what can start now. Tasks of different components run in parallel, at most settings.maxParallel.
       if (!flow.spec) return refuse(t.next.noSpec());
       if (flow.spec.status !== 'plan-approved') return refuse(t.next.notApproved(flow.spec.status));
       if (!flow.tasks.length) return refuse(t.next.noTasks(`${flow.spec.dir}/tasks.md`));
-      const { ready, queued, waiting } = taskQueue(flow.tasks, {}, flow.externalDone);
+      if (runtime.paused) return out(t.pause.nextPaused(runtime.paused.at.slice(0, 16).replace('T', ' '))), OK;
+      const { ready, queued, waiting } = taskQueue(flow.tasks, {}, flow.externalDone, settings.maxParallel);
       if (!ready.length && !queued.length && !waiting.length) {
         out(t.next.allDone());
         return OK;
@@ -225,8 +293,8 @@ export async function runSdd(argv, io) {
         }
         if (!VERIFY_ORDER.some((k) => comp.verify?.[k])) out(`  ${t.next.noVerify(task.component)}`);
       }
-      if (ready.length) out(t.next.parallel());
-      if (queued.length) out(t.next.queued(queued.map((x) => x.id)));
+      if (ready.length) out(t.next.parallel(settings.maxParallel));
+      if (queued.length) out(t.next.queued(queued.map((x) => x.id), settings.maxParallel));
       if (waiting.length) out(t.next.waiting(waiting));
       return OK;
     }
@@ -255,6 +323,11 @@ export async function runSdd(argv, io) {
           out(`- **${rid}:** ${reqMap.get(rid) ?? '—'}`);
         }
       }
+      // The brief is what the subagent gets: it carries the rules it must follow, whatever the tool.
+      const cmds = VERIFY_ORDER.filter((k) => comp?.verify?.[k]).map((k) => comp.verify[k]);
+      out('');
+      out(t.brief.rulesTitle);
+      out(t.brief.rules(role, comp?.path ?? '.', cmds));
       return OK;
     }
 
@@ -265,6 +338,15 @@ export async function runSdd(argv, io) {
       const task = flow.tasks.find((t) => t.id === tid);
       if (!task) return refuse(t.done.notFound(tid));
       if (task.done) return out(t.done.alreadyDone(tid));
+      // RF-VER-01: a task closes only with a green verification of its component, run on the code being closed.
+      const comp = settings.components[task.component];
+      if (comp && VERIFY_ORDER.some((k) => comp.verify?.[k])) {
+        const v = runtime.verify?.[task.component];
+        if (!v || v.status !== 'pass') return refuse(t.done.notVerified(tid, task.component));
+        if (v.digest && v.digest !== componentDigest(root, comp.path)) return refuse(t.done.stale(tid, task.component));
+      } else if (comp) {
+        out(t.done.noVerifyNote(task.component));
+      }
       const tasksFile = path.join(root, flow.spec.dir, 'tasks.md');
       const currentTasks = safeRead(tasksFile) ?? '';
       const updatedTasks = markTaskDone(currentTasks, tid);
@@ -300,8 +382,8 @@ export async function runSdd(argv, io) {
         }
         const at = new Date().toISOString();
         if (result.status === 'pass') {
-          runtime.verify[id] = { status: 'pass', at };
-          out(t.verify.pass(id));
+          runtime.verify[id] = { status: 'pass', at, digest: componentDigest(root, settings.components[id].path) };
+          out(t.verify.pass(id, settings.maxParallel));
         } else {
           failed = true;
           runtime.verify[id] = { status: 'fail', command: result.failing.command, at };

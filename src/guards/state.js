@@ -2,8 +2,8 @@
 //
 // What matters is visible in the project: the `status` in the frontmatter of
 // each spec.md and the checkboxes of tasks.md. .harness/state/runtime.json only
-// keeps ephemeral data that never stops the work: the pending stop, the last
-// verification per component, alerts already shown and running subagents.
+// keeps ephemeral data: the pending stop, the last verification per component,
+// alerts already shown, running subagents and the pause the user asked for.
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -16,7 +16,8 @@ export const STATUSES = ['draft', 'spec-approved', 'plan-approved', 'done'];
 export const STOPS = { spec: 'spec-approved', plan: 'plan-approved' };
 
 export function emptyRuntime() {
-  return { version: 2, pending: null, verify: {}, alerted: [], subagents: {}, focus: null };
+  // paused: the user asked to stop launching work (sdd.js pause); decided: alert keys the user already settled.
+  return { version: 2, pending: null, verify: {}, alerted: [], subagents: {}, focus: null, paused: null, decided: [] };
 }
 
 function writeAtomic(file, text) {

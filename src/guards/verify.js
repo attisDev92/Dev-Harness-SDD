@@ -77,6 +77,20 @@ function hashFile(file) {
   }
 }
 
+/**
+ * RF-VER-01: digest of the code of one component (its changed and untracked
+ * files, without docs and the harness), recorded with each verification so
+ * `sdd.js done` can tell whether the tree verified is the tree being closed.
+ */
+export function componentDigest(root, componentPath = '.', snapshot = changeSnapshot) {
+  const snap = snapshot(root);
+  if (!snap) return null;
+  const dir = String(componentPath ?? '.').replace(/\\/g, '/').replace(/^\.\/?/, '').replace(/\/$/, '');
+  const inside = (f) => (dir === '' || f === dir || f.startsWith(`${dir}/`)) && !f.startsWith('.harness/') && !/\.(md|mdx)$/i.test(f);
+  const entries = Object.keys(snap).filter(inside).sort().map((f) => `${f}=${snap[f]}`);
+  return createHash('sha1').update(entries.join('\n')).digest('hex');
+}
+
 /** Files that changed between two snapshots. */
 export function changedSince(before, after) {
   const files = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);

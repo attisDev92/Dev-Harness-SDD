@@ -139,7 +139,7 @@ Cuando salga una nueva versión de `sdd-harness` y quieras actualizar tu proyect
    ```bash
    sdd-harness upgrade
    ```
-   El harness te mostrará las notas de la versión, te enseñará el *diff* de los archivos generados que cambiarán, y actualizará la versión registrada de forma segura.
+   El harness te mostrará las notas de la versión, migrará `harness.config.yaml` si la versión añade claves (por ejemplo, 2.1.0 añade `orchestration.max_parallel: 2` y `gates.decisions: summary`, que conservan el comportamiento anterior), te enseñará el *diff* de los archivos generados que cambiarán y actualizará la versión registrada de forma segura. Después, reinicia tu agente para que cargue la configuración nueva y edita las claves nuevas si quieres otro valor: el harness se regenera solo.
 
 ---
 
@@ -167,11 +167,13 @@ Los comandos `/sdd:*` son **atajos opcionales** para ver qué pasó o lanzar tra
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, última verificación, últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar las tareas listas, hasta 2 a la vez (p. ej. una API y una pantalla) |
+| `/sdd:next` | Lanzar las tareas listas (p. ej. una API y una pantalla), hasta `orchestration.max_parallel` a la vez |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
 | `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |
 | `/sdd:commit` | Proponer el commit ahora |
+| `/sdd:decisions` | Entrevistarte, una pregunta cada vez, sobre las decisiones pendientes (aclaraciones, ADRs en borrador, tareas añadidas al implementar, avisos de zona protegida) |
+| `/sdd:pause` | Terminar lo que está en marcha y no lanzar nada nuevo: para cerrar o suspender una sesión. `/sdd:resume` la retira |
 
 > [!NOTE]
 > La sintaxis de invocación varía según la herramienta. Por ejemplo, Codex invoca las skills como `$nombre` y Antigravity las expone como workflows con `/`. `sdd-harness doctor` te muestra la sintaxis correcta para tu configuración.
@@ -250,9 +252,11 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 | 🔁 **Sin bucles infinitos** | Máximo **2** intentos de corrección. Después, informe del depurador → tú eliges |
 | 🧑 **Pruebas lo que importa** | URL, pasos y datos de prueba con la granularidad que elijas (`task`, `story`, `spec` o `none`) |
 | 🗂️ **Documentación siempre al día** | Se puede escribir cualquier `.md`; los agentes deben actualizar todo documento que un cambio afecte. La lista blanca es opcional (`gates.docs: whitelist`) |
-| ⚡ **Hasta 2 agentes a la vez** | Frontend, backend, QA… avanzan en paralelo, pero nunca más de 2 subagentes a la vez (para poder seguirles la pista y no disparar los tokens); una tarea solo espera a su propio `Depends on` |
+| ⚡ **Agentes en paralelo, con límite** | Frontend, backend, QA… avanzan en paralelo, pero nunca más de `orchestration.max_parallel` subagentes a la vez (1–4, por defecto 2, para poder seguirles la pista y no disparar los tokens); una tarea solo espera a su propio `Depends on` |
 | 🧱 **Cada agente en su carril** | Propiedad de rutas por agente, verificada con `git diff` al terminar cada subagente (un aviso, y solo si trabajó solo) |
-| ✅ **Nada se da por hecho con tests en rojo** | El hook de parada se lo recuerda al agente una vez si la última verificación falló |
+| ✅ **Nada se da por hecho con tests en rojo** | `sdd.js done` se niega a cerrar una tarea si su componente no tiene una verificación verde ejecutada sobre el código actual, así que un agente no puede "contar" tests que no ejecutó. El hook de parada además se lo recuerda una vez si la última verificación falló |
+| 🧭 **Decisiones pendientes** | `gates.decisions: summary` las registra y te las cuenta en los resúmenes; `interview` hace que el agente te pregunte una cada vez antes de seguir, y retiene la parada de la spec mientras queden aclaraciones abiertas |
+| ⏸️ **Pausa ordenada** | `/sdd:pause`: los subagentes activos terminan su tarea, no arranca nada nuevo (el hook rechaza lanzamientos) y recibes un resumen de dónde queda todo. `/sdd:resume` continúa |
 
 **Red de seguridad universal:** un pre-commit de git (vía `core.hooksPath`, en Node puro, sin husky) rechaza secretos y archivos `.env`; una plantilla de CI añade la lista blanca de docs y la verificación completa.
 
@@ -263,7 +267,7 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 | Claude Code | `CLAUDE.md` → `@AGENTS.md` | ✅ | ✅ | permisos + hooks | 🟢 fuerte |
 | opencode | `AGENTS.md` | ✅ | ✅ | `permission.bash` + plugins | 🟢 medio-fuerte |
 | Codex | `AGENTS.md` | ✅ | ✅ | hooks (beta) + política de aprobación | 🟡 medio |
-| Antigravity | `AGENTS.md` | ✅ | modo degradado | allow/deny list de terminal | 🟠 débil → git hooks + CI |
+| Antigravity | `AGENTS.md` + regla siempre activa `.agents/rules/sdd-harness.md` | ✅ (+ una skill `role-*` por rol) | `invoke_subagent` con el brief de la tarea | hooks (`.agents/hooks.json`) + `sdd.js done` exigiendo verificación verde | 🟡 medio → git hooks + CI |
 
 Ejecuta `sdd-harness doctor` para ver qué se aplica realmente en tu proyecto.
 
@@ -310,6 +314,10 @@ gates:
   docs: free                   # free | whitelist
   commits: per-story           # el agente propone el commit al cerrar cada historia
   deps: ask
+  decisions: summary           # summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)
+
+orchestration:
+  max_parallel: 2              # subagentes trabajando a la vez, de 1 a 4
 
 retries:
   in_scope: 2                  # intentos de corrección antes del informe del depurador

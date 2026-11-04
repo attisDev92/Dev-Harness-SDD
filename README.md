@@ -139,7 +139,7 @@ When a new version of `sdd-harness` is released and you want to update your proj
    ```bash
    sdd-harness upgrade
    ```
-   The harness will show you the release notes, display the diff of the generated files that will change, and safely update the recorded version.
+   The harness shows the release notes, migrates `harness.config.yaml` when the version adds keys (for example, 2.1.0 adds `orchestration.max_parallel: 2` and `gates.decisions: summary`, which keep the previous behaviour), displays the diff of the generated files that will change and safely updates the recorded version. Then restart your agent so it loads the new configuration, and edit the new keys if you want other values: the harness regenerates itself.
 
 ---
 
@@ -167,11 +167,13 @@ The `/sdd:*` commands are **optional shortcuts** to see what happened or to laun
 |---|---|
 | `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification, last commits |
 | `/sdd:spec <idea>` | Start a spec |
-| `/sdd:next` | Launch the ready tasks in parallel (frontend ∥ backend) |
+| `/sdd:next` | Launch the ready tasks in parallel (frontend ∥ backend), up to `orchestration.max_parallel` at once |
 | `/sdd:docs` | Bring the docs up to date in the background |
 | `/sdd:review` | Review (and QA) of the recent changes, in parallel |
 | `/sdd:validate` | Requirement → test report |
 | `/sdd:commit` | Propose the commit now |
+| `/sdd:decisions` | Interview you, one question at a time, about the pending decisions (clarifications, ADR drafts, tasks added while implementing, protected-zone alerts) |
+| `/sdd:pause` | Finish what is running and launch nothing new: to end or suspend a session. `/sdd:resume` lifts it |
 
 > [!NOTE]
 > Invocation syntax varies by tool. For example, Codex invokes skills as `$name`, and Antigravity exposes these as workflows under `/`. `sdd-harness doctor` prints the right syntax for your setup.
@@ -250,9 +252,11 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 | 🔁 **No infinite loops** | Max **2** fix attempts. Then debugger report → you choose |
 | 🧑 **You test what matters** | URL, steps and test data at the granularity you choose (`task`, `story`, `spec` or `none`) |
 | 🗂️ **Docs always up to date** | Any `.md` can be written; agents must update every document a change affects. A whitelist is opt-in (`gates.docs: whitelist`) |
-| ⚡ **Parallel agents** | Frontend and backend tasks run at once; a task waits only for its own `Depends on` |
+| ⚡ **Parallel agents, with a limit** | Frontend and backend tasks run at once, never more than `orchestration.max_parallel` subagents (1–4, default 2); a task waits only for its own `Depends on` |
 | 🧱 **Agents stay in their lane** | Path ownership per agent, checked with `git diff` when a sub-agent ends (an alert, and only when it ran alone) |
-| ✅ **No "done" with red tests** | The Stop hook reminds the agent once when the last verification failed |
+| ✅ **No "done" with red tests** | `sdd.js done` refuses to close a task unless its component has a green verification run on the current code, so an agent cannot "report" tests it did not run. The Stop hook also reminds the agent once when the last verification failed |
+| 🧭 **Pending decisions** | `gates.decisions: summary` records them and tells you in the summaries; `interview` makes the agent ask you one question at a time before going on, and holds the spec stop while clarifications are open |
+| ⏸️ **Graceful pause** | `/sdd:pause`: active subagents finish their task, nothing new starts (the hook refuses launches) and you get a summary of where everything stands. `/sdd:resume` continues |
 
 **Universal safety net:** a git pre-commit (via `core.hooksPath`, pure Node, no husky) refuses secrets and `.env` files; a CI template adds the docs whitelist and the full verification.
 
@@ -263,7 +267,7 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 | Claude Code | `CLAUDE.md` → `@AGENTS.md` | ✅ | ✅ | permissions + hooks | 🟢 strong |
 | opencode | `AGENTS.md` | ✅ | ✅ | `permission.bash` + plugins | 🟢 medium-strong |
 | Codex | `AGENTS.md` | ✅ | ✅ | hooks (beta) + approval policy | 🟡 medium |
-| Antigravity | `AGENTS.md` | ✅ | degraded mode | terminal allow/deny list | 🟠 weak → git hooks + CI |
+| Antigravity | `AGENTS.md` + always-on rule `.agents/rules/sdd-harness.md` | ✅ (+ one `role-*` skill per role) | `invoke_subagent` with the task brief | hooks (`.agents/hooks.json`) + `sdd.js done` requiring a green verification | 🟡 medium → git hooks + CI |
 
 Run `sdd-harness doctor` to see what is actually enforced in your project.
 
@@ -310,6 +314,10 @@ gates:
   docs: free                   # free | whitelist
   commits: per-story           # the agent proposes the commit when a story closes
   deps: ask
+  decisions: summary           # summary (told in the summaries) | interview (asked one question at a time)
+
+orchestration:
+  max_parallel: 2              # subagents working at once, 1–4
 
 retries:
   in_scope: 2                  # fix attempts before the debugger report

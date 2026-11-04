@@ -186,7 +186,7 @@ export function parseTasks(text) {
   return tasks;
 }
 
-/** Most subagents working at once, whatever their role: more cannot be followed and burn tokens. */
+/** Default most subagents working at once, whatever their role: more cannot be followed and burn tokens. `orchestration.max_parallel` overrides it. */
 export const MAX_PARALLEL = 2;
 /** Most tasks one subagent takes in a row (one cold start for all of them). */
 export const MAX_BATCH = 3;
@@ -198,10 +198,10 @@ export const MAX_BATCH = 3;
  * `externalDone(ref)` answers for dependencies on other specs ("SPEC-003#T12").
  * @returns {{ ready: object[], queued: object[], waiting: { task: object, on: string[] }[] }}
  */
-export function taskQueue(tasks, active = {}, externalDone = () => false) {
+export function taskQueue(tasks, active = {}, externalDone = () => false, max = MAX_PARALLEL) {
   const done = new Set(tasks.filter((t) => t.done).map((t) => t.id));
   const busy = new Map(Object.values(active).map((t) => [t.component, t.id]));
-  const free = Math.max(0, MAX_PARALLEL - Object.keys(active).length);
+  const free = Math.max(0, max - Object.keys(active).length);
   const ready = [];
   const queued = [];
   const waiting = [];

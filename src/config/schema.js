@@ -74,7 +74,12 @@ export const schema = obj(
       // per-story: the agent proposes the commit when a story closes (human-only is the pre-0.8 value, same behaviour).
       commits: oneOf(['per-story', 'human-only']),
       deps: oneOf(['ask']),
+      // summary: pending decisions (clarifications, ADR drafts, alerts) are recorded and told in the
+      // summaries; interview: the agent asks the user about them, one question at a time, before going on.
+      decisions: oneOf(['summary', 'interview']),
     }),
+    // Most subagents working at the same time, whatever their role.
+    orchestration: obj({ max_parallel: int({ min: 1, max: 4 }) }),
     retries: obj({ in_scope: int({ min: 0, max: 2 }), protected: int({ min: 0, max: 0 }) }),
     protected: map(arr(str({ minLength: 1 }))),
     docs_whitelist: arr(str({ minLength: 1 }), { unique: true }),

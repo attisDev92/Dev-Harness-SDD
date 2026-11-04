@@ -20,6 +20,19 @@ async function askSpecPrefix(p, t) {
   return 'SPEC';
 }
 
+export const DEFAULT_MAX_PARALLEL = 2;
+const MAX_PARALLEL_LIMIT = 4;
+
+async function askMaxParallel(p, t) {
+  for (let i = 0; i < 3; i += 1) {
+    const raw = String(await p.text('maxParallel', t.q.maxParallel(MAX_PARALLEL_LIMIT), { default: String(DEFAULT_MAX_PARALLEL) })).trim();
+    const n = Number(raw);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_PARALLEL_LIMIT) return n;
+    p.say(t.q.maxParallelInvalid(MAX_PARALLEL_LIMIT));
+  }
+  return DEFAULT_MAX_PARALLEL;
+}
+
 /**
  * @param {{ detected: object, prompter: import('./prompt.js').Prompter, t: object, lang: string, version: string, preset?: { tools?: string[], mode?: string } }} input
  */
@@ -113,6 +126,9 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
     tracker = (await p.text('trackerName', 'Nombre del tracker (p. ej. asana, clickup, youtrack)', { default: '' })).trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-') || 'none';
   }
   const manual = await p.select('manualTest', t.q.manualTest, choices(['none', 'task', 'story', 'spec'], t.manualLabels), { default: 'story' });
+  // Orchestration: how many subagents at once, and what to do with pending decisions.
+  const maxParallel = await askMaxParallel(p, t);
+  const decisions = await p.select('decisions', t.q.decisions, choices(['summary', 'interview'], t.decisionLabels), { default: 'summary' });
   const mode = preset.mode ?? (await p.select('installMode', t.q.installMode, choices(['local', 'team'], t.modeLabels), { default: 'local' }));
   const artifacts = await p.select('artifacts', t.q.artifacts, choices(['versioned', 'local'], t.artifactLabels), { default: mode === 'team' ? 'versioned' : 'local' });
 
@@ -147,7 +163,8 @@ export async function runInterview({ detected, prompter: p, t, lang, version, pr
     components,
     design: { source: design },
     tracker: tracker === 'none' ? { enabled: false } : { enabled: true, provider: tracker },
-    gates: { manual_test: manual, commits: 'per-story', deps: 'ask' },
+    gates: { manual_test: manual, commits: 'per-story', deps: 'ask', decisions },
+    orchestration: { max_parallel: maxParallel },
     retries: { in_scope: 2 },
     protected: protectedZones,
     docs_whitelist: [...DEFAULT_DOCS_WHITELIST],

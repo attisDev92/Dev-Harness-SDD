@@ -30,29 +30,30 @@ const TOOLS = {
   'doc-writer': 'Read, Grep, Glob, Write, Edit',
 };
 
-export const ROLE_TEXT = {
+/** @param {number} max most subagents at once (orchestration.max_parallel) */
+export const roleText = (max = 2) => ({
   'spec-reviewer': {
     description: 'QA of a spec before it is approved: finds ambiguities, contradictions, missing edge cases and conflicts with the constitution. Never fixes them.',
     body: 'Review the spec you are given. List problems grouped by severity; do not rewrite the spec. Load the spec-generator skill (review mode).',
   },
   architect: {
     description: 'Technical plan, API contracts, ADR drafts and tasks.md for an approved spec, all in one go.',
-    body: 'Write plan.md: modules, data model, decisions with the discarded alternative, test strategy (which requirements are proven by AI evaluations instead of normal tests, because they need a real model), and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). The data model lists the tables and columns the spec creates or changes: approving the plan approves those migrations, so they need no ADR; tasks that write migrations include the migration path in their scope. Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks can run in parallel (2 subagents at once at most).',
+    body: `Write plan.md: modules, data model, decisions with the discarded alternative, test strategy (which requirements are proven by AI evaluations instead of normal tests, because they need a real model), and which requirements each part covers. When the spec spans several components, write the contract in contracts/ of the provider spec. Every stack or architecture decision gets an ADR draft (adr skill). The data model lists the tables and columns the spec creates or changes: approving the plan approves those migrations, so they need no ADR; tasks that write migrations include the migration path in their scope. Then tasks.md, in the format of .harness/templates/tasks.md: tasks under 30 minutes, each with its component; requirements, scope and "Done when" whenever you can. Set "Depends on" only for real dependencies (a UI task works against the contract with mocks), so frontend and backend tasks can run in parallel (${max} subagent${max === 1 ? '' : 's'} at once at most).`,
   },
   'frontend-dev': {
     description: 'Implements frontend tasks: UI, design system, components. Tests first. Use for tasks of frontend components.',
-    body: 'Implement the task you are given. Write the tests first, then the code. Reuse the design system and existing components; follow the component AGENTS.md. If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
+    body: 'Implement the task you are given, and only it: no refactors, clean-ups or UI changes outside its scope (report them as new tasks instead). Write the tests first, then the code. Reuse the design system and existing components; follow the component AGENTS.md. Run the real verification commands and report their actual output; never claim tests pass without running them. If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
   },
   'backend-dev': {
     description: 'Implements backend tasks: API, domain, persistence. Tests first. Use for tasks of backend or other non-UI components.',
-    body: 'Implement the task you are given. Write the tests first, then the code. Validate input at the edges, keep layers separate, follow the component AGENTS.md. Tests that call a real model (retrieval quality, LLM as judge) are AI evaluations: they cost money and are not deterministic, so they go with the verify.eval command of the component (for example in evals/), never with the normal tests; normal tests mock the model. A migration that is in the data model of the approved plan needs no ADR and no new approval; one that is not goes into the data model of plan.md and your report. An ADR draft only for structural database decisions (db-migrations skill). If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
+    body: 'Implement the task you are given, and only it: no refactors or clean-ups outside its scope (report them as new tasks instead). Write the tests first, then the code. Run the real verification commands and report their actual output; never claim tests pass without running them. Validate input at the edges, keep layers separate, follow the component AGENTS.md. Tests that call a real model (retrieval quality, LLM as judge) are AI evaluations: they cost money and are not deterministic, so they go with the verify.eval command of the component (for example in evals/), never with the normal tests; normal tests mock the model. A migration that is in the data model of the approved plan needs no ADR and no new approval; one that is not goes into the data model of plan.md and your report. An ADR draft only for structural database decisions (db-migrations skill). If you find work the task did not foresee, do it when it is small and needed, and report it so it is added to tasks.md. When done, report the files you changed.',
   },
   'qa-tester': {
     description: 'Unit, integration and end-to-end tests, and reproducible bug reports.',
     body: 'Write or extend tests that prove the requirements (put the requirement ID, e.g. RF-01, in the test name so the validation can find it). Tests that call a real model (retrieval quality, LLM as judge) are AI evaluations: they cost money and are not deterministic, so they go with the verify.eval command of the component (for example in evals/), never with the normal tests; normal tests mock the model. Report bugs with steps, expected and actual result.',
   },
   reviewer: {
-    description: 'Reviews finished work: spec compliance first, then quality and security. Read-only. Runs with doc-writer after verification passes, as long as no more than 2 subagents work at once.',
+    description: `Reviews finished work: spec compliance first, then quality and security. Read-only. Runs with doc-writer after verification passes, as long as no more than ${max} subagent${max === 1 ? '' : 's'} work at once.`,
     body: 'First check each requirement of the task against the code and tests. If the changes include migrations or schema files, check that every table and column they create, change or drop is in the data model of plan.md; report any that is not. Report any test outside the evaluations that calls a real model or a paid API. Then quality (clarity, duplication, error handling) and security (input validation, authorization, secrets, injection). Report findings with file and line, most important first; change nothing.',
   },
   debugger: {
@@ -60,10 +61,13 @@ export const ROLE_TEXT = {
     body: 'Follow the triage-report skill exactly. Do not modify any file.',
   },
   'doc-writer': {
-    description: 'Keeps the documentation current: spec, plan, tasks.md, README, CHANGELOG, ADRs, architecture docs. Runs with reviewer after each task, as long as no more than 2 subagents work at once.',
+    description: `Keeps the documentation current: spec, plan, tasks.md, README, CHANGELOG, ADRs, architecture docs. Runs with reviewer after each task, as long as no more than ${max} subagent${max === 1 ? '' : 's'} work at once.`,
     body: 'Read the changes (git diff) and update every document they affect: tick nothing, but keep spec/plan/tasks.md consistent with what was built (add tasks that came up, marked "added during implementation" in the specs language), README and CHANGELOG, ADRs and architecture docs. Keep them short and accurate. Report what you updated.',
   },
-};
+});
+
+/** Role texts with the default limit; adapters call roleText(max) with the configured one. */
+export const ROLE_TEXT = roleText();
 
 /** Own skills each role loads; third-party ones come from the registry (RF-SKL-12). */
 const OWN_SKILLS = {
@@ -80,7 +84,7 @@ const OWN_SKILLS = {
 function agentFile(config, role, writes, installed = [], available = {}) {
   const tier = config.roles?.[role]?.tier ?? ROLE_TIERS[role];
   const model = config.models?.['claude-code']?.[tier] ?? DEFAULT_MODELS[tier];
-  const r = ROLE_TEXT[role];
+  const r = roleText(maxParallel(config))[role];
   const own = (OWN_SKILLS[role] ?? []).filter((s) => available[s]);
   const skills = [...own, ...installed.filter((s) => (s.roles ?? []).includes(role)).map((s) => s.name)];
   const skillLine = skills.length ? `\nBefore starting, load these skills: ${skills.map((s) => `\`${s}\``).join(', ')}.\n` : '';
@@ -104,19 +108,34 @@ AGENTS.md is already loaded in your context via CLAUDE.md; read the component AG
 
 const S = 'node .harness/scripts/sdd.js';
 
-// RF-ORQ-14: shortcuts that inform or launch work. None of them is needed to approve or to move on.
-const COMMANDS = {
-  status: ['What happened and what comes next', '', `Run \`${S} status\` and summarise it for the user: the spec in progress and its state, the last tasks closed, what is pending and what can start now, tasks added during implementation, the last verification and the last commits. Suggest the next step in one line.`],
-  spec: ['Start a new spec', '<short description>', `Load the sdd skill and start a new spec for: $ARGUMENTS`],
-  next: ['Launch the tasks that can start now (2 at once at most)', '', `Load the sdd skill and follow "Implement": \`${S} next\` lists the tasks that can start now (one per component, 2 at most); delegate them at the same time. Never more than 2 subagents working at once.`],
-  docs: ['Bring the documentation up to date, in the background', '[what changed]', `Delegate to the doc-writer subagent: update every document affected by the recent changes (git diff) $ARGUMENTS. Keep working on anything else meanwhile, and summarise what it updated.`],
-  review: ['Review the recent changes', '[scope]', `Delegate at the same time to the reviewer subagent (spec compliance, quality, security) and, when there are tests to add, to qa-tester (never more than 2 subagents working at once), over the recent changes (git diff) $ARGUMENTS. Summarise the findings, most important first, and fix the clear ones inside the task.`],
-  validate: ['Validate the spec requirement by requirement', '', `Run \`${S} verify\` and \`${S} validate\`. Give, for each requirement: the test that covers it and its result; requirements without a test are "not covered". End with a verdict.`],
-  commit: ['Propose the commit now', '', `Run \`${S} commit-context\`. Propose one commit message per repository with changes, following its convention and language, referencing specs and tasks, and ask the user. If they say yes, run git add and git commit. Never push unless they ask.`],
-};
+export const maxParallel = (config) => config.orchestration?.max_parallel ?? 2;
 
-function commandFile(name) {
-  const [description, hint, body] = COMMANDS[name];
+/**
+ * RF-ORQ-14: shortcuts that inform or launch work. None of them is needed to approve or to move on.
+ * Shared with the Antigravity adapter (its workflows say the same with its own tool names).
+ * @returns {Record<string, [description: string, argumentHint: string, body: string]>}
+ */
+export function commands(config, { delegate = 'delegate', subagentNote = '' } = {}) {
+  const max = maxParallel(config);
+  const plural = max === 1 ? '' : 's';
+  return {
+    status: ['What happened and what comes next', '', `Run \`${S} status\` and summarise it for the user: the spec in progress and its state, whether it is paused, pending decisions, the last tasks closed, what is pending and what can start now, tasks added during implementation, the last verification and the last commits. Suggest the next step in one line.`],
+    spec: ['Start a new spec', '<short description>', `Load the sdd skill and start a new spec for: $ARGUMENTS`],
+    next: [`Launch the tasks that can start now (${max} at once at most)`, '', `Load the sdd skill and follow "Implement": \`${S} next\` lists the tasks that can start now (one per component, ${max} at most). For each one run \`${S} brief <TID>\` and ${delegate} it${subagentNote}, handing the subagent that brief verbatim as its instructions; delegate them in the same message. Never more than ${max} subagent${plural} working at once. When one finishes: \`${S} verify --component <id> --tests\`, then \`${S} done <TID>\`.`],
+    docs: ['Bring the documentation up to date, in the background', '[what changed]', `${cap(delegate)} to the doc-writer subagent${subagentNote}: update every document affected by the recent changes (git diff) $ARGUMENTS. Keep working on anything else meanwhile, and summarise what it updated.`],
+    review: ['Review the recent changes', '[scope]', `${cap(delegate)} at the same time to the reviewer subagent (spec compliance, quality, security) and, when there are tests to add, to qa-tester${subagentNote} (never more than ${max} subagent${plural} working at once), over the recent changes (git diff) $ARGUMENTS. Summarise the findings, most important first, and fix the clear ones inside the task.`],
+    validate: ['Validate the spec requirement by requirement', '', `Run \`${S} verify\` and \`${S} validate\`. Give, for each requirement: the test that covers it and its result; requirements without a test are "not covered". End with a verdict.`],
+    commit: ['Propose the commit now', '', `Run \`${S} commit-context\`. Propose one commit message per repository with changes, following its convention and language, referencing specs and tasks, and ask the user. If they say yes, run git add and git commit. Never push unless they ask.`],
+    decisions: ['Interview the user about the pending decisions', '', `Run \`${S} decisions\`. For each pending decision (clarifications left in the spec, ADR drafts, tasks added during implementation, protected-zone or dependency alerts) ask the user one question at a time, with 2–3 options and your recommendation (use the question tool if available). Write each answer where it belongs (spec.md, plan.md, the ADR, tasks.md) and record keyed ones with \`${S} decisions --resolve <key>\`. End with a one-line summary of what was decided.`],
+    pause: ['Finish what is running and launch nothing new (end or suspend the session)', '', `Run \`${S} pause\`. From now on launch no new subagent and start no new task. Let the active subagents finish: verify, \`${S} done <TID>\`, their report. Leave tasks.md, progress.md and the affected docs up to date, propose the commit if a story closed, and end with a short summary of where everything stands and how to resume (\`/sdd:resume\`).`],
+    resume: ['Lift the pause and continue', '', `Run \`${S} resume\`, then \`${S} status\` and continue the sdd flow from where it stopped (\`${S} next\` when the plan is approved).`],
+  };
+}
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function commandFile(config, name) {
+  const [description, hint, body] = commands(config)[name];
   return quoteFrontmatter(`---
 description: ${description}
 ${hint ? `argument-hint: ${hint}\n` : ''}---
@@ -206,7 +225,7 @@ export function generate(config, ctx) {
     if (config.design?.mcp_url) add({ kind: 'json', path: '.mcp.json', values: { 'mcpServers.penpot': { type: 'http', url: config.design.mcp_url } } });
     else notices.push({ code: 'penpotUrl', params: {} });
   }
-  for (const name of Object.keys(COMMANDS)) add({ kind: 'file', path: `.claude/commands/sdd/${name}.md`, content: commandFile(name) });
+  for (const name of Object.keys(commands(config))) add({ kind: 'file', path: `.claude/commands/sdd/${name}.md`, content: commandFile(config, name) });
   if (config.tracker?.enabled && config.tracker.provider) {
     add({ kind: 'file', path: '.claude/commands/sdd/tracker.md', content: trackerCommand(config.tracker) });
   }

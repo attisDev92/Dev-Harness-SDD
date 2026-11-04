@@ -6,6 +6,7 @@ import path from 'node:path';
 import { safeRead } from './state.js';
 import { ADDED_RE, resolveSpecRef, specDependencies, taskQueue } from './tasks.js';
 import { runtimeMessages } from './runtime-messages.js';
+import { pendingDecisions } from './decisions.js';
 
 const ids = (tasks) => tasks.map((x) => x.id).join(', ');
 
@@ -26,9 +27,11 @@ export function statusData(root, settings, flow, runtime) {
     pending: spec && runtime.pending?.spec === spec.id ? runtime.pending.stop : null,
     done: done.map((x) => x.id),
     open: open.map((x) => x.id),
-    ready: spec?.status === 'plan-approved' ? taskQueue(tasks, {}, flow.externalDone).ready.map((x) => x.id) : [],
+    ready: spec?.status === 'plan-approved' ? taskQueue(tasks, {}, flow.externalDone, settings.maxParallel).ready.map((x) => x.id) : [],
     added: tasks.filter((x) => ADDED_RE.test(x.title)).map((x) => x.id),
     verify: runtime.verify ?? {},
+    paused: runtime.paused?.at ?? null,
+    decisions: pendingDecisions(root, settings, flow, runtime).map((d) => d.text),
     warnings,
   };
 }
@@ -40,7 +43,9 @@ export function statusLines(root, settings, flow, runtime, { brief = false } = {
   const titled = (list) => list.map((id) => `${id} ${byId[id]?.title ?? ''}`.trim());
   const lines = [
     `- ${s.spec}: ${d.spec ?? s.none} (${s.phase}: ${d.status ?? s.none})`,
+    ...(d.paused ? [`- ${s.paused(d.paused.slice(0, 16).replace('T', ' '))}`] : []),
     ...(d.pending ? [`- ${s.pending}: ${d.pending}`] : []),
+    ...(d.decisions.length ? [`- ${s.decisions(d.decisions.length, settings.decisions)}`] : []),
     `- ${s.done} (${d.done.length}/${flow.tasks.length}): ${titled(d.done.slice(-3)).join(' · ') || s.none}`,
     `- ${s.open}: ${ids(flow.tasks.filter((x) => !x.done)) || s.none}`,
     ...(d.ready.length ? [`- ${s.ready}: ${d.ready.join(', ')}`] : []),

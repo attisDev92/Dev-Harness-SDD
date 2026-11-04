@@ -17,6 +17,11 @@ const S = (lang) => ({
 
 function flowSkills(config) {
   const l = S({ cli: config.cli?.language ?? config.language?.docs, specs: config.language?.specs, docs: config.language?.docs });
+  const max = config.orchestration?.max_parallel ?? 2;
+  const interview = (config.gates?.decisions ?? 'summary') === 'interview';
+  const decisionsText = interview
+    ? `**This project interviews the user about pending decisions** (\`gates.decisions: interview\`). Whenever \`sdd.js decisions\` lists something (clarifications left in the spec, ADR drafts, tasks added during implementation, protected-zone or dependency alerts), ask the user about it **before going on**: one question at a time, 2–3 options and your recommendation. Write each answer where it belongs (spec.md, plan.md, the ADR, tasks.md) and record the keyed ones with \`sdd.js decisions --resolve <key>\`. \`sdd.js stop spec\` refuses while the spec still has \`[NEEDS CLARIFICATION]\` entries: interview first. Run \`sdd.js decisions\` before each stop and when a story closes.`
+    : `**This project keeps the flow light** (\`gates.decisions: summary\`): pending decisions (clarifications left in the spec, ADR drafts, tasks added during implementation, protected-zone or dependency alerts) are recorded and told in your summaries; you only ask when something is really the user's to decide. \`sdd.js decisions\` lists them at any time, and the user can ask for the interview with \`/sdd:decisions\`.`;
   return {
     sdd: `---
 name: sdd
@@ -44,16 +49,24 @@ You are the orchestrator, in the main session: you delegate to the subagents (th
 
 ## 3. Implement (status: plan-approved)
 
-1. \`sdd.js next\` lists what can start now (2 tasks/batches at most). Use \`sdd.js brief <TID>\` to inspect task scope and requirements without reading large markdown files. When next suggests a batch (\`T30 → T31\`), delegate the whole batch to a single subagent to avoid repeated cold starts. Delegate ready tasks **in the same message** so independent components move at once. **Never more than 2 subagents working at the same time, whatever their role**. Tests first. Resume paused subagents with messages instead of launching new ones when continuing work.
-2. When a subagent finishes: run \`sdd.js verify --component <id> --tests\` (lint, typecheck and component tests, without heavy e2e). If it fails, fix it (2 attempts at most). If it still fails, delegate to \`debugger\`, show its options and let the user choose.
-3. Green: mark the task done via \`sdd.js done <TID> [--note "resumen"]\` (avoids manual edits and collisions). For tasks marked \`[seguridad]\` or touching protected zones, run \`reviewer\` immediately. For normal tasks, skip individual reviewer and doc-writer runs per task: review and doc-sync happen once per story.
+1. \`sdd.js next\` lists what can start now (${max} task${max === 1 ? '' : 's'}/batch${max === 1 ? '' : 'es'} at most). For each one run \`sdd.js brief <TID>\` and **hand the subagent that brief verbatim** as its instructions: it carries the scope, the requirements and the rules (tests first, only the task's scope, real verification, no refactors or UI changes outside it). When next suggests a batch (\`T30 → T31\`), delegate the whole batch to a single subagent to avoid repeated cold starts. Delegate ready tasks **in the same message** so independent components move at once. **Never more than ${max} subagent${max === 1 ? '' : 's'} working at the same time, whatever the role** (\`orchestration.max_parallel\`). Resume paused subagents with messages instead of launching new ones when continuing work.
+2. When a subagent finishes: run \`sdd.js verify --component <id> --tests\` (lint, typecheck and component tests, without heavy e2e). Trust only that output, never the subagent's own claim that tests pass. If it fails, fix it (2 attempts at most). If it still fails, delegate to \`debugger\`, show its options and let the user choose.
+3. Green: close the task with \`sdd.js done <TID> [--note "resumen"]\`. It refuses when the component has no green verification or the code changed after it, so never tick tasks.md by hand. For tasks marked \`[seguridad]\` or touching protected zones, run \`reviewer\` immediately. For normal tasks, skip individual reviewer and doc-writer runs per task: review and doc-sync happen once per story.
 4. Call \`next\` again: a free slot or a finished dependency unblocks new tasks or batches.
 5. When a story is done: run full verification \`sdd.js verify --component <id>\` (including e2e). Delegate to \`reviewer\` and \`doc-writer\` to review the whole story changes and update docs. ${Object.values(config.components ?? {}).some((c) => c.verify?.eval) ? 'Run the AI evaluations once: \`sdd.js verify --eval\`. They cost money and are not deterministic, so never in the task loop and never again just to get a pass; their result goes with the commit proposal and the user decides. ' : ''}${config.gates?.manual_test === 'none' ? 'no manual test is asked for.' : 'give the manual test (how to start it, URL or command, steps, test data, expected result per requirement) as a normal question. A failure starts the triage of that story; the rest go on.'} Then **propose the commit**: \`sdd.js commit-context --story <H#>\`, one message per repository with changes, following the project convention; if the user says yes, \`git add\` + \`git commit\`. Never push unless they ask.
 6. Last story done: \`sdd.js validate\` (requirement → test) and give the verdict; the spec is closed as \`done\`.
 
+## Pending decisions
+
+${decisionsText}
+
+## Pause and resume
+
+When the user wants to stop, pause, end the session or "pick it up later": run \`sdd.js pause\`. From then on **launch no new subagent and start no new task** (the hook refuses launches, and \`next\` lists nothing). Let the active subagents finish their task: verify, \`done\`, their report. Leave tasks.md, progress.md and the affected docs up to date, propose the commit if a story closed, and end with a short summary of where everything stands and how to resume. When the user says to continue, run \`sdd.js resume\` and go on with \`next\`.
+
 ## Things that come up
 
-- **New work during implementation:** add it to tasks.md with its component, marked "${config.language?.specs === 'es' ? 'añadida en implementación' : 'added during implementation'}", and carry on. Say so in your summary. No need to ask.
+- **New work during implementation:** add it to tasks.md with its component, marked "${config.language?.specs === 'es' ? 'añadida en implementación' : 'added during implementation'}", and carry on. ${interview ? 'It is a pending decision: confirm it with the user at the next check.' : 'Say so in your summary. No need to ask.'}
 - **The user changes or adds a requirement:** update the spec first (and plan/tasks), show the diff in a few lines and continue. Stop only if it contradicts something already built.
 - **Configuration:** \`harness.config.yaml\` can change at any moment; the tool asks the user to confirm the edit and the harness regenerates the configuration on its own.
 - **Alerts** (protected zone, code without a task, out of scope): they never stop you. Keep the documents in line (ADR draft, tasks.md) and mention it in your summary.
@@ -61,7 +74,7 @@ You are the orchestrator, in the main session: you delegate to the subagents (th
 
 ## Shortcuts the user may type
 
-\`/sdd:status\` (what happened), \`/sdd:spec\`, \`/sdd:next\`, \`/sdd:docs\`, \`/sdd:review\`, \`/sdd:validate\`, \`/sdd:commit\`. None of them is needed to approve or move on.
+\`/sdd:status\` (what happened), \`/sdd:spec\`, \`/sdd:next\`, \`/sdd:docs\`, \`/sdd:review\`, \`/sdd:validate\`, \`/sdd:commit\`, \`/sdd:decisions\` (interview about the pending decisions), \`/sdd:pause\` and \`/sdd:resume\`. None of them is needed to approve or move on.
 
 ## Never
 

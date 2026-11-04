@@ -186,12 +186,13 @@ test('RF-INI-17: end of input (Ctrl+D / closed pipe) cancels too', (t) => {
 
 test('RF-INI-01: the interview also works with piped answers', (t) => {
   const root = FIXTURES.frontend(t);
-  // topology, kind, verify, specPrefix, tools, conventions, lang:code, lang:commits, design, tracker, manual, mode, artifacts, gitHooks, ci, protected, apply
-  const input = ['', '', '', 'SHOP', '2', '', '', 'es', '2', '', '', '', '', '', '', '', 'y'].join('\n') + '\n';
+  // topology, kind, verify, specPrefix, tools, conventions, lang:code, lang:commits, design, tracker, manual, maxParallel, decisions, mode, artifacts, gitHooks, ci, protected, apply
+  const input = ['', '', '', 'SHOP', '2', '', '', 'es', '2', '', '', '3', '2', '', '', '', '', '', 'y'].join('\n') + '\n';
   const r = runCli(['init'], { cwd: root, input });
   assert.equal(r.code, 0, r.stdout + r.stderr);
   const c = readConfig(root);
   assert.deepEqual([c.specs.id_prefix, c.tools, c.language.commits, c.design.source], ['SHOP', ['opencode'], 'es', 'tokens-in-code']);
+  assert.deepEqual([c.orchestration.max_parallel, c.gates.decisions], [3, 'interview']);
 });
 
 test('RF-INI-18: a write failure rolls everything back', async (t) => {

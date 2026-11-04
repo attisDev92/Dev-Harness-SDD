@@ -27,6 +27,8 @@ La entrevista detecta y te pide confirmar:
 | Herramientas | Hoy, Claude Code |
 | Convenciones e idiomas | Lo que ya declara el proyecto (AGENTS.md, CONTRIBUTING.md, linters, historial de commits) |
 | Diseño, tracker, prueba manual | Fuente de diseño, tracker (cualquiera), cuándo pruebas tú |
+| Subagentes a la vez | Cuántos pueden trabajar en paralelo (`orchestration.max_parallel`, de 1 a 4) |
+| Decisiones pendientes | `summary`: se registran y se cuentan · `interview`: el agente te entrevista una pregunta cada vez (`gates.decisions`) |
 | Modo | `local`: el equipo no ve nada · `team`: la configuración se commitea |
 | Git hooks, CI | Pre-commit que solo rechaza secretos · plantilla de GitHub Actions con docs y verificación |
 | Zonas protegidas | Qué cambios exigen tu aprobación y un ADR |
@@ -48,7 +50,7 @@ Dile al agente lo que quieres construir ("quiero un login con email") y la skill
 
 1. **Spec**: te entrevista (máx. 6 preguntas), escribe los requisitos en EARS y los revisa. 🛑 **Parada 1**: apruebas la spec.
 2. **Plan y tareas**: el architect escribe plan, contratos, ADRs y `tasks.md` de una vez. 🛑 **Parada 2**: apruebas el plan con sus tareas.
-3. **Implementación**: frontend y backend en paralelo (nunca más de 2 subagentes a la vez, del rol que sea), tests primero. Tras cada tarea, verificación y después revisión y documentación, en paralelo solo si hay hueco.
+3. **Implementación**: frontend y backend en paralelo (nunca más de `orchestration.max_parallel` subagentes a la vez, del rol que sea), tests primero. Cada subagente recibe el brief de su tarea (`sdd.js brief`), con el alcance y las reglas. Tras cada tarea, verificación real y `sdd.js done` (que la exige en verde); al cerrar la historia, revisión y documentación.
 4. **Al cerrar una historia**: prueba manual (una pregunta normal) y el agente **propone el commit**; si dices que sí, lo hace.
 5. **Al final**: validación requisito por requisito; la spec queda como `done`.
 
@@ -66,12 +68,18 @@ Atajos opcionales (ninguno hace falta para avanzar):
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, último verify y últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar las tareas listas, hasta 2 a la vez |
+| `/sdd:next` | Lanzar las tareas listas, hasta `orchestration.max_parallel` a la vez |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
 | `/sdd:review` | Revisión (y QA) de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |
 | `/sdd:commit` | Proponer el commit ahora |
+| `/sdd:decisions` | Entrevista, una pregunta cada vez, sobre las decisiones pendientes |
+| `/sdd:pause` · `/sdd:resume` | Pausa ordenada: lo activo termina, nada nuevo arranca, resumen para retomar · retirar la pausa |
 | `/sdd:tracker` | Sincronizar `tasks.md` con tu tracker |
+
+**Para parar o cerrar la sesión**, di "para" o "lo retomamos luego" (o usa `/sdd:pause`): los subagentes activos terminan su tarea (verificación y `done`), no se lanza ninguno nuevo y el agente te deja un resumen de dónde queda todo. Al volver, `/sdd:status` lo muestra como "En pausa" y `/sdd:resume` (o "sigue") continúa.
+
+**Decisiones pendientes.** Las aclaraciones que quedaron en la spec, los ADRs en borrador, las tareas añadidas al implementar y los avisos de zona protegida se detectan en los archivos (`sdd.js decisions`). Con `gates.decisions: summary` el agente las registra y te las cuenta; con `interview` te pregunta una cada vez antes de seguir y no pide la parada de la spec mientras queden aclaraciones abiertas.
 
 El estado es visible: `status` en el frontmatter de `spec.md` (`draft` → `spec-approved` → `plan-approved` → `done`) y las casillas de `tasks.md`.
 

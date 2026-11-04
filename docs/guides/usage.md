@@ -27,6 +27,8 @@ The interview detects and asks you to confirm:
 | Tools | Claude Code today |
 | Conventions and languages | What the project already declares (AGENTS.md, CONTRIBUTING.md, linters, commit history) |
 | Design, tracker, manual test | Design source, tracker (any), when you test |
+| Subagents at once | How many may work in parallel (`orchestration.max_parallel`, 1–4) |
+| Pending decisions | `summary`: recorded and told · `interview`: the agent asks you one question at a time (`gates.decisions`) |
 | Mode | `local`: the team sees nothing · `team`: the configuration is committed |
 | Git hooks, CI | Pre-commit that only refuses secrets · GitHub Actions template with docs and verification |
 | Protected zones | Which changes need your approval and an ADR |
@@ -68,12 +70,18 @@ Optional shortcuts (none is needed to move on):
 |---|---|
 | `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification and last commits |
 | `/sdd:spec <idea>` | Start a spec |
-| `/sdd:next` | Launch the ready tasks in parallel |
+| `/sdd:next` | Launch the ready tasks in parallel, up to `orchestration.max_parallel` at once |
 | `/sdd:docs` | Bring the documentation up to date in the background |
 | `/sdd:review` | Review (and QA) of the changes, in parallel |
 | `/sdd:validate` | Requirement → test report |
 | `/sdd:commit` | Propose the commit now |
+| `/sdd:decisions` | Interview you, one question at a time, about the pending decisions |
+| `/sdd:pause` · `/sdd:resume` | Graceful pause: what runs finishes, nothing new starts, summary to resume · lift the pause |
 | `/sdd:tracker` | Sync `tasks.md` with your tracker |
+
+**To stop or end the session**, say "stop" or "let's pick it up later" (or use `/sdd:pause`): the active subagents finish their task (verification and `done`), nothing new is launched and the agent leaves you a summary of where everything stands. When you come back, `/sdd:status` shows it as paused and `/sdd:resume` (or "continue") goes on.
+
+**Pending decisions.** Clarifications left in the spec, ADR drafts, tasks added while implementing and protected-zone alerts are detected in the files (`sdd.js decisions`). With `gates.decisions: summary` the agent records them and tells you; with `interview` it asks you one question at a time before going on, and does not put the spec up for approval while clarifications are open.
 
 The state is visible: `status` in the frontmatter of `spec.md` (`draft` → `spec-approved` → `plan-approved` → `done`) and the checkboxes of `tasks.md`.
 

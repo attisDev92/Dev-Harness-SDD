@@ -382,9 +382,25 @@ test('done and brief commands: brief returns compact context; done marks task an
   assert.match(br.stdout, /Brief: T1/);
   assert.match(br.stdout, /Alcance permitido: src\/\*\*/);
   assert.match(br.stdout, /RF-01:?\*\*?\s*Health check 200/);
+  // The brief carries the rules the subagent must follow, whatever the tool runs it.
+  assert.match(br.stdout, /Reglas para el subagente/);
+  assert.match(br.stdout, /Nada de refactors/);
+  assert.match(br.stdout, /ejecuta `node check\.js`/);
+
+  // RF-VER-01: done refuses without a green verification, and again when the code changed after it.
+  const early = await sdd(root, 'done', 'T1');
+  assert.equal(early.code, 2);
+  assert.match(early.stderr, /No se cierra T1: la última verificación de "svc" no está en verde/);
+  fs.writeFileSync(path.join(root, 'pass.flag'), '');
+  assert.equal((await sdd(root, 'verify', '--component', 'svc', '--tests')).code, 0);
+  fs.writeFileSync(path.join(root, 'src/index.js'), 'export const changed = true;\n');
+  const stale = await sdd(root, 'done', 'T1');
+  assert.equal(stale.code, 2);
+  assert.match(stale.stderr, /cambiaron después de la última verificación/);
+  assert.equal((await sdd(root, 'verify', '--component', 'svc', '--tests')).code, 0);
 
   const d = await sdd(root, 'done', 'T1', '--note', 'Implemented endpoint');
-  assert.equal(d.code, 0);
+  assert.equal(d.code, 0, d.stderr);
   assert.match(d.stdout, /Tarea T1 marcada como hecha en tasks\.md/);
 
   const tasksContent = fs.readFileSync(path.join(root, 'specs', spec, 'tasks.md'), 'utf8');
@@ -392,5 +408,105 @@ test('done and brief commands: brief returns compact context; done marks task an
 
   const progContent = fs.readFileSync(path.join(root, 'specs', spec, 'progress.md'), 'utf8');
   assert.match(progContent, /T1: Implemented endpoint/);
+});
+
+test('orchestration.max_parallel: the queue, next and the hook use the configured limit', async (t) => {
+  const tasks = parseTasks(`- [ ] T1 API · Component: api · Depends on: —
+- [ ] T2 Screen · Component: web · Depends on: —
+- [ ] T3 Jobs · Component: jobs · Depends on: —
+`);
+  assert.deepEqual(taskQueue(tasks, {}, () => false, 3).ready.map((x) => x.id), ['T1', 'T2', 'T3']);
+  assert.deepEqual(taskQueue(tasks, {}, () => false, 1).ready.map((x) => x.id), ['T1']);
+  const root = await project(t, `${CONFIG}orchestration: {max_parallel: 3}\n`);
+  const launch = (id, role) => hook(root, 'PreToolUse', { tool_use_id: id, tool_name: 'Task', tool_input: { subagent_type: role, prompt: 'x' } }, { snapshot: () => ({}) });
+  launch('a', 'backend-dev');
+  launch('b', 'frontend-dev');
+  assert.equal(launch('c', 'qa-tester').stdout, undefined, 'a third subagent fits');
+  assert.match(alertOf(launch('d', 'reviewer')), /El máximo son 3 a la vez/);
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  const next = await sdd(root, 'next');
+  assert.equal(next.code, 0, next.stderr);
+  assert.match(next.stdout, /Máximo 3 subagentes/);
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /never more than 3 subagents/);
+});
+
+test('sdd.js pause: active subagents finish, nothing new starts; resume lifts it', async (t) => {
+  const root = await project(t);
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  const launch = (id, role) => hook(root, 'PreToolUse', { tool_use_id: id, tool_name: 'Task', tool_input: { subagent_type: role, prompt: 'x' } }, { snapshot: () => ({}) });
+  assert.equal(launch('a', 'backend-dev').stdout, undefined);
+
+  const p = await sdd(root, 'pause');
+  assert.equal(p.code, 0, p.stderr);
+  assert.match(p.stdout, /Pausa registrada\. El subagente activo termina su tarea/);
+  assert.match((await sdd(root, 'pause')).stdout, /Ya estaba en pausa/);
+  // A new subagent is refused, in Claude Code (exit 2) and in Antigravity (deny).
+  const blocked = launch('b', 'frontend-dev');
+  assert.equal(blocked.code, 2);
+  assert.match(blocked.stderr, /el usuario pidió pausar/);
+  const agy = hook(root, 'PreToolUse', { toolCall: { name: 'invoke_subagent', args: { Subagents: [{ Role: 'qa-tester' }] } } }, { snapshot: () => ({}) });
+  assert.equal(JSON.parse(agy.stdout).decision, 'deny');
+  // next lists nothing new; the running subagent reports back as usual.
+  const next = await sdd(root, 'next');
+  assert.equal(next.code, 0);
+  assert.match(next.stdout, /En pausa desde/);
+  assert.doesNotMatch(next.stdout, /T1 Health endpoint/);
+  assert.equal(hook(root, 'PostToolUse', { tool_use_id: 'a', tool_name: 'Task', tool_input: { subagent_type: 'backend-dev' } }, { snapshot: () => ({}) }).code, 0);
+  assert.match((await sdd(root, 'status')).stdout, /En pausa desde/);
+  assert.match(hook(root, 'SessionStart').stdout, /En pausa desde/);
+
+  assert.match((await sdd(root, 'resume')).stdout, /Pausa retirada/);
+  assert.match((await sdd(root, 'resume')).stdout, /No había ninguna pausa/);
+  assert.match((await sdd(root, 'next')).stdout, /T1 Health endpoint/);
+  assert.equal(launch('c', 'frontend-dev').stdout, undefined);
+});
+
+test('gates.decisions: pending decisions come from the files; interview mode holds the spec stop until clarifications are answered', async (t) => {
+  const root = await project(t, CONFIG.replace('gates: {manual_test: story, commits: per-story, deps: ask}', 'gates: {manual_test: story, commits: per-story, deps: ask, decisions: interview}'));
+  const id = /Spec (\S+) creada/.exec((await sdd(root, 'new-spec', 'login')).stdout)[1];
+  const draft = (extra) => `---\nstatus: draft\n---\n# ${id}\n\n- **RF-01:** WHEN x THE SYSTEM SHALL y.\n${extra}`;
+  fs.writeFileSync(specFile(root, id), draft('\n## Open questions\n\n- [NEEDS CLARIFICATION: ¿Se permite el login social?]\n'));
+  const stop = await sdd(root, 'stop', 'spec');
+  assert.equal(stop.code, 2);
+  assert.match(stop.stderr, /1 aclaración pendiente/);
+  assert.match(stop.stdout, /login social/);
+  const list = await sdd(root, 'decisions');
+  assert.match(list.stdout, /Decisiones pendientes de \S+ \(1\):/);
+  assert.match(list.stdout, /Entrevista al usuario/);
+  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /one question at a time before going on/);
+
+  // Answered in the spec: the stop goes through.
+  fs.writeFileSync(specFile(root, id), draft(''));
+  assert.equal((await sdd(root, 'stop', 'spec')).code, 0);
+  say(root, 'sí');
+  await sdd(root, 'stop', 'plan');
+  say(root, 'sí');
+  assert.equal(statusOf(root, id), 'plan-approved');
+
+  // ADR drafts of this spec, tasks added during implementation and guard alerts are decisions too.
+  const adr = await sdd(root, 'new-adr', 'use redis');
+  const adrFile = /docs\/decisions\/\S+\.md/.exec(adr.stdout)[0];
+  fs.writeFileSync(path.join(root, 'specs', id, 'tasks.md'), `${TASKS.trimEnd()}\n- [ ] T9 Cache layer (añadida en implementación) · Component: svc · Depends on: —\n`);
+  writeTool(root, 'db/migrations/001.sql');
+  const d = JSON.parse((await sdd(root, 'decisions', '--json')).stdout).decisions;
+  assert.deepEqual(d.map((x) => x.kind), ['adr', 'added', 'alert']);
+  assert.equal(d[0].file, adrFile);
+  assert.match(d[2].text, /Zona protegida "db"/);
+  // Keyed alerts are resolved explicitly; the rest by editing the files.
+  assert.equal((await sdd(root, 'decisions', '--resolve', d[2].key)).code, 0);
+  assert.equal((await sdd(root, 'decisions', '--resolve', d[2].key)).code, 2);
+  assert.deepEqual(JSON.parse((await sdd(root, 'decisions', '--json')).stdout).decisions.map((x) => x.kind), ['adr', 'added']);
+  assert.match((await sdd(root, 'status')).stdout, /Decisiones pendientes del usuario: 2/);
+  assert.match((await sdd(root, 'decisions')).stdout, /Entrevista al usuario/);
+});
+
+test('gates.decisions summary (default): the stop is not held and decisions are only reported', async (t) => {
+  const root = await project(t);
+  const id = /Spec (\S+) creada/.exec((await sdd(root, 'new-spec', 'login')).stdout)[1];
+  fs.writeFileSync(specFile(root, id), `---\nstatus: draft\n---\n# ${id}\n\n- [NEEDS CLARIFICATION: ¿MFA?]\n`);
+  assert.equal((await sdd(root, 'stop', 'spec')).code, 0);
+  assert.match((await sdd(root, 'decisions')).stdout, /Cuéntaselas al usuario en tu resumen/);
 });
 

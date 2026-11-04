@@ -22,6 +22,13 @@ export const CHANGES = {
   '0.7.0': ['Comando sdd-harness y atajo sdd-harness-init', 'Ocho skills propias más (clean-code, design-system, api-design…)', 'Git hooks en cada repo de un workspace'],
   '0.8.0': ['Flujo ligero: solo dos paradas (spec y plan+tareas) que se aprueban hablando ("sí", "continúa")', 'El agente propone el commit al cerrar cada historia y lo hace con tu OK', 'Tareas nuevas y cambios de harness.config.yaml en cualquier momento, con sync automático', 'Comandos /sdd:* solo informativos o para lanzar trabajo en paralelo (status, spec, next, docs, review, validate, commit)', 'Estado visible en spec.md (frontmatter) y tasks.md; sin lock de sesión ni gates'],
   '0.8.1': ['Nunca más de 2 subagentes trabajando a la vez (backend, frontend, qa…): sdd.js next lista 2 como máximo y un tercer subagente produce un aviso'],
+  '2.1.0': [
+    'orchestration.max_parallel: cuántos subagentes pueden trabajar a la vez (1–4; antes siempre 2)',
+    'gates.decisions: summary (como hasta ahora) o interview, para que el agente te entreviste sobre las decisiones pendientes; nuevo sdd.js decisions y /sdd:decisions',
+    'sdd.js pause / resume y /sdd:pause, /sdd:resume: los subagentes activos terminan y no se lanza ninguno nuevo, para cerrar o suspender una sesión',
+    'sdd.js done solo cierra una tarea con una verificación verde y actual de su componente; sdd.js brief incluye las reglas que recibe el subagente',
+    'Antigravity: regla siempre activa (.agents/rules/sdd-harness.md) con lo que los modelos de Google dejaban de seguir',
+  ],
 };
 
 /**
@@ -29,7 +36,24 @@ export const CHANGES = {
  * document (comments are kept) and changes it in place.
  * @type {{ to: string, migrate: (doc: import('yaml').Document) => void }[]}
  */
-export const MIGRATIONS = [];
+export const MIGRATIONS = [
+  {
+    // 2.1.0: the two orchestration options, with the values the project had implicitly (2 subagents, decisions in the summary).
+    to: '2.1.0',
+    migrate(doc) {
+      // Nodes are created explicitly so the comment can hang on the scalar.
+      const add = (section, key, value, text) => {
+        if (doc.hasIn([section, key])) return;
+        const node = doc.createNode(value);
+        node.comment = ` ${text}`;
+        if (!doc.hasIn([section])) doc.set(section, doc.createNode({}));
+        doc.setIn([section, key], node);
+      };
+      add('orchestration', 'max_parallel', 2, 'subagentes trabajando a la vez, de 1 a 4');
+      add('gates', 'decisions', 'summary', 'summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)');
+    },
+  },
+];
 
 export async function upgradeCommand(argv, ctx) {
   const { io, t, tc, version } = ctx;

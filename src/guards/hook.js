@@ -2,7 +2,8 @@
 // Claude Code hook dispatcher (RF-ADP-01/02). One entry point per event:
 //   node .harness/scripts/hook.js <PreToolUse|PostToolUse|UserPromptSubmit|SessionStart|Stop>
 // It reads the hook payload from stdin. Alerts never stop the work; only the
-// harness itself is blocked (exit 2 + stderr). Dependency-free.
+// harness itself is blocked (exit 2 + stderr), and launching a new subagent
+// while the user asked to pause (sdd.js pause). Dependency-free.
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -15,7 +16,6 @@ import { changeSnapshot, changedSince } from './verify.js';
 import { runtimeMessages, verdictText } from './runtime-messages.js';
 import { matchesAny } from './glob.js';
 import { statusLines } from './status.js';
-import { MAX_PARALLEL } from './tasks.js';
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const AGENT_TOOLS = new Set(['Task', 'Agent']);
@@ -65,10 +65,15 @@ export function handleHook(event, payload, opts = {}) {
     case 'PreToolUse': {
       if ((AGENT_TOOLS.has(tool) && HARNESS_ROLES.has(input.subagent_type)) || (tool === 'invoke_subagent' && HARNESS_ROLES.has(agySubagentRole))) {
         const subType = input.subagent_type ?? agySubagentRole;
+        // The user asked to pause (sdd.js pause): what runs finishes, nothing new starts.
+        if (runtime.paused) {
+          logEvent(root, 'subagent-refused', { role: subType, reason: 'paused' });
+          return blockHook(t.pause.launchBlocked(subType, runtime.paused.at.slice(0, 16).replace('T', ' ')));
+        }
         const running = Object.values(runtime.subagents).filter((s) => Date.now() - Date.parse(s.started) < STALE_SUBAGENT_MS).length;
         runtime.subagents[payload.tool_use_id ?? subType] = { role: subType, snapshot: snapshot(root), started: new Date().toISOString() };
         save();
-        return running >= MAX_PARALLEL ? context(t.hook.tooMany(subType, running)) : { code: 0 };
+        return running >= settings.maxParallel ? context(t.hook.tooMany(subType, running, settings.maxParallel)) : { code: 0 };
       }
       if (!WRITE_TOOLS.has(tool) && tool !== 'write_to_file' && tool !== 'replace_file_content') return { code: 0 };
       const file = input.file_path ?? input.notebook_path ?? input.path ?? input.TargetFile;

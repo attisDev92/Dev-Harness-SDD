@@ -25,7 +25,7 @@ export const HEADER = {
 export const TOOL_CONTEXT_LIMITS = { codex: 32768, 'claude-code': 40000, opencode: 40000, antigravity: 12000 };
 
 const GUARD_SOURCES = [
-  'args.js', 'checks.js', 'contracts.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'glob.js', 'hook.js', 'project.js',
+  'args.js', 'checks.js', 'contracts.js', 'decisions.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'glob.js', 'hook.js', 'project.js',
   'runtime-messages.js', 'sdd.js', 'state.js', 'status.js', 'tasks.js', 'tracker-sync.js', 'verify.js',
 ];
 const GUARDS_DIR = path.dirname(fileURLToPath(new URL('../guards/hook.js', import.meta.url)));
@@ -211,6 +211,8 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
         components: Object.fromEntries(Object.entries(config.components ?? {}).map(([id, c]) => [id, { path: c.path, kind: c.kind ?? 'other', id_prefix: c.id_prefix, verify: c.verify ?? {} }])),
         roles: Object.fromEntries(neededRoles(config).map((r) => [r.role, { writes: r.writes }])),
         manual_test: config.gates?.manual_test ?? 'story',
+        decisions: config.gates?.decisions ?? 'summary',
+        max_parallel: config.orchestration?.max_parallel ?? 2,
         specs_language: config.language?.specs ?? 'en',
         docs_language: config.language?.docs ?? 'en',
         commits: { convention: config.conventions?.commits ?? 'conventional', language: config.language?.commits ?? 'en', note: config.conventions?.commits_note },
