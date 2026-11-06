@@ -10,7 +10,7 @@
 
 import { neededRoles } from '../context.js';
 import { withMdHeader, quoteFrontmatter } from '../core.js';
-import { roleText, commands, maxParallel } from './claude-code.js';
+import { roleText, commands } from './claude-code.js';
 
 export const id = 'antigravity';
 export const RULES = ['commits', 'deps', 'protected', 'docs', 'verify', 'lanes'];
@@ -48,7 +48,6 @@ Do not commit or push directly. Follow AGENTS.md. Keep your final report concise
  * only what the model must never improvise. Everything else stays in the skills.
  */
 export function rulesFile(config) {
-  const max = maxParallel(config);
   const interview = (config.gates?.decisions ?? 'summary') === 'interview';
   return `---
 trigger: always_on
@@ -61,7 +60,7 @@ Este proyecto sigue Spec-Driven Development con sdd-harness. AGENTS.md tiene las
 
 - **Estado y órdenes**: \`${S} status\` dice dónde estamos. El estado vive en \`specs/*/spec.md\` (\`status\`) y en las casillas de \`tasks.md\`; no lo deduzcas de memoria.
 - **Dos paradas** (spec y plan): pide la aprobación al usuario y, cuando diga que sí, regístrala con \`${S} approve\`. Nada se implementa sin el plan aprobado.
-- **Delegar**: \`${S} next\` lista las tareas listas (${max} como máximo). Para cada una ejecuta \`${S} brief <TID>\` y pásale al subagente (invoke_subagent, Role = el rol que indica el brief) **ese brief tal cual** como instrucciones: lleva el alcance, los requisitos y las reglas. Nunca más de ${max} subagente${max === 1 ? '' : 's'} a la vez.
+- **Delegar**: \`${S} next\` lista las tareas listas (hasta el máximo de subagentes a la vez de cada desarrollador, que ahí mismo se indica). Para cada una ejecuta \`${S} brief <TID>\` y pásale al subagente (invoke_subagent, Role = el rol que indica el brief) **ese brief tal cual** como instrucciones: lleva el alcance, los requisitos y las reglas. Nunca más subagentes a la vez de los que indica \`next\` (cada desarrollador fija el suyo con \`${S} agents <1-4>\`).
 - **Verificación real**: una tarea solo se cierra con \`${S} verify --component <id> --tests\` en verde y después \`${S} done <TID>\`, que lo comprueba y rechaza si no. Nunca marques \`tasks.md\` a mano ni des por ejecutados tests que no ejecutaste; no inventes resultados.
 - **Solo el alcance de la tarea**: nada de refactors, limpieza, cambios de estilo ni de UI fuera de ella. Si hacen falta, añádelos a \`tasks.md\` como "añadida en implementación" y sigue.
 - **Decisiones pendientes** (aclaraciones, ADRs en borrador, tareas añadidas, avisos): \`${S} decisions\` las lista. ${interview ? 'En este proyecto se entrevista al usuario sobre ellas, una pregunta cada vez, antes de seguir.' : 'En este proyecto se registran y se cuentan en el resumen; el usuario pide la entrevista con /sdd:decisions.'}
@@ -84,7 +83,7 @@ export function generate(config, ctx) {
   }
 
   // Role skills, so Antigravity subagents (which have no agent definition file) get the role's guidelines.
-  const texts = roleText(maxParallel(config));
+  const texts = roleText();
   for (const { role, writes } of neededRoles(config)) {
     const text = texts[role];
     if (text) {

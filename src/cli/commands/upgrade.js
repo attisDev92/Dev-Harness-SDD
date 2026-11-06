@@ -29,6 +29,11 @@ export const CHANGES = {
     'sdd.js done solo cierra una tarea con una verificación verde y actual de su componente; sdd.js brief incluye las reglas que recibe el subagente',
     'Antigravity: regla siempre activa (.agents/rules/sdd-harness.md) con lo que los modelos de Google dejaban de seguir',
   ],
+  '2.2.0': [
+    'Límite de subagentes por desarrollador: sdd.js agents <1-4> lo fija solo en tu máquina (.harness/state/local.json, nunca se versiona); orchestration.max_parallel pasa a ser el valor por defecto del proyecto',
+    'sdd.js agents muestra el límite efectivo y su origen; sdd.js agents --clear vuelve al del proyecto',
+    'Skills, agentes, AGENTS.md y la regla de Antigravity ya no llevan el número escrito: remiten a sdd.js next',
+  ],
 };
 
 /**
@@ -49,7 +54,7 @@ export const MIGRATIONS = [
         if (!doc.hasIn([section])) doc.set(section, doc.createNode({}));
         doc.setIn([section, key], node);
       };
-      add('orchestration', 'max_parallel', 2, 'subagentes trabajando a la vez, de 1 a 4');
+      add('orchestration', 'max_parallel', 2, 'subagentes a la vez por defecto, de 1 a 4 (cada dev lo cambia en su máquina: sdd.js agents N)');
       add('gates', 'decisions', 'summary', 'summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)');
     },
   },

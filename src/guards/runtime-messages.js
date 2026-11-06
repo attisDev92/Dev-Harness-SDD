@@ -45,6 +45,14 @@ const es = {
     nextPaused: (at) => `En pausa desde ${at}: no se lanzan tareas nuevas. Termina lo que esté activo y da el resumen de dónde queda todo. Para retomar: ${S} resume.`,
     launchBlocked: (role, at) => `Bloqueado: el usuario pidió pausar (${at}) y ${role} sería un subagente nuevo. Termina lo activo, deja los documentos al día y da el resumen. Si el usuario ya dijo que sigamos, ejecuta ${S} resume y vuelve a lanzarlo.`,
   },
+  agents: {
+    show: (max, source, project) => (source === 'local'
+      ? `Subagentes a la vez: ${max} (límite propio de este desarrollador; el del proyecto es ${project}). Para volver al del proyecto: ${S} agents --clear.`
+      : `Subagentes a la vez: ${max} (el del proyecto). Para fijar el tuyo, solo en esta máquina: ${S} agents <1-4>.`),
+    set: (n, max) => `Límite propio fijado: ${n} subagente${n === 1 ? '' : 's'} a la vez, solo en esta máquina (.harness/state/local.json, nunca se versiona). Límite del proyecto: ${max}.`,
+    cleared: (max) => `Límite propio retirado. Vale el del proyecto: ${max}.`,
+    invalid: (raw, limit) => `"${raw}" no es válido: indica un número entero de 1 a ${limit}.`,
+  },
   hook: {
     approvedByUser: (stop, id, text) => `El usuario APROBÓ ${stop} de ${id}${text ? ` ("${text}")` : ''}; ya está registrado en spec.md. Sigue con el siguiente paso sin volver a preguntar.`,
     changesRequested: (stop, id) => `El usuario no aprobó todavía ${stop} de ${id}: su mensaje son cambios o preguntas. Atiéndelos, actualiza los documentos y vuelve a pedir la aprobación.`,
@@ -67,7 +75,7 @@ const es = {
       ...(t.doneWhen ? [`  Hecho cuando: ${t.doneWhen}`] : []),
     ].join('\n'),
     batch: (ids) => `  Lote recomendado: ${ids.join(' → ')} (un solo subagente para todas).`,
-    parallel: (max = 2) => `Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje), pasando a cada subagente la salida de ${S} brief <TID> tal cual. Máximo ${max} subagente${max === 1 ? '' : 's'} trabajando a la vez. Tests primero. Al terminar: ${S} verify --component <id> --tests, luego ${S} done <TID>.`,
+    parallel: (max = 2, source = 'project') => `Delégalas a la vez (varias llamadas a subagentes en el mismo mensaje), pasando a cada subagente la salida de ${S} brief <TID> tal cual. Máximo ${max} subagente${max === 1 ? '' : 's'} trabajando a la vez${source === 'local' ? ' (límite propio de este desarrollador)' : ''}. Tests primero. Al terminar: ${S} verify --component <id> --tests, luego ${S} done <TID>.`,
     queued: (ids, max = 2) => `Sin hueco ahora (máximo ${max} a la vez): ${ids.join(', ')}. Vuelve a llamar a next cuando termine una.`,
     waiting: (w) => `Esperando dependencias: ${w.map((x) => `${x.task.id} espera a ${x.on.join(', ')}`).join(' · ')}.`,
     problems: (t, ps) => `${t} necesita arreglo en tasks.md: ${ps.join(', ')}.`,

@@ -19,7 +19,7 @@ suite('Antigravity Adapter', () => {
     assert.match(rule.content, /^---\ntrigger: always_on\n---\n/);
     assert.ok(rule.content.length < 12000);
     assert.match(rule.content, /sdd\.js brief <TID>/);
-    assert.match(rule.content, /Nunca más de 2 subagentes a la vez/);
+    assert.match(rule.content, /Nunca más subagentes a la vez de los que indica `next`/);
     assert.match(rule.content, /se registran y se cuentan en el resumen/);
 
     // Skills and role skills
@@ -42,13 +42,14 @@ suite('Antigravity Adapter', () => {
     assert.deepStrictEqual(hooks.enforces, antigravity.RULES);
   });
 
-  test('the rule, the role skills and the workflows follow orchestration.max_parallel and gates.decisions', () => {
+  test('the rule defers the subagent limit to `sdd.js next` (each developer sets their own) and follows gates.decisions', () => {
     const config = { orchestration: { max_parallel: 3 }, gates: { decisions: 'interview' }, components: { api: { path: 'api', kind: 'backend' } } };
     const { entries } = antigravity.generate(config, { skills: {} });
     const byPath = Object.fromEntries(entries.map((e) => [e.path, e]));
-    assert.match(byPath['.agents/rules/sdd-harness.md'].content, /Nunca más de 3 subagentes a la vez/);
-    assert.match(byPath['.agents/rules/sdd-harness.md'].content, /se entrevista al usuario/);
-    assert.match(byPath['.agents/skills/role-architect/SKILL.md'].content, /3 subagents at once at most/);
-    assert.match(byPath['.agents/workflows/sdd-next.md'].content, /Never more than 3 subagents/);
+    const rule = byPath['.agents/rules/sdd-harness.md'].content;
+    assert.match(rule, /Nunca más subagentes a la vez de los que indica `[^`]*next`/);
+    assert.match(rule, /agents <1-4>/);
+    assert.match(rule, /se entrevista al usuario/);
+    for (const e of entries.filter((x) => typeof x.content === 'string')) assert.doesNotMatch(e.content, /\b3 subagent|3 subagentes/, `${e.path} must not embed the project limit`);
   });
 });

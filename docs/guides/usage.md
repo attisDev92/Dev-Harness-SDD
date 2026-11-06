@@ -27,7 +27,7 @@ The interview detects and asks you to confirm:
 | Tools | Claude Code today |
 | Conventions and languages | What the project already declares (AGENTS.md, CONTRIBUTING.md, linters, commit history) |
 | Design, tracker, manual test | Design source, tracker (any), when you test |
-| Subagents at once | How many may work in parallel (`orchestration.max_parallel`, 1–4) |
+| Subagents at once | Project default for how many may work in parallel (`orchestration.max_parallel`, 1–4). Each developer can pick their own on their machine with `sdd.js agents N` (saved in `.harness/state/local.json`, never versioned); `sdd.js agents` shows it and `sdd.js agents --clear` goes back to the default |
 | Pending decisions | `summary`: recorded and told · `interview`: the agent asks you one question at a time (`gates.decisions`) |
 | Mode | `local`: the team sees nothing · `team`: the configuration is committed |
 | Git hooks, CI | Pre-commit that only refuses secrets · GitHub Actions template with docs and verification |
@@ -70,7 +70,7 @@ Optional shortcuts (none is needed to move on):
 |---|---|
 | `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification and last commits |
 | `/sdd:spec <idea>` | Start a spec |
-| `/sdd:next` | Launch the ready tasks in parallel, up to `orchestration.max_parallel` at once |
+| `/sdd:next` | Launch the ready tasks in parallel, up to your limit of subagents at once (`sdd.js agents` shows it) |
 | `/sdd:docs` | Bring the documentation up to date in the background |
 | `/sdd:review` | Review (and QA) of the changes, in parallel |
 | `/sdd:validate` | Requirement → test report |

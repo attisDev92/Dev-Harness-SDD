@@ -20,7 +20,7 @@ export function emptyRuntime() {
   return { version: 2, pending: null, verify: {}, alerted: [], subagents: {}, focus: null, paused: null, decided: [] };
 }
 
-function writeAtomic(file, text) {
+export function writeAtomic(file, text) {
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, text);

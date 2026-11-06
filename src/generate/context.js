@@ -57,7 +57,7 @@ const L = {
     precedence: 'Precedence',
     precedenceText: (sources) => `When instructions conflict, follow this order: 1) \`docs/constitution.md\`; 2) project conventions: the rest of this file${sources.length ? ` and ${sources.map((s) => `\`${s}\``).join(', ')}` : ''}; 3) sdd-harness skills; 4) third-party skills.`,
     workflow: 'Workflow',
-    workflowText: (n) => `Spec → plan and tasks → implementation (frontend and backend in parallel, never more than ${n} subagent${n === 1 ? '' : 's'} working at once, tests first) → validation, with the documentation always up to date. The sdd skill runs it. The user is asked at two stops only (the spec, and the plan with its tasks) and answers in plain words ("yes", "continue"); the rest moves on and is told in summaries. Templates: \`.harness/templates/\`.`,
+    workflowText: () => `Spec → plan and tasks → implementation (frontend and backend in parallel, never more subagents working at once than the developer's own limit, which \`sdd.js next\` reports and \`sdd.js agents\` changes; tests first) → validation, with the documentation always up to date. The sdd skill runs it. The user is asked at two stops only (the spec, and the plan with its tasks) and answers in plain words ("yes", "continue"); the rest moves on and is told in summaries. Templates: \`.harness/templates/\`.`,
     commands: 'Optional shortcuts: `/sdd:status` (what happened), `/sdd:spec`, `/sdd:next`, `/sdd:docs`, `/sdd:review`, `/sdd:validate`, `/sdd:commit`, `/sdd:decisions` (interview about pending decisions), `/sdd:pause` (finish what is running, launch nothing new) and `/sdd:resume`. None is needed to approve or to move on.',
     ruleDecisions: (mode) => mode === 'interview'
       ? 'Pending decisions (clarifications, ADR drafts, tasks added during implementation, protected-zone alerts): `sdd.js decisions` lists them; ask the user about them one question at a time before going on.'
@@ -96,7 +96,7 @@ const L = {
     precedence: 'Precedencia',
     precedenceText: (sources) => `Si las instrucciones chocan, sigue este orden: 1) \`docs/constitution.md\`; 2) convenciones del proyecto: el resto de este archivo${sources.length ? ` y ${sources.map((s) => `\`${s}\``).join(', ')}` : ''}; 3) skills del harness; 4) skills de terceros.`,
     workflow: 'Flujo',
-    workflowText: (n) => `Spec → plan y tareas → implementación (frontend y backend en paralelo, nunca más de ${n} subagente${n === 1 ? '' : 's'} trabajando a la vez, tests primero) → validación, con la documentación siempre al día. Lo dirige la skill sdd. Al usuario solo se le pregunta en dos paradas (la spec, y el plan con sus tareas) y responde hablando ("sí", "continúa"); el resto avanza y se cuenta en los resúmenes. Plantillas: \`.harness/templates/\`.`,
+    workflowText: () => `Spec → plan y tareas → implementación (frontend y backend en paralelo, nunca más subagentes a la vez que el límite propio de cada desarrollador, que indica \`sdd.js next\` y cambia \`sdd.js agents\`; tests primero) → validación, con la documentación siempre al día. Lo dirige la skill sdd. Al usuario solo se le pregunta en dos paradas (la spec, y el plan con sus tareas) y responde hablando ("sí", "continúa"); el resto avanza y se cuenta en los resúmenes. Plantillas: \`.harness/templates/\`.`,
     commands: 'Atajos opcionales: `/sdd:status` (qué pasó), `/sdd:spec`, `/sdd:next`, `/sdd:docs`, `/sdd:review`, `/sdd:validate`, `/sdd:commit`, `/sdd:decisions` (entrevista sobre las decisiones pendientes), `/sdd:pause` (termina lo activo, no lanza nada nuevo) y `/sdd:resume`. Ninguno hace falta para aprobar ni para avanzar.',
     ruleDecisions: (mode) => mode === 'interview'
       ? 'Decisiones pendientes (aclaraciones, ADRs en borrador, tareas añadidas en implementación, avisos de zona protegida): `sdd.js decisions` las lista; pregúntaselas al usuario una cada vez antes de seguir.'
@@ -170,7 +170,7 @@ export function rootContext(config, ctx) {
     '',
     `## ${t.workflow}`,
     '',
-    t.workflowText(config.orchestration?.max_parallel ?? 2),
+    t.workflowText(),
     '',
     t.commands,
     '',

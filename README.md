@@ -167,7 +167,7 @@ The `/sdd:*` commands are **optional shortcuts** to see what happened or to laun
 |---|---|
 | `/sdd:status` | What happened: spec and status, last tasks closed, pending ones, last verification, last commits |
 | `/sdd:spec <idea>` | Start a spec |
-| `/sdd:next` | Launch the ready tasks in parallel (frontend ∥ backend), up to `orchestration.max_parallel` at once |
+| `/sdd:next` | Launch the ready tasks in parallel (frontend ∥ backend), up to your limit of subagents at once (`sdd.js agents` shows it) |
 | `/sdd:docs` | Bring the docs up to date in the background |
 | `/sdd:review` | Review (and QA) of the recent changes, in parallel |
 | `/sdd:validate` | Requirement → test report |
@@ -252,7 +252,7 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 | 🔁 **No infinite loops** | Max **2** fix attempts. Then debugger report → you choose |
 | 🧑 **You test what matters** | URL, steps and test data at the granularity you choose (`task`, `story`, `spec` or `none`) |
 | 🗂️ **Docs always up to date** | Any `.md` can be written; agents must update every document a change affects. A whitelist is opt-in (`gates.docs: whitelist`) |
-| ⚡ **Parallel agents, with a limit** | Frontend and backend tasks run at once, never more than `orchestration.max_parallel` subagents (1–4, default 2); a task waits only for its own `Depends on` |
+| ⚡ **Parallel agents, with a limit** | Frontend and backend tasks run at once, never more than the limit of subagents (1–4; `orchestration.max_parallel` sets the project default, 2, and each developer picks their own on their machine with `sdd.js agents N`, never shared through git); a task waits only for its own `Depends on` |
 | 🧱 **Agents stay in their lane** | Path ownership per agent, checked with `git diff` when a sub-agent ends (an alert, and only when it ran alone) |
 | ✅ **No "done" with red tests** | `sdd.js done` refuses to close a task unless its component has a green verification run on the current code, so an agent cannot "report" tests it did not run. The Stop hook also reminds the agent once when the last verification failed |
 | 🧭 **Pending decisions** | `gates.decisions: summary` records them and tells you in the summaries; `interview` makes the agent ask you one question at a time before going on, and holds the spec stop while clarifications are open |
@@ -317,7 +317,7 @@ gates:
   decisions: summary           # summary (told in the summaries) | interview (asked one question at a time)
 
 orchestration:
-  max_parallel: 2              # subagents working at once, 1–4
+  max_parallel: 2              # subagents at once by default, 1–4 (each dev overrides it locally: sdd.js agents N)
 
 retries:
   in_scope: 2                  # fix attempts before the debugger report

@@ -25,8 +25,24 @@ export const DEFAULT_SPEC_PREFIX = 'SPEC';
 
 export const DEFAULT_RETRIES = Object.freeze({ in_scope: 2, protected: 0 });
 
+/** Per-developer overrides, never versioned (.harness/state/ is ignored in both install modes). */
+export const LOCAL_FILE = path.join('.harness', 'state', 'local.json');
+
 /** Most subagents working at once unless harness.config.yaml says otherwise (orchestration.max_parallel). */
 export const DEFAULT_MAX_PARALLEL = 2;
+export const MAX_PARALLEL_LIMIT = 4;
+
+export const validParallel = (n) => Number.isInteger(n) && n >= 1 && n <= MAX_PARALLEL_LIMIT;
+
+/** A JSON object from `file`, or {} when it is missing, damaged or not an object. */
+export function readJson(file) {
+  try {
+    const data = JSON.parse(readFileSync(file, 'utf8'));
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Nearest ancestor of `start` that holds harness.config.yaml, or null. */
 export function findProjectRoot(start = process.cwd()) {
@@ -41,14 +57,10 @@ export function findProjectRoot(start = process.cwd()) {
 
 /** Guard settings for `root`, falling back to defaults field by field. */
 export function loadGuardSettings(root) {
-  let data = {};
-  if (root) {
-    try {
-      data = JSON.parse(readFileSync(path.join(root, GUARDS_FILE), 'utf8'));
-    } catch {
-      data = {};
-    }
-  }
+  const data = root ? readJson(path.join(root, GUARDS_FILE)) : {};
+  const local = root ? readJson(path.join(root, LOCAL_FILE)) : {};
+  const projectMaxParallel = Number.isInteger(data.max_parallel) && data.max_parallel >= 1 ? data.max_parallel : DEFAULT_MAX_PARALLEL;
+  const localMaxParallel = validParallel(local.max_parallel) ? local.max_parallel : null;
   return {
     language: data.language === 'es' ? 'es' : data.language === 'en' ? 'en' : undefined,
     docsMode: data.docs_mode === 'whitelist' ? 'whitelist' : 'free',
@@ -64,7 +76,10 @@ export function loadGuardSettings(root) {
     roles: data.roles && typeof data.roles === 'object' ? data.roles : {},
     manualTest: ['task', 'story', 'spec', 'none'].includes(data.manual_test) ? data.manual_test : 'story',
     decisions: data.decisions === 'interview' ? 'interview' : 'summary',
-    maxParallel: Number.isInteger(data.max_parallel) && data.max_parallel >= 1 ? data.max_parallel : DEFAULT_MAX_PARALLEL,
+    // The developer's own limit (sdd.js agents N) wins over the project default.
+    maxParallel: localMaxParallel ?? projectMaxParallel,
+    projectMaxParallel,
+    maxParallelSource: localMaxParallel ? 'local' : 'project',
     specsLanguage: data.specs_language === 'es' ? 'es' : 'en',
     docsLanguage: data.docs_language === 'es' ? 'es' : 'en',
     commits: data.commits ?? { convention: 'conventional' },

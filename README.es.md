@@ -36,7 +36,7 @@ Primero la spec. Subagentes para frontend y backend. Guardarraíles determinista
 
 Implementa el flujo de Spec-Driven Development:
 
-**Spec → Plan y tareas → Implementación (frontend y backend en paralelo, máximo 2 subagentes a la vez, tests primero) → Validación, con la documentación siempre al día. Un cambio va primero a la spec y luego al código.**
+**Spec → Plan y tareas → Implementación (frontend y backend en paralelo, con un límite de subagentes a la vez que elige cada dev, tests primero) → Validación, con la documentación siempre al día. Un cambio va primero a la spec y luego al código.**
 
 Sobre ese flujo añade subagentes de frontend y backend, un agente de QA, un revisor, un depurador y un documentador, coordinados por un orquestador. **Solo se detiene dos veces**, para aprobar la spec y el plan, y respondes hablando ("sí", "continúa"). Lo demás avanza y se cuenta en los resúmenes.
 
@@ -167,7 +167,7 @@ Los comandos `/sdd:*` son **atajos opcionales** para ver qué pasó o lanzar tra
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, última verificación, últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar las tareas listas (p. ej. una API y una pantalla), hasta `orchestration.max_parallel` a la vez |
+| `/sdd:next` | Lanzar las tareas listas (p. ej. una API y una pantalla), hasta tu límite de subagentes a la vez (`sdd.js agents` lo muestra) |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
 | `/sdd:review` | Revisión (y QA) en paralelo de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |
@@ -252,7 +252,7 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 | 🔁 **Sin bucles infinitos** | Máximo **2** intentos de corrección. Después, informe del depurador → tú eliges |
 | 🧑 **Pruebas lo que importa** | URL, pasos y datos de prueba con la granularidad que elijas (`task`, `story`, `spec` o `none`) |
 | 🗂️ **Documentación siempre al día** | Se puede escribir cualquier `.md`; los agentes deben actualizar todo documento que un cambio afecte. La lista blanca es opcional (`gates.docs: whitelist`) |
-| ⚡ **Agentes en paralelo, con límite** | Frontend, backend, QA… avanzan en paralelo, pero nunca más de `orchestration.max_parallel` subagentes a la vez (1–4, por defecto 2, para poder seguirles la pista y no disparar los tokens); una tarea solo espera a su propio `Depends on` |
+| ⚡ **Agentes en paralelo, con límite** | Frontend, backend, QA… avanzan en paralelo, pero nunca más del límite de subagentes a la vez (1–4; `orchestration.max_parallel` fija el valor por defecto del proyecto, 2, y cada dev elige el suyo en su máquina con `sdd.js agents N`, sin que viaje por git; para poder seguirles la pista y no disparar los tokens); una tarea solo espera a su propio `Depends on` |
 | 🧱 **Cada agente en su carril** | Propiedad de rutas por agente, verificada con `git diff` al terminar cada subagente (un aviso, y solo si trabajó solo) |
 | ✅ **Nada se da por hecho con tests en rojo** | `sdd.js done` se niega a cerrar una tarea si su componente no tiene una verificación verde ejecutada sobre el código actual, así que un agente no puede "contar" tests que no ejecutó. El hook de parada además se lo recuerda una vez si la última verificación falló |
 | 🧭 **Decisiones pendientes** | `gates.decisions: summary` las registra y te las cuenta en los resúmenes; `interview` hace que el agente te pregunte una cada vez antes de seguir, y retiene la parada de la spec mientras queden aclaraciones abiertas |
@@ -317,7 +317,7 @@ gates:
   decisions: summary           # summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)
 
 orchestration:
-  max_parallel: 2              # subagentes trabajando a la vez, de 1 a 4
+  max_parallel: 2              # subagentes a la vez por defecto, de 1 a 4 (cada dev lo cambia en local: sdd.js agents N)
 
 retries:
   in_scope: 2                  # intentos de corrección antes del informe del depurador

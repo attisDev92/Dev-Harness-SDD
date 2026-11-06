@@ -27,7 +27,7 @@ La entrevista detecta y te pide confirmar:
 | Herramientas | Hoy, Claude Code |
 | Convenciones e idiomas | Lo que ya declara el proyecto (AGENTS.md, CONTRIBUTING.md, linters, historial de commits) |
 | Diseño, tracker, prueba manual | Fuente de diseño, tracker (cualquiera), cuándo pruebas tú |
-| Subagentes a la vez | Cuántos pueden trabajar en paralelo (`orchestration.max_parallel`, de 1 a 4) |
+| Subagentes a la vez | Valor por defecto del proyecto de cuántos pueden trabajar en paralelo (`orchestration.max_parallel`, de 1 a 4). Cada dev elige el suyo en su máquina con `sdd.js agents N` (se guarda en `.harness/state/local.json`, sin versionar); `sdd.js agents` lo muestra y `sdd.js agents --clear` vuelve al valor por defecto |
 | Decisiones pendientes | `summary`: se registran y se cuentan · `interview`: el agente te entrevista una pregunta cada vez (`gates.decisions`) |
 | Modo | `local`: el equipo no ve nada · `team`: la configuración se commitea |
 | Git hooks, CI | Pre-commit que solo rechaza secretos · plantilla de GitHub Actions con docs y verificación |
@@ -50,7 +50,7 @@ Dile al agente lo que quieres construir ("quiero un login con email") y la skill
 
 1. **Spec**: te entrevista (máx. 6 preguntas), escribe los requisitos en EARS y los revisa. 🛑 **Parada 1**: apruebas la spec.
 2. **Plan y tareas**: el architect escribe plan, contratos, ADRs y `tasks.md` de una vez. 🛑 **Parada 2**: apruebas el plan con sus tareas.
-3. **Implementación**: frontend y backend en paralelo (nunca más de `orchestration.max_parallel` subagentes a la vez, del rol que sea), tests primero. Cada subagente recibe el brief de su tarea (`sdd.js brief`), con el alcance y las reglas. Tras cada tarea, verificación real y `sdd.js done` (que la exige en verde); al cerrar la historia, revisión y documentación.
+3. **Implementación**: frontend y backend en paralelo (nunca más subagentes a la vez que el límite de cada dev, del rol que sea), tests primero. Cada subagente recibe el brief de su tarea (`sdd.js brief`), con el alcance y las reglas. Tras cada tarea, verificación real y `sdd.js done` (que la exige en verde); al cerrar la historia, revisión y documentación.
 4. **Al cerrar una historia**: prueba manual (una pregunta normal) y el agente **propone el commit**; si dices que sí, lo hace.
 5. **Al final**: validación requisito por requisito; la spec queda como `done`.
 
@@ -68,7 +68,7 @@ Atajos opcionales (ninguno hace falta para avanzar):
 |---|---|
 | `/sdd:status` | Qué pasó: spec y estado, últimas tareas cerradas, pendientes, último verify y últimos commits |
 | `/sdd:spec <idea>` | Empezar una spec |
-| `/sdd:next` | Lanzar las tareas listas, hasta `orchestration.max_parallel` a la vez |
+| `/sdd:next` | Lanzar las tareas listas, hasta tu límite de subagentes a la vez (`sdd.js agents` lo muestra) |
 | `/sdd:docs` | Poner la documentación al día en segundo plano |
 | `/sdd:review` | Revisión (y QA) de lo cambiado |
 | `/sdd:validate` | Informe requisito → test |

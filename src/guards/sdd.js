@@ -9,8 +9,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { parseArgs, isMainModule } from './args.js';
-import { findProjectRoot, loadGuardSettings } from './project.js';
-import { loadRuntime, saveRuntime, logEvent, readFlow, approveStop, withStatus, safeRead, findSpec, STOPS } from './state.js';
+import { findProjectRoot, loadGuardSettings, LOCAL_FILE, MAX_PARALLEL_LIMIT, validParallel, readJson } from './project.js';
+import { loadRuntime, saveRuntime, writeAtomic, logEvent, readFlow, approveStop, withStatus, safeRead, findSpec, STOPS } from './state.js';
 import { importContract } from './contracts.js';
 import { listSpecs, specsDirFor, specRoots, nextSpecId, usedSpecNumbers, branchSpecNumbers, nextAdrFile, slugify, parseTasks, taskQueue, taskBatch, taskProblems, parseRequirements, markTaskDone } from './tasks.js';
 import { runVerify, VERIFY_ORDER, componentDigest } from './verify.js';
@@ -42,6 +42,8 @@ const USAGE_TEXT = `usage: sdd.js <command>
                                   --eval runs only verify.eval, once when a story closes
   decisions [--json] [--resolve <key>]
                                   decisions pending from the user (clarifications, ADR drafts, added tasks, alerts)
+  agents [N|--clear]              your own limit of subagents at once (1-4), only on this machine;
+                                  without arguments shows the effective one, --clear goes back to the project default
   pause                           let active subagents finish and launch nothing new (end or suspend a session)
   resume                          lift the pause
   validate [--spec S] [--json]    requirement → test coverage; closes the spec when every task is done
@@ -242,6 +244,34 @@ export async function runSdd(argv, io) {
       return OK;
     }
 
+    case 'agents': {
+      // The developer's own limit of simultaneous subagents: local to this machine, never versioned.
+      const localFile = path.join(root, LOCAL_FILE);
+      const local = readJson(localFile);
+      if (flags.clear) {
+        // Nothing to write when there was no own limit.
+        if ('max_parallel' in local) {
+          delete local.max_parallel;
+          writeAtomic(localFile, JSON.stringify(local, null, 2) + '\n');
+        }
+        logEvent(root, 'agents', { cleared: true });
+        out(t.agents.cleared(settings.projectMaxParallel));
+        return OK;
+      }
+      const raw = rest[0];
+      if (raw === undefined) {
+        out(t.agents.show(settings.maxParallel, settings.maxParallelSource, settings.projectMaxParallel));
+        return OK;
+      }
+      // Only plain integers: Number() would also take "0x2" or "2e0".
+      const n = /^\d+$/.test(String(raw)) ? Number(raw) : NaN;
+      if (!validParallel(n)) return refuse(t.agents.invalid(raw, MAX_PARALLEL_LIMIT));
+      writeAtomic(localFile, JSON.stringify({ ...local, max_parallel: n }, null, 2) + '\n');
+      logEvent(root, 'agents', { max_parallel: n });
+      out(t.agents.set(n, settings.projectMaxParallel));
+      return OK;
+    }
+
     case 'decisions': {
       if (!flow.spec) return refuse(t.next.noSpec());
       if (flags.resolve) {
@@ -293,7 +323,7 @@ export async function runSdd(argv, io) {
         }
         if (!VERIFY_ORDER.some((k) => comp.verify?.[k])) out(`  ${t.next.noVerify(task.component)}`);
       }
-      if (ready.length) out(t.next.parallel(settings.maxParallel));
+      if (ready.length) out(t.next.parallel(settings.maxParallel, settings.maxParallelSource));
       if (queued.length) out(t.next.queued(queued.map((x) => x.id), settings.maxParallel));
       if (waiting.length) out(t.next.waiting(waiting));
       return OK;

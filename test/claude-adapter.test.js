@@ -46,7 +46,7 @@ test('RF-ADP-01 / RF-ORQ-14: /sdd:* shortcuts that inform or launch work, and th
   assert.deepEqual(cmds, ['commit', 'decisions', 'docs', 'next', 'pause', 'resume', 'review', 'spec', 'status', 'validate'], 'no approve/reject: approving is talking');
   assert.match(read(root, '.claude/commands/sdd/pause.md'), /launch no new subagent/);
   assert.match(read(root, '.claude/commands/sdd/decisions.md'), /one question at a time/);
-  assert.match(read(root, '.claude/commands/sdd/next.md'), /^---\ndescription: "Launch the tasks that can start now \(2 at once at most\)"/);
+  assert.match(read(root, '.claude/commands/sdd/next.md'), /^---\ndescription: "Launch the tasks that can start now \(up to your limit of subagents at once\)"/);
   assert.match(read(root, '.claude/commands/sdd/status.md'), /last tasks closed/);
   // Nothing tells the agent it may never commit: it commits when the user says yes.
   assert.doesNotMatch(read(root, '.claude/agents/frontend-dev.md'), /Never commit/);

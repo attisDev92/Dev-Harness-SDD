@@ -428,7 +428,72 @@ test('orchestration.max_parallel: the queue, next and the hook use the configure
   const next = await sdd(root, 'next');
   assert.equal(next.code, 0, next.stderr);
   assert.match(next.stdout, /Máximo 3 subagentes/);
-  assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /never more than 3 subagents/);
+  const agentsMd = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
+  assert.match(agentsMd, /sdd\.js agents/);
+  assert.doesNotMatch(agentsMd, /\b3 subagents/, 'the generated files do not embed the project limit');
+});
+
+test('sdd.js agents: each developer sets their own limit, local and never versioned', async (t) => {
+  const root = await project(t, `${CONFIG}orchestration: {max_parallel: 3}\n`);
+  const launch = (id, role) => hook(root, 'PreToolUse', { tool_use_id: id, tool_name: 'Task', tool_input: { subagent_type: role, prompt: 'x' } }, { snapshot: () => ({}) });
+  const localFile = path.join(root, '.harness', 'state', 'local.json');
+
+  // Without an override the project default applies.
+  assert.match((await sdd(root, 'agents')).stdout, /Subagentes a la vez: 3 \(el del proyecto\)/);
+
+  // Invalid values are refused and write nothing.
+  for (const bad of ['0', '5', 'abc', '2.5', '0x2', '2e0']) {
+    const r = await sdd(root, 'agents', bad);
+    assert.equal(r.code, 2, bad);
+    assert.match(r.stderr, /número entero de 1 a 4/);
+  }
+  assert.equal(fs.existsSync(localFile), false);
+
+  // The override wins and is saved only in .harness/state/local.json.
+  const set = await sdd(root, 'agents', '1');
+  assert.equal(set.code, 0, set.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(localFile, 'utf8')).max_parallel, 1);
+  assert.match((await sdd(root, 'agents')).stdout, /Subagentes a la vez: 1 \(límite propio.*proyecto es 3/);
+  assert.equal(launch('a', 'backend-dev').stdout, undefined);
+  assert.match(alertOf(launch('b', 'frontend-dev')), /El máximo son 1 a la vez/);
+
+  // next reports it, and sync (which rewrites guards.json) leaves it alone.
+  const spec = await approved(root);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  assert.match((await sdd(root, 'next')).stdout, /Máximo 1 subagente trabajando a la vez \(límite propio/);
+  const synced = await run(['sync', '--yes'], { cwd: root });
+  assert.equal(synced.code, 0, synced.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(localFile, 'utf8')).max_parallel, 1);
+
+  // --clear goes back to the project default.
+  const cleared = await sdd(root, 'agents', '--clear');
+  assert.match(cleared.stdout, /Vale el del proyecto: 3/);
+  assert.match((await sdd(root, 'agents')).stdout, /Subagentes a la vez: 3 \(el del proyecto\)/);
+
+  // A damaged file (here, an array) is ignored instead of being written back as is.
+  fs.writeFileSync(localFile, '[]');
+  assert.match((await sdd(root, 'agents')).stdout, /Subagentes a la vez: 3 \(el del proyecto\)/);
+  assert.equal((await sdd(root, 'agents', '2')).code, 0);
+  assert.deepEqual(JSON.parse(fs.readFileSync(localFile, 'utf8')), { max_parallel: 2 });
+});
+
+test('sdd.js agents: --clear without an own limit writes nothing', async (t) => {
+  const root = await project(t);
+  const localFile = path.join(root, '.harness', 'state', 'local.json');
+  assert.equal((await sdd(root, 'agents', '--clear')).code, 0);
+  assert.equal(fs.existsSync(localFile), false);
+});
+
+test('sdd.js agents in team mode: the shared config is versioned, the own limit is not', async (t) => {
+  // In team mode harness.config.yaml and guards.json are committed; only .harness/.gitignore (state/) keeps local.json out.
+  const root = await project(t, CONFIG.replace('install_mode: local', 'install_mode: team') + 'orchestration: {max_parallel: 3}\n');
+  assert.match(fs.readFileSync(path.join(root, '.harness', '.gitignore'), 'utf8'), /^state\/$/m);
+  assert.equal((await sdd(root, 'agents', '4')).code, 0);
+  assert.ok(fs.existsSync(path.join(root, '.harness', 'state', 'local.json')));
+  const status = git(root, 'status', '--porcelain', '--untracked-files=all');
+  assert.match(status, /harness\.config\.yaml/, 'the shared config is visible to git');
+  assert.doesNotMatch(status, /local\.json/, 'the own limit never reaches git');
+  assert.match((await sdd(root, 'agents')).stdout, /Subagentes a la vez: 4 \(límite propio.*proyecto es 3/);
 });
 
 test('sdd.js pause: active subagents finish, nothing new starts; resume lifts it', async (t) => {

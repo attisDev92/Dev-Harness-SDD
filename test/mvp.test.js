@@ -41,7 +41,7 @@ test('RF-UPG-04: upgrading a 2.0 project adds the orchestration options with the
   assert.match(r.stdout, /\+orchestration:\n\+ {2}max_parallel: 2/);
   assert.match(r.stdout, /\+ {2}decisions: summary/);
   const config = read(root, 'harness.config.yaml');
-  assert.match(config, /orchestration:\n {2}max_parallel: 2 # subagentes trabajando a la vez/);
+  assert.match(config, /orchestration:\n {2}max_parallel: 2 # subagentes a la vez por defecto/);
   assert.match(config, /decisions: summary # summary/);
   // The sync that follows regenerates what 2.1.0 adds.
   assert.ok(fs.existsSync(path.join(root, '.agents/rules/sdd-harness.md')));

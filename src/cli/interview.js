@@ -2,7 +2,7 @@
 // builds a configuration object; nothing is written here.
 
 import { TOOLS, TOPOLOGIES, DESIGN_SOURCES, TRACKERS, COMPONENT_KINDS } from '../config/schema.js';
-import { DEFAULT_DOCS_WHITELIST } from '../guards/project.js';
+import { DEFAULT_DOCS_WHITELIST, DEFAULT_MAX_PARALLEL, MAX_PARALLEL_LIMIT } from '../guards/project.js';
 
 const PREFIX_RE = /^[A-Z][A-Z0-9]{1,9}$/;
 const LANG_KEYS = ['code', 'specs', 'docs', 'commits', 'ui'];
@@ -19,9 +19,6 @@ async function askSpecPrefix(p, t) {
   }
   return 'SPEC';
 }
-
-export const DEFAULT_MAX_PARALLEL = 2;
-const MAX_PARALLEL_LIMIT = 4;
 
 async function askMaxParallel(p, t) {
   for (let i = 0; i < 3; i += 1) {
