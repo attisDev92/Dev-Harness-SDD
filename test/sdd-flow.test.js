@@ -120,13 +120,12 @@ test('verify.eval: AI evaluations run only with --eval, never in the normal veri
   assert.match(fs.readFileSync(path.join(root, '.agents/skills/sdd/SKILL.md'), 'utf8'), /verify --eval/);
 });
 
-test('RF-SDD-13: two stops, approved by talking; the status lives in spec.md', async (t) => {
+test('RF-SDD-13 & RF-HRD-01: unplanned code is blocked before plan-approved; two stops approved by talking', async (t) => {
   const root = await project(t);
-  // No spec, no task: an alert, never a block, and only once.
+  // RF-HRD-01: writing component code before any plan is approved is hard-blocked.
   const first = writeTool(root, 'src/app.js');
-  assert.equal(first.code, 0);
-  assert.match(alertOf(first), /no hay ninguna tarea pendiente/);
-  assert.equal(writeTool(root, 'src/app.js').stdout, undefined, 'the same alert is not repeated');
+  assert.equal(first.code, 2);
+  assert.match(first.stderr, /no se escribe código.*sin un plan aprobado.*new-spec/);
 
   const created = await sdd(root, 'new-spec', 'Health check');
   assert.equal(created.code, 0, created.stderr);
@@ -134,6 +133,7 @@ test('RF-SDD-13: two stops, approved by talking; the status lives in spec.md', a
   const text = fs.readFileSync(specFile(root, 'SVC-001-health-check'), 'utf8');
   assert.match(text, /^---\nstatus: draft\n---\n\n# SVC-001 — Health check/);
 
+  assert.equal(writeTool(root, 'src/app.js').code, 2, 'still draft: component code remains blocked');
   assert.match(alertOf(writeTool(root, 'specs/SVC-001-health-check/plan.md')), /la spec todavía no está aprobada/, 'plan before the spec: an alert');
 
   // Nothing pending: words are just words, and approve refuses.
@@ -374,14 +374,17 @@ test('focus and --spec: allow selecting active spec when multiple exist', async 
 test('done and brief commands: brief returns compact context; done marks task and records note in progress.md', async (t) => {
   const root = await project(t);
   const spec = await approved(root);
-  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), `${TASKS.trimEnd()}\n- [ ] T3 Rename constants [mecánica] · Component: svc · Depends on: —\n`);
   fs.writeFileSync(specFile(root, spec), `---\nstatus: plan-approved\n---\n- **RF-01:** Health check 200.\n`);
 
   const br = await sdd(root, 'brief', 'T1');
   assert.equal(br.code, 0);
   assert.match(br.stdout, /Brief: T1/);
+  assert.match(br.stdout, /Modelo \(mid\): claude-code: sonnet/);
   assert.match(br.stdout, /Alcance permitido: src\/\*\*/);
   assert.match(br.stdout, /RF-01:?\*\*?\s*Health check 200/);
+  const mech = await sdd(root, 'brief', 'T3');
+  assert.match(mech.stdout, /Modelo \(low\): claude-code: haiku/, '[mecánica] task automatically uses low model tier');
   // The brief carries the rules the subagent must follow, whatever the tool runs it.
   assert.match(br.stdout, /Reglas para el subagente/);
   assert.match(br.stdout, /Nada de refactors/);
@@ -574,4 +577,82 @@ test('gates.decisions summary (default): the stop is not held and decisions are 
   assert.equal((await sdd(root, 'stop', 'spec')).code, 0);
   assert.match((await sdd(root, 'decisions')).stdout, /Cuéntaselas al usuario en tu resumen/);
 });
+
+test('RF-AGH-03..08 & RF-HRD-04..06: full Antigravity hook lifecycle (write_file/edit_file, PreInvocation approvals, ask confirmations, async subagents & Stop)', async (t) => {
+  const agyCfg = CONFIG.replace('tools: [claude-code]', 'tools: [antigravity]');
+  const root = await project(t, agyCfg);
+  const agy = (event, payload = {}, opts = {}) => handleHook(event, { cwd: root, conversationId: 'conv-main', hookEventName: event, ...payload }, { env: {}, ...opts });
+  const parseOut = (r) => JSON.parse(r.stdout);
+
+  // 1. Before plan-approved, Antigravity write_file on component code is denied.
+  const deniedEarly = agy('PreToolUse', { toolCall: { id: 't1', name: 'write_file', args: { Path: path.join(root, 'src/app.js'), Content: 'x' } } });
+  assert.equal(parseOut(deniedEarly).decision, 'deny');
+  assert.match(parseOut(deniedEarly).reason, /sin un plan aprobado/);
+
+  // 2. Create spec; anti-self-approval blocks chaining stop+approve or calling approve before asking the user.
+  const spec = /Spec (\S+) creada/.exec((await sdd(root, 'new-spec', 'auth')).stdout)[1];
+  const chained = agy('PreToolUse', { toolCall: { id: 't2', name: 'run_command', args: { CommandLine: 'node .harness/scripts/sdd.js stop spec && node .harness/scripts/sdd.js approve' } } });
+  assert.equal(parseOut(chained).decision, 'deny');
+
+  await sdd(root, 'stop', 'spec');
+  assert.deepEqual(parseOut(agy('PostToolUse', { toolCall: { id: 't3', name: 'run_command', args: { CommandLine: 'node .harness/scripts/sdd.js stop spec' } } })), {});
+  const prematureApprove = agy('PreToolUse', { toolCall: { id: 't4', name: 'run_command', args: { CommandLine: 'node .harness/scripts/sdd.js approve' } } });
+  assert.equal(parseOut(prematureApprove).decision, 'deny');
+
+  // 3. RF-AGH-05: User replies "sí, continúa" -> PreInvocation (invocationNum: 1) approves spec deterministically via systemMessage.
+  const preInv = agy('PreInvocation', { invocationNum: 1, lastUserInput: 'sí, continúa' });
+  assert.equal(statusOf(root, spec), 'spec-approved');
+  assert.match(parseOut(preInv).injectSteps[0].systemMessage.systemMessage, /El usuario APROBÓ spec/);
+
+  // 4. Stop 2 via ask_question: asking unlocks sdd.js approve in the same turn.
+  await sdd(root, 'stop', 'plan');
+  agy('PostToolUse', { toolCall: { id: 't5', name: 'run_command', args: { CommandLine: 'node .harness/scripts/sdd.js stop plan' } } });
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 't6', name: 'ask_question', args: { questions: [] } } })).decision, 'allow');
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 't7', name: 'run_command', args: { CommandLine: 'node .harness/scripts/sdd.js approve' } } })).decision, 'allow');
+  assert.equal((await sdd(root, 'approve')).code, 0);
+  assert.equal(statusOf(root, spec), 'plan-approved');
+  fs.writeFileSync(path.join(root, 'specs', spec, 'tasks.md'), TASKS);
+
+  // 5. SessionStart uses systemMessage (never deprecated ephemeralMessage).
+  const startOut = parseOut(agy('SessionStart'));
+  assert.match(startOut.injectSteps[0].systemMessage.systemMessage, /trabajo en curso/);
+  assert.equal(startOut.injectSteps[0].ephemeralMessage, undefined);
+
+  // 6. RF-HRD-05: edit_file attempting to tick - [x] T1 by hand is denied.
+  const manualTick = agy('PreToolUse', { toolCall: { id: 't8', name: 'edit_file', args: { Path: path.join(root, 'specs', spec, 'tasks.md'), Target: '- [ ] T1', Replacement: '- [x] T1' } } });
+  assert.equal(parseOut(manualTick).decision, 'deny');
+
+  // 7. RF-AGH-04/06: risky git, package installs and harness.config.yaml return decision: "ask"; PostToolUse queues sync message for PostInvocation.
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 't9', name: 'run_command', args: { CommandLine: 'git push origin main' } } })).decision, 'ask');
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 't10', name: 'run_command', args: { CommandLine: 'npm install zod' } } })).decision, 'ask');
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 't11', name: 'edit_file', args: { Path: path.join(root, 'harness.config.yaml'), Target: 'a', Replacement: 'b' } } })).decision, 'ask');
+  const postCfg = agy('PostToolUse', { toolCall: { id: 't11', name: 'edit_file', args: { Path: path.join(root, 'harness.config.yaml') } } }, { runSync: () => ({ ok: true, output: 'Synced AGY.' }) });
+  assert.deepEqual(parseOut(postCfg), {});
+  const postInv = parseOut(agy('PostInvocation', { invocationNum: 2 }));
+  assert.match(postInv.injectSteps[0].systemMessage.systemMessage, /Synced AGY\./);
+
+  // 8. RF-AGH-08: async invoke_subagent keeps slot across PostToolUse, binds background conversationId, enforces read-only & checks lanes on subagent Stop.
+  let snap = { 'src/index.js': 'a' };
+  const snapOpts = { snapshot: () => snap };
+  assert.equal(parseOut(agy('PreToolUse', { toolCall: { id: 'sub1', name: 'invoke_subagent', args: { TypeName: 'reviewer', Role: 'Code Reviewer', Prompt: 'review' } } }, snapOpts)).decision, 'allow');
+  assert.deepEqual(parseOut(agy('PostToolUse', { toolCall: { id: 'sub1', name: 'invoke_subagent', args: { TypeName: 'reviewer' } } }, snapOpts)), {});
+  assert.equal(Object.keys(loadRuntime(root).subagents).length, 1, 'async subagent remains active after PostToolUse');
+
+  // Subagent runs in its own conversationId: read-only role is denied write_file, and Stop checks lanes & frees slot.
+  const roWrite = handleHook('PreToolUse', { cwd: root, conversationId: 'conv-sub-1', toolCall: { id: 's1', name: 'write_file', args: { Path: path.join(root, 'src/index.js'), Content: 'b' } } }, snapOpts);
+  assert.equal(parseOut(roWrite).decision, 'deny');
+  snap = { 'src/index.js': 'b' };
+  assert.deepEqual(parseOut(handleHook('Stop', { cwd: root, conversationId: 'conv-sub-1', terminationReason: 'NO_TOOL_CALL', continuationActive: false }, snapOpts)), {});
+  assert.equal(Object.keys(loadRuntime(root).subagents).length, 0, 'subagent slot released on Stop');
+  const laneMsg = parseOut(agy('PreInvocation', { invocationNum: 1, lastUserInput: '' }));
+  assert.match(laneMsg.injectSteps[0].systemMessage.systemMessage, /reviewer cambió archivos fuera de sus rutas: src\/index\.js/);
+
+  // 9. RF-AGH-07: Stop ignores USER_CANCELED, asks to continue once on NO_TOOL_CALL when verification failed, and stops when continuationActive is true.
+  await sdd(root, 'verify');
+  assert.deepEqual(parseOut(agy('Stop', { terminationReason: 'USER_CANCELED', continuationActive: false })), {});
+  const cont = parseOut(agy('Stop', { terminationReason: 'NO_TOOL_CALL', continuationActive: false }));
+  assert.equal(cont.decision, 'continue');
+  assert.deepEqual(parseOut(agy('Stop', { terminationReason: 'NO_TOOL_CALL', continuationActive: true })), {});
+});
+
 

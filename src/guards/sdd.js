@@ -337,11 +337,23 @@ export async function runSdd(argv, io) {
       if (!task) return refuse(t.brief.notFound(tid));
       const comp = settings.components[task.component];
       const role = comp ? roleFor(comp.kind) : 'unknown';
+      const mechanical = Boolean(task.tags?.includes('mechanical'));
+      const tier = mechanical ? 'low' : (settings.roles?.[role]?.tier ?? 'mid');
+      const modelEntries = Object.entries(settings.models ?? {}).map(([tool, info]) => {
+        if (mechanical) {
+          const low = info.low ?? '';
+          return tool === 'antigravity' ? `${tool}: ${low} (invoke_subagent Model="flash_lite")` : `${tool}: ${low}`;
+        }
+        const rm = info.roles?.[role];
+        if (!rm) return null;
+        return tool === 'antigravity' ? `${tool}: ${rm.model} (invoke_subagent Model="${rm.invokeModel}")` : `${tool}: ${rm.model}`;
+      }).filter(Boolean);
       const specContent = safeRead(path.join(root, flow.spec.dir, 'spec.md')) ?? '';
       const allReqs = parseRequirements(specContent);
       const reqMap = new Map(allReqs.map((r) => [r.id, r.text]));
       out(`# Brief: ${task.id} (${flow.spec.id})`);
       out(`Rol: ${role} | Componente: ${task.component ?? '—'}`);
+      if (modelEntries.length) out(`Modelo (${tier}): ${modelEntries.join(' · ')}`);
       out(`Título: ${task.title}`);
       if (task.tags?.length) out(`Etiquetas: ${task.tags.map((x) => `[${x}]`).join(' ')}`);
       if (task.scope.length) out(`Alcance permitido: ${task.scope.join(', ')}`);
@@ -392,6 +404,12 @@ export async function runSdd(argv, io) {
           ? prog.replace(/(## Decisiones\s*\n\s*\|[^\n]+\|\s*\n\s*\|[^\n]+\|\s*\n)/, `$1${row}`)
           : `${prog}\n${row}`;
         writeFileSync(progressFile, updatedProg);
+      }
+      const expectedRole = comp ? roleFor(comp.kind) : null;
+      const doneSubKey = expectedRole && Object.keys(runtime.subagents ?? {}).find((k) => runtime.subagents[k]?.async && !runtime.subagents[k]?.subConv && runtime.subagents[k]?.role === expectedRole);
+      if (doneSubKey) {
+        delete runtime.subagents[doneSubKey];
+        save();
       }
       logEvent(root, 'task-done', { spec: flow.spec.id, task: tid, note: note || undefined });
       out(t.done.marked(tid, note));

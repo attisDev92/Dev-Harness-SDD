@@ -56,7 +56,7 @@ In local mode an adapter must not write to committed files (RF-MOD-02). Check `t
 
 ### Hook payloads
 
-`src/guards/hook.js` reads Claude Code's payload. A tool with another payload format needs its own thin entry script that normalises the payload and calls the same guards (`checkShell`, `checkWrite`, `decide`…). The guards themselves are tool-neutral.
+`src/guards/hook.js` normalises both Claude Code and Google Antigravity hook payloads (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `SessionStart`, `UserPromptSubmit`, `Stop`), handling both synchronous (`Task`) and background asynchronous (`invoke_subagent`) subagents. A tool with another payload format can either extend that normaliser or use a thin entry script calling the same neutral guards (`checkWrite`, `parseDecision`…).
 
 ## Tools without subagents or blocking hooks
 

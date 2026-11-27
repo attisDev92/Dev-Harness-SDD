@@ -1,13 +1,15 @@
 // What an agent writes, and what the harness says about it (RF-GAT-06/07/09,
-// RF-MD-01, RF-ORQ-13). Dependency-free.
+// RF-MD-01, RF-ORQ-13, RF-HRD-01..05). Dependency-free.
 //
 // Verdicts: allow, warn (an alert, once per spec; the work goes on) or block
-// (only the harness itself and the generated block of AGENTS.md/CLAUDE.md).
+// (.harness/, managed blocks, manual tampering with spec status or task
+// checkboxes, and component code written before a plan is approved).
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { matchesAny, globToRegExp } from './glob.js';
 import { checkDocWrite } from './docs-guard.js';
+import { STATUSES, specStatus } from './state.js';
 
 const TEST_FILE = ['**/*.test.*', '**/*.spec.*', '**/tests/**', '**/test/**', '**/__tests__/**', '**/e2e/**', '**/evals/**', '**/*.eval.*'];
 const DEP_SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies', 'bundledDependencies', 'overrides', 'resolutions'];
@@ -31,13 +33,24 @@ export function componentOf(rel, components) {
   return best;
 }
 
-/** New content of the file after a Write, Edit or MultiEdit. */
+/** New content of the file after Write/Edit/MultiEdit (Claude) or write_file/edit_file/replace_file_content (Antigravity). */
 export function contentAfter(input, current) {
   if (typeof input.content === 'string') return input.content;
+  if (typeof input.Content === 'string') return input.Append ? `${current ?? ''}${input.Content}` : input.Content;
+  if (typeof input.CodeContent === 'string') return input.CodeContent;
   const cur = current ?? '';
   const apply = (text, e) => (e.replace_all ? text.split(e.old_string).join(e.new_string) : text.replace(e.old_string, e.new_string));
   if (Array.isArray(input.edits)) return input.edits.reduce(apply, cur);
   if (typeof input.old_string === 'string') return apply(cur, input);
+  if (typeof input.Target === 'string' && typeof input.Replacement === 'string') {
+    return input.Target ? cur.split(input.Target).join(input.Replacement) : cur;
+  }
+  if (Array.isArray(input.ReplacementChunks)) {
+    return input.ReplacementChunks.reduce((t, c) => (c.TargetContent ? t.split(c.TargetContent).join(c.ReplacementContent ?? '') : t), cur);
+  }
+  if (typeof input.TargetContent === 'string' && typeof input.ReplacementContent === 'string') {
+    return input.AllowMultiple ? cur.split(input.TargetContent).join(input.ReplacementContent) : cur.replace(input.TargetContent, input.ReplacementContent);
+  }
   return null;
 }
 
@@ -70,8 +83,12 @@ function zoneHits(rel, zones) {
   return hits;
 }
 
+function doneTaskIds(text) {
+  return new Set([...String(text ?? '').matchAll(/^\s*- \[[xX]\] (T\d+)\b/gm)].map((m) => m[1]));
+}
+
 /**
- * @param {{ root: string, file: string, settings: object, flow?: { spec: { id: string, status: string } | null, tasks: object[] }, input?: object }} req
+ * @param {{ root: string, file: string, settings: object, flow?: { spec: { id: string, status: string } | null, tasks: object[], implementing?: object[], open?: object[] }, input?: object }} req
  *   `flow` is read from the markdown files by the caller (state.js, tasks.js).
  */
 export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [] }, input = {} }) {
@@ -92,6 +109,24 @@ export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [
   if (current && (settings.managedBlocks ?? []).includes(rel)) {
     const before = managedBlockOf(current);
     if (before && managedBlockOf(after ?? '') !== before) return block('contextBlock', rel);
+  }
+
+  // RF-HRD-04: advancing status in spec.md by hand is blocked (only sdd.js approve / validate may advance it).
+  if (/(?:^|\/)specs\/[^/]+\/spec\.md$/.test(rel) && after !== null) {
+    const from = exists ? specStatus(current) : 'draft';
+    const to = specStatus(after);
+    if (STATUSES.indexOf(to) > STATUSES.indexOf(from)) {
+      return block('manualSpecStatus', rel, { from, to });
+    }
+  }
+
+  // RF-HRD-05: ticking tasks (- [x] T1) by hand in tasks.md is blocked (only sdd.js done <TID> may close tasks).
+  if (/(?:^|\/)specs\/[^/]+\/tasks\.md$/.test(rel) && after !== null) {
+    const beforeDone = doneTaskIds(current);
+    const newlyTicked = [...doneTaskIds(after)].filter((id) => !beforeDone.has(id));
+    if (newlyTicked.length) {
+      return block('manualTaskDone', rel, { task: newlyTicked.join(', ') });
+    }
   }
 
   // RF-MD-01: documentation whitelist, only when the user chose it.
@@ -117,9 +152,15 @@ export function checkWrite({ root, file, settings, flow = { spec: null, tasks: [
     return warn('protectedZone', rel, { zone: hit.zone });
   }
 
-  // RF-ORQ-13: code without a pending task, or outside its scope, is an alert.
+  // RF-HRD-01..03: component code without an approved plan is blocked by default (gates.unplanned: block);
+  // once a plan is approved, missing/out-of-scope tasks raise non-blocking alerts (RF-ORQ-13, RF-SDD-19).
   const comp = componentOf(rel, settings.components);
   if (!comp || /(^|\/)(specs|docs)\//.test(rel) || /\.(md|mdx)$/i.test(rel)) return allow;
+  const hasApprovedPlan = (flow.implementing?.length ?? 0) > 0 || flow.spec?.status === 'plan-approved';
+  if (!hasApprovedPlan) {
+    const verdictFn = settings.unplanned === 'warn' ? warn : block;
+    return verdictFn('unplannedCode', rel, { component: comp.id, spec: flow.spec?.id ?? null, status: flow.spec?.status ?? null });
+  }
   const allOpen = flow.open ?? (flow.spec?.status === 'plan-approved' ? (flow.tasks ?? []).filter((x) => !x.done) : []);
   const open = allOpen.filter((x) => x.component === comp.id);
   if (!open.length) return warn('noTask', rel, { component: comp.id });

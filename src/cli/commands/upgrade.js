@@ -34,6 +34,10 @@ export const CHANGES = {
     'sdd.js agents muestra el límite efectivo y su origen; sdd.js agents --clear vuelve al del proyecto',
     'Skills, agentes, AGENTS.md y la regla de Antigravity ya no llevan el número escrito: remiten a sdd.js next',
   ],
+  '2.3.0': [
+    'Antigravity 2.0 completo: subagentes nativos (.agents/agents/), skills /sdd-*, reglas glob por componente, mcp_config.json y contratos reales de hooks (write_file/edit_file, PreInvocation, PostInvocation, Stop, invoke_subagent asíncrono y confirmaciones ask en run_command)',
+    'Blindaje anti-salto (gates.unplanned: block por defecto): bloquea escribir código de componentes sin plan aprobado y bloquea avanzar status en spec.md o marcar [x] en tasks.md sin pasar por sdd.js',
+  ],
 };
 
 /**
@@ -56,6 +60,16 @@ export const MIGRATIONS = [
       };
       add('orchestration', 'max_parallel', 2, 'subagentes a la vez por defecto, de 1 a 4 (cada dev lo cambia en su máquina: sdd.js agents N)');
       add('gates', 'decisions', 'summary', 'summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)');
+    },
+  },
+  {
+    to: '2.3.0',
+    migrate(doc) {
+      if (doc.hasIn(['gates', 'unplanned'])) return;
+      const node = doc.createNode('block');
+      node.comment = ' block (impide escribir código sin plan aprobado) | warn (solo avisa)';
+      if (!doc.hasIn(['gates'])) doc.set('gates', doc.createNode({}));
+      doc.setIn(['gates', 'unplanned'], node);
     },
   },
 ];

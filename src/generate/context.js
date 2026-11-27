@@ -2,6 +2,7 @@
 // and one AGENTS.md per component (RF-GEN-03).
 
 import { DEFAULT_DOCS_WHITELIST } from '../guards/project.js';
+import { antigravitySubagentTier, roleTier, resolveRoleModel } from './models.js';
 
 export const ALWAYS_ROLES = ['spec-reviewer', 'architect', 'qa-tester', 'reviewer', 'debugger', 'doc-writer'];
 
@@ -77,6 +78,7 @@ const L = {
     compHeader: '| Component | Path | Stack | Spec prefix | Implemented by | Verification |',
     notConfigured: 'not configured: ask the user before the first task',
     roles: 'Roles',
+    orchestratorLine: (models) => `- \`orchestrator\` (main session, \`sdd\` skill${models ? ` · ${models}` : ''}): coordinates the flow, stops and subagents`,
     readOnly: 'read-only',
     conventions: 'Conventions',
     languages: (l) => `Languages: code ${l.code ?? '?'}, specs ${l.specs ?? '?'}, docs ${l.docs ?? '?'}, commits ${l.commits ?? '?'}, UI ${l.ui ?? '?'}.`,
@@ -116,6 +118,7 @@ const L = {
     compHeader: '| Componente | Ruta | Stack | Prefijo de spec | Lo implementa | Verificación |',
     notConfigured: 'sin configurar: pregunta al usuario antes de la primera tarea',
     roles: 'Roles',
+    orchestratorLine: (models) => `- \`orchestrator\` (sesión principal, skill \`sdd\`${models ? ` · ${models}` : ''}): coordina el flujo, las paradas y los subagentes`,
     readOnly: 'solo lectura',
     conventions: 'Convenciones',
     languages: (l) => `Idiomas: código ${l.code ?? '?'}, specs ${l.specs ?? '?'}, docs ${l.docs ?? '?'}, commits ${l.commits ?? '?'}, interfaz ${l.ui ?? '?'}.`,
@@ -140,18 +143,35 @@ function verifyCell(v, t) {
   return cmds.length ? cmds.join('<br>') : t.notConfigured;
 }
 
+function formatRoleModels(config, role) {
+  const tools = config.tools ?? [];
+  if (!tools.length) return '';
+  const tier = roleTier(config, role);
+  return tools.map((tool) => {
+    const m = resolveRoleModel(config, tool, role, tier);
+    if (tool === 'antigravity' && role !== 'orchestrator') {
+      const { invokeModel } = antigravitySubagentTier(m, tier);
+      return `${tool}: \`${m}\` [Model: \`${invokeModel}\`]`;
+    }
+    return tools.length === 1 ? `\`${m}\`` : `${tool}: \`${m}\``;
+  }).join(', ');
+}
+
 /**
  * @param {object} config
  * @param {{ componentFiles: Record<string, string | null> }} ctx  where each
  *   component's context lives (null when it is covered by the root file)
  */
 // Spanish only, whatever the docs language (project rule: no English variants).
-const ruleTooling = (globs) => `La configuración de herramientas (${globs.map((g) => `\`${g}\``).join(', ')}) no necesita tarea ni ADR: edítala cuando haga falta (lint, tipos, CI); Claude Code te pedirá confirmación y el usuario decide.`;
+const ruleTooling = (globs) => `La configuración de herramientas (${globs.map((g) => `\`${g}\``).join(', ')}) no necesita tarea ni ADR: edítala cuando haga falta (lint, tipos, CI); la herramienta te pedirá confirmación y el usuario decide.`;
 const RULE_PROTECTED = 'Zonas protegidas (el harness avisa si las tocas; no las bloquea):';
-const RULE_ALERTS = 'El harness no bloquea tu trabajo: te avisa. Si te avisa de una zona protegida, de código sin tarea o fuera de su alcance, sigue, deja la decisión registrada (ADR, tasks.md) y cuéntaselo al usuario en tu resumen. Mantén siempre al día spec, plan, tasks.md y demás documentos que cada cambio afecte.';
+const RULE_UNPLANNED_BLOCK = 'No se escribe código de ningún componente mientras no haya un plan aprobado (`status: plan-approved` en `spec.md`): el guardián lo bloquea. Primero crea y aprueba la spec y el plan.';
+const RULE_ALERTS = 'Una vez aprobado el plan, el harness no bloquea tu trabajo: te avisa si tocas una zona protegida, un componente sin tarea o fuera de su alcance. Sigue, deja la decisión registrada (ADR, tasks.md) y cuéntaselo al usuario en tu resumen. Mantén siempre al día spec, plan, tasks.md y demás documentos que cada cambio afecte.';
 const RULE_DOCS_FREE = 'Mantén al día los documentos `.md` que afecte cada cambio (README, CHANGELOG, specs, arquitectura, lecciones): actualizarlos nunca requiere permiso.';
 const RULE_MANUAL_NONE = 'No hace falta prueba manual: basta con que la verificación de la tarea pase.';
-const RULE_INIT = 'Si ejecutas `/init` o añades instrucciones del proyecto, escríbelas en `AGENTS.md` fuera de este bloque; `CLAUDE.md` solo debe referenciar `@AGENTS.md`.';
+const ruleInit = (hasClaude) => (hasClaude
+  ? 'Si ejecutas `/init` o añades instrucciones del proyecto, escríbelas en `AGENTS.md` fuera de este bloque; `CLAUDE.md` solo debe referenciar `@AGENTS.md`.'
+  : 'Si ejecutas `/init` o añades instrucciones del proyecto, escríbelas en `AGENTS.md` fuera de este bloque.');
 
 export function rootContext(config, ctx) {
   const lang = config.language?.docs ?? 'en';
@@ -160,6 +180,8 @@ export function rootContext(config, ctx) {
   const protectedZones = Object.entries(config.protected ?? {}).filter(([name, globs]) => name !== 'tooling' && globs?.length);
   const tooling = config.protected?.tooling ?? [];
   const comps = Object.entries(config.components ?? {});
+  const hasClaude = (config.tools ?? []).includes('claude-code');
+  const unplannedBlock = (config.gates?.unplanned ?? 'block') !== 'warn';
   const out = [
     `<!-- ${t.note} -->`,
     `# ${t.title}`,
@@ -178,6 +200,7 @@ export function rootContext(config, ctx) {
     '',
     `- ${t.ruleCommit}`,
     `- ${t.ruleDeps}`,
+    ...(unplannedBlock ? [`- ${RULE_UNPLANNED_BLOCK}`] : []),
     `- ${RULE_ALERTS}`,
     ...(protectedZones.length ? [`- ${RULE_PROTECTED}`, ...protectedZones.map(([name, globs]) => `  - ${name}: ${globs.map((g) => `\`${g}\``).join(', ')}`)] : []),
     ...(tooling.length ? [`- ${ruleTooling(tooling)}`] : []),
@@ -189,7 +212,7 @@ export function rootContext(config, ctx) {
     `- ${config.gates?.docs === 'whitelist' ? `${t.ruleDocs} ${whitelist.map((w) => `\`${w}\``).join(', ')}.` : RULE_DOCS_FREE}`,
     `- ${t.ruleLanes}`,
     `- ${t.ruleHarness}`,
-    `- ${RULE_INIT}`,
+    `- ${ruleInit(hasClaude)}`,
     '',
     `## ${t.components}`,
     '',
@@ -204,7 +227,12 @@ export function rootContext(config, ctx) {
     }),
     `## ${t.roles}`,
     '',
-    ...neededRoles(config).map(({ role, writes }) => `- \`${role}\`: ${writes.length ? writes.map((w) => `\`${w}\``).join(', ') : t.readOnly}`),
+    t.orchestratorLine(formatRoleModels(config, 'orchestrator')),
+    ...neededRoles(config).map(({ role, writes }) => {
+      const tier = roleTier(config, role);
+      const models = formatRoleModels(config, role);
+      return `- \`${role}\` (${tier}${models ? ` · ${models}` : ''}): ${writes.length ? writes.map((w) => `\`${w}\``).join(', ') : t.readOnly}`;
+    }),
     '',
     `## ${t.conventions}`,
     '',

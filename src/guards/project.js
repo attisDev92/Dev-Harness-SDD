@@ -74,8 +74,10 @@ export function loadGuardSettings(root) {
     retries: { ...DEFAULT_RETRIES, ...(data.retries ?? {}) },
     components: data.components && typeof data.components === 'object' ? data.components : {},
     roles: data.roles && typeof data.roles === 'object' ? data.roles : {},
+    models: data.models && typeof data.models === 'object' ? data.models : {},
     manualTest: ['task', 'story', 'spec', 'none'].includes(data.manual_test) ? data.manual_test : 'story',
     decisions: data.decisions === 'interview' ? 'interview' : 'summary',
+    unplanned: data.unplanned === 'warn' ? 'warn' : 'block',
     // The developer's own limit (sdd.js agents N) wins over the project default.
     maxParallel: localMaxParallel ?? projectMaxParallel,
     projectMaxParallel,

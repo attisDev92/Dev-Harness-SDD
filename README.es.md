@@ -176,7 +176,7 @@ Los comandos `/sdd:*` son **atajos opcionales** para ver qué pasó o lanzar tra
 | `/sdd:pause` | Terminar lo que está en marcha y no lanzar nada nuevo: para cerrar o suspender una sesión. `/sdd:resume` la retira |
 
 > [!NOTE]
-> La sintaxis de invocación varía según la herramienta. Por ejemplo, Codex invoca las skills como `$nombre` y Antigravity las expone como workflows con `/`. `sdd-harness doctor` te muestra la sintaxis correcta para tu configuración.
+> La sintaxis de invocación varía según la herramienta. Por ejemplo, Claude Code usa `/sdd:status`, Antigravity y opencode exponen las skills como `/sdd-status` y Codex como `$sdd-status`. `sdd-harness doctor` te muestra la sintaxis correcta para tu configuración.
 
 ---
 
@@ -186,16 +186,26 @@ Solo se generan los agentes que tu proyecto necesita. Un proyecto solo de fronte
 
 | Agente | Rol | Escribe en | Skills clave | Nivel |
 |---|---|---|---|---|
-| 🧐 `spec-reviewer` | QA de la spec. Detecta problemas, nunca los resuelve | — (solo lectura) | spec-generator (modo revisión) | alto |
-| 🏗️ `architect` | Plan, contrato API y propuestas de ADR | `specs/**`, `docs/decisions/**` | api-design, backend-architecture, adr | alto |
-| 🎨 `frontend-dev` | UI, sistema de diseño, componentes | solo rutas de frontend | frontend-design, design-system, web-design-guidelines, clean-code, TDD (+ skills de React/Next si se detectan) | medio |
-| ⚙️ `backend-dev` | API, dominio, persistencia | solo rutas de backend | backend-architecture, api-design, secure-coding, db-migrations, clean-code, TDD (+ skill de Postgres si se detecta) | medio |
-| 🧪 `qa-tester` | Unitarios, integración, E2E, reportes de errores | `tests/**`, `e2e/**` | webapp-testing, testing-strategy, TDD | medio |
-| 👀 `reviewer` | Cumplimiento de la spec, luego calidad y seguridad | — (solo lectura) | code-review, secure-coding, verification-before-completion | alto |
-| 🩺 `debugger` | Triage de causa raíz. Reporta opciones, **no arregla** | — (solo lectura) | systematic-debugging, triage-report | alto |
-| 📚 `doc-writer` | Actualiza solo los docs permitidos | `.md` de la lista blanca | docs-writer | bajo |
+| 🧭 `orchestrator` | Sesión principal: entrevista, las dos paradas, coordinación y verificación | `specs/**` (vía flujo) | `sdd` | `orchestrator` |
+| 🧐 `spec-reviewer` | QA de la spec. Detecta problemas, nunca los resuelve | — (solo lectura) | spec-generator (modo revisión) | `high` |
+| 🏗️ `architect` | Plan, contrato API y propuestas de ADR | `specs/**`, `docs/decisions/**` | api-design, backend-architecture, adr | `high` |
+| 🎨 `frontend-dev` | UI, sistema de diseño, componentes | solo rutas de frontend | frontend-design, design-system, web-design-guidelines, clean-code, TDD (+ skills de React/Next si se detectan) | `mid` |
+| ⚙️ `backend-dev` | API, dominio, persistencia | solo rutas de backend | backend-architecture, api-design, secure-coding, db-migrations, clean-code, TDD (+ skill de Postgres si se detecta) | `mid` |
+| 🧪 `qa-tester` | Unitarios, integración, E2E, reportes de errores | `tests/**`, `e2e/**` | webapp-testing, testing-strategy, TDD | `mid` |
+| 👀 `reviewer` | Cumplimiento de la spec, luego calidad y seguridad | — (solo lectura) | code-review, secure-coding, verification-before-completion | `high` |
+| 🩺 `debugger` | Triage de causa raíz. Reporta opciones, **no arregla** | — (solo lectura) | systematic-debugging, triage-report | `high` |
+| 📚 `doc-writer` | Actualiza solo los docs permitidos (y tareas `[mecánica]`) | `.md` de la lista blanca | docs-writer | `low` |
 
-Los niveles (`alto` / `medio` / `bajo`) se traducen a modelos concretos en cada herramienta mediante los adaptadores.
+### Equivalencia de modelos por nivel y herramienta
+
+Cada nivel (`orchestrator` / `high` / `mid` / `low`) se traduce a modelos equivalentes por herramienta (y puedes personalizar cualquiera —por nivel o por rol concreto— en `models.<herramienta>` de `harness.config.yaml`; `sdd-harness doctor` muestra los activos):
+
+| Nivel | Roles | Claude Code (`claude-code`) | Google Antigravity (`antigravity`) | Tier en `invoke_subagent` (Antigravity) |
+|---|---|---|---|---|
+| `orchestrator` | `orchestrator` (sesión principal) | `opus` (`claude-opus-5-5`) | `gemini-4-neon-high` *(o `Orchestrator (Neon)`)* | Sesión principal (`--model` / `.agents/agents/sdd-orchestrator.md`) |
+| `high` | `architect`, `spec-reviewer`, `reviewer`, `debugger` | `opus` (`claude-opus-5-5`) | `gemini-4-carbon-high` *(Gemini 4 Carbon High)* | `pro` |
+| `mid` | `frontend-dev`, `backend-dev`, `qa-tester` | `sonnet` (`claude-sonnet-5-5`) | `gemini-4-hydrogen-high` *(Gemini 4 Hydrogen High)* | `flash` |
+| `low` | `doc-writer` y tareas `[mecánica]` | `haiku` (`claude-haiku-4-5`) | `gemini-4-hydrogen-low` *(Gemini 4 Hydrogen Low)* | `flash_lite` |
 
 > [!IMPORTANT]
 > En Claude Code los subagentes no pueden lanzar otros subagentes, así que **el orquestador es tu sesión principal**, guiada por la skill `sdd`. En las herramientas sin subagentes equivalentes, el harness funciona en **modo degradado**: los roles se ejecutan uno tras otro en el mismo agente.
@@ -247,7 +257,8 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 |---|---|
 | 💾 **Commit por historia, con tu OK** | Al cerrar una historia el agente propone el commit y lo hace si dices que sí. Push, rebase, merge, reset, borrar ramas y tags piden confirmación nativa |
 | 📦 **Instalar dependencias te pregunta** | Permiso `ask` en los comandos de instalación. Editar a mano manifiestos o lockfiles solo genera un aviso |
-| 🔔 **Avisos, no muros** | Zonas protegidas, código sin tarea o fuera de su alcance: el harness avisa una vez y deja seguir. Solo se bloquea `.harness/` y los archivos generados |
+| 🧱 **Sin código sin plan aprobado** | Escribir código de componentes antes de `plan-approved` queda bloqueado por defecto (`gates.unplanned: block`), así ningún modelo se salta la spec ni el plan; tampoco se puede avanzar `status` en `spec.md` ni marcar `[x]` en `tasks.md` a mano |
+| 🔔 **Avisos en implementación, no muros** | Con el plan aprobado, zonas protegidas, código sin tarea o fuera de su alcance solo avisan una vez y dejan seguir. Solo se bloquea `.harness/` y los archivos generados |
 | 🧩 **Tareas que surgen** | Se añaden a `tasks.md` como "añadida en implementación", sin parar |
 | 🔁 **Sin bucles infinitos** | Máximo **2** intentos de corrección. Después, informe del depurador → tú eliges |
 | 🧑 **Pruebas lo que importa** | URL, pasos y datos de prueba con la granularidad que elijas (`task`, `story`, `spec` o `none`) |
@@ -267,7 +278,7 @@ Con `design.source: figma` o `penpot`, el harness configura el servidor MCP de l
 | Claude Code | `CLAUDE.md` → `@AGENTS.md` | ✅ | ✅ | permisos + hooks | 🟢 fuerte |
 | opencode | `AGENTS.md` | ✅ | ✅ | `permission.bash` + plugins | 🟢 medio-fuerte |
 | Codex | `AGENTS.md` | ✅ | ✅ | hooks (beta) + política de aprobación | 🟡 medio |
-| Antigravity | `AGENTS.md` + regla siempre activa `.agents/rules/sdd-harness.md` | ✅ (+ una skill `role-*` por rol) | `invoke_subagent` con el brief de la tarea | hooks (`.agents/hooks.json`) + `sdd.js done` exigiendo verificación verde | 🟡 medio → git hooks + CI |
+| Antigravity | `AGENTS.md` + `.agents/rules/sdd-harness.md` + reglas `glob` por componente | ✅ (`/sdd-*` + skills propias y curadas) | ✅ (`.agents/agents/<rol>.md` con `tools` y `model` nativos) | `hooks.json` (`deny` + `ask` nativo + `PreInvocation` / `Stop`) | 🟢 fuerte |
 
 Ejecuta `sdd-harness doctor` para ver qué se aplica realmente en tu proyecto.
 
@@ -315,6 +326,7 @@ gates:
   commits: per-story           # el agente propone el commit al cerrar cada historia
   deps: ask
   decisions: summary           # summary (se cuentan en los resúmenes) | interview (te pregunta una cada vez)
+  unplanned: block             # block (impide escribir código sin plan aprobado) | warn (solo avisa)
 
 orchestration:
   max_parallel: 2              # subagentes a la vez por defecto, de 1 a 4 (cada dev lo cambia en local: sdd.js agents N)
@@ -380,7 +392,7 @@ mi-proyecto/
 ├─ harness.config.yaml
 ├─ AGENTS.md · CLAUDE.md (@AGENTS.md)
 ├─ .agents/skills/              # skills canónicas (+ copias para las herramientas que las necesitan)
-├─ .claude/ · .opencode/ · .codex/ · .agents/workflows/   # solo para las herramientas activadas
+├─ .claude/ · .agents/{agents,rules,hooks.json,mcp_config.json} · .opencode/ · .codex/   # solo para las herramientas activadas
 ├─ .harness/
 │  ├─ scripts/                  # guardianes, en Node
 │  ├─ githooks/                 # red de seguridad universal
@@ -417,7 +429,8 @@ mi-proyecto/
 - [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, flujo SDD completo, avisos, dos paradas de aprobación, git hooks, mensajes en español
 - [x] Flujo ligero (v0.8): aprobar hablando, commit por historia, tareas y cambios de configuración a mitad del desarrollo
 - [x] Topologías de varios repos y workspace, dependencias entre specs y snapshots de contratos
-- [ ] Adaptadores de opencode, Codex y Antigravity, y modo degradado
+- [x] Adaptador completo de Google Antigravity (App 2.0, CLI `agy`, IDE) y blindajes deterministas anti-salto para modelos Gemini / multiherramienta
+- [ ] Adaptadores de opencode y Codex, y modo degradado
 - [x] Registro de skills e instalador verificado
 - [x] Sincronización bidireccional con cualquier tracker: GitHub desde la CLI, el resto desde el agente con su MCP
 - [x] Matriz de CI multiplataforma (Windows, macOS, Linux · Node 24 LTS)

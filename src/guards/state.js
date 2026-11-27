@@ -16,8 +16,8 @@ export const STATUSES = ['draft', 'spec-approved', 'plan-approved', 'done'];
 export const STOPS = { spec: 'spec-approved', plan: 'plan-approved' };
 
 export function emptyRuntime() {
-  // paused: the user asked to stop launching work (sdd.js pause); decided: alert keys the user already settled.
-  return { version: 2, pending: null, verify: {}, alerted: [], subagents: {}, focus: null, paused: null, decided: [] };
+  // paused: the user asked to stop launching work (sdd.js pause); decided: alert keys the user already settled; queuedAlerts: post-tool messages for async/AGY hooks.
+  return { version: 2, pending: null, verify: {}, alerted: [], subagents: {}, focus: null, paused: null, decided: [], queuedAlerts: [] };
 }
 
 export function writeAtomic(file, text) {

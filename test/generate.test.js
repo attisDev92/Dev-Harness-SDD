@@ -173,7 +173,7 @@ test('RF-GEN-14 / edge case 6: the context stays under every tool limit and over
   const own = byPath(entries)['AGENTS.md'].content.length;
   assert.ok(own < Math.min(...Object.values(TOOL_CONTEXT_LIMITS)) / 2, `own block is ${own} chars`);
   assert.deepEqual(notices, []);
-  const huge = 'x'.repeat(20000);
+  const huge = 'x'.repeat(23000);
   const big = generateCore(base({ tools, install_mode: 'team' }), env({ read: (p) => (p === 'AGENTS.md' ? huge : null) }));
   assert.deepEqual(big.notices.map((n) => n.params.tool), ['antigravity']);
 });

@@ -176,7 +176,7 @@ The `/sdd:*` commands are **optional shortcuts** to see what happened or to laun
 | `/sdd:pause` | Finish what is running and launch nothing new: to end or suspend a session. `/sdd:resume` lifts it |
 
 > [!NOTE]
-> Invocation syntax varies by tool. For example, Codex invokes skills as `$name`, and Antigravity exposes these as workflows under `/`. `sdd-harness doctor` prints the right syntax for your setup.
+> Invocation syntax varies by tool. For example, Claude Code uses `/sdd:status`, Antigravity and opencode expose the flow skills as `/sdd-status`, and Codex invokes them as `$sdd-status`. `sdd-harness doctor` prints the right syntax for your setup.
 
 ---
 
@@ -186,16 +186,26 @@ Only the agents your project needs are generated. A frontend-only project gets n
 
 | Agent | Role | Writes to | Key skills | Tier |
 |---|---|---|---|---|
-| 🧐 `spec-reviewer` | QA of the spec. Detects problems, never resolves them | — (read only) | spec-generator (review mode) | high |
-| 🏗️ `architect` | Plan, API contract, ADR proposals | `specs/**`, `docs/decisions/**` | api-design, backend-architecture, adr | high |
-| 🎨 `frontend-dev` | UI, design system, components | frontend paths only | frontend-design, design-system, web-design-guidelines, clean-code, TDD (+ React/Next skills if detected) | mid |
-| ⚙️ `backend-dev` | API, domain, persistence | backend paths only | backend-architecture, api-design, secure-coding, db-migrations, clean-code, TDD (+ Postgres skill if detected) | mid |
-| 🧪 `qa-tester` | Unit, integration, E2E, bug reports | `tests/**`, `e2e/**` | webapp-testing, testing-strategy, TDD | mid |
-| 👀 `reviewer` | Spec compliance, then code quality and security | — (read only) | code-review, secure-coding, verification-before-completion | high |
-| 🩺 `debugger` | Root-cause triage. Reports options, **does not fix** | — (read only) | systematic-debugging, triage-report | high |
-| 📚 `doc-writer` | Updates whitelisted docs only | whitelisted `.md` | docs-writer | low |
+| 🧭 `orchestrator` | Main session: interview, the two stops, coordination and verification | `specs/**` (flow) | `sdd` | `orchestrator` |
+| 🧐 `spec-reviewer` | QA of the spec. Detects problems, never resolves them | — (read only) | spec-generator (review mode) | `high` |
+| 🏗️ `architect` | Plan, API contract, ADR proposals | `specs/**`, `docs/decisions/**` | api-design, backend-architecture, adr | `high` |
+| 🎨 `frontend-dev` | UI, design system, components | frontend paths only | frontend-design, design-system, web-design-guidelines, clean-code, TDD (+ React/Next skills if detected) | `mid` |
+| ⚙️ `backend-dev` | API, domain, persistence | backend paths only | backend-architecture, api-design, secure-coding, db-migrations, clean-code, TDD (+ Postgres skill if detected) | `mid` |
+| 🧪 `qa-tester` | Unit, integration, E2E, bug reports | `tests/**`, `e2e/**` | webapp-testing, testing-strategy, TDD | `mid` |
+| 👀 `reviewer` | Spec compliance, then code quality and security | — (read only) | code-review, secure-coding, verification-before-completion | `high` |
+| 🩺 `debugger` | Root-cause triage. Reports options, **does not fix** | — (read only) | systematic-debugging, triage-report | `high` |
+| 📚 `doc-writer` | Updates whitelisted docs only (and `[mechanical]` tasks) | whitelisted `.md` | docs-writer | `low` |
 
-Tiers (`high` / `mid` / `low`) map to concrete models per tool through the adapters.
+### Model equivalence per tier and tool
+
+Each tier (`orchestrator` / `high` / `mid` / `low`) maps to equivalent concrete models per tool (and you can override any tier or individual role under `models.<tool>` in `harness.config.yaml`; `sdd-harness doctor` prints the active ones):
+
+| Tier | Roles | Claude Code (`claude-code`) | Google Antigravity (`antigravity`) | `invoke_subagent` Tier (Antigravity) |
+|---|---|---|---|---|
+| `orchestrator` | `orchestrator` (main session) | `opus` (`claude-opus-5-5`) | `gemini-4-neon-high` *(or `Orchestrator (Neon)`)* | Main session (`--model` / `.agents/agents/sdd-orchestrator.md`) |
+| `high` | `architect`, `spec-reviewer`, `reviewer`, `debugger` | `opus` (`claude-opus-5-5`) | `gemini-4-carbon-high` *(Gemini 4 Carbon High)* | `pro` |
+| `mid` | `frontend-dev`, `backend-dev`, `qa-tester` | `sonnet` (`claude-sonnet-5-5`) | `gemini-4-hydrogen-high` *(Gemini 4 Hydrogen High)* | `flash` |
+| `low` | `doc-writer` and `[mechanical]` tasks | `haiku` (`claude-haiku-4-5`) | `gemini-4-hydrogen-low` *(Gemini 4 Hydrogen Low)* | `flash_lite` |
 
 > [!IMPORTANT]
 > In Claude Code, sub-agents cannot spawn other sub-agents, so the **orchestrator is your main session**, driven by the `sdd` skill. In tools without equivalent sub-agents, the harness runs in **degraded mode**: roles run one after another in the same agent.
@@ -247,7 +257,8 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 |---|---|
 | 💾 **Commit per story, with your OK** | When a story closes the agent proposes the commit and makes it if you say yes. Push, rebase, merge, reset, deleting branches and tags ask natively |
 | 📦 **Dependency installs ask you** | `ask` permission on install commands. Editing manifests or lockfiles by hand only raises an alert |
-| 🔔 **Alerts, not walls** | Protected zones, code without a task or outside its scope: the harness warns once and lets the work go on. Only `.harness/` and generated files are blocked |
+| 🧱 **No code before an approved plan** | Component code written before `plan-approved` is blocked by default (`gates.unplanned: block`), so fast models never skip the spec or the plan; tampering with `status` in `spec.md` or `[x]` in `tasks.md` by hand is blocked too |
+| 🔔 **Alerts while implementing, not walls** | Once a plan is approved, protected zones, code without a task or outside its scope warn once and let the work go on. Only `.harness/` and generated files stay blocked |
 | 🧩 **Tasks that come up** | Added to `tasks.md` as "added during implementation", without stopping |
 | 🔁 **No infinite loops** | Max **2** fix attempts. Then debugger report → you choose |
 | 🧑 **You test what matters** | URL, steps and test data at the granularity you choose (`task`, `story`, `spec` or `none`) |
@@ -267,7 +278,7 @@ With `design.source: figma` or `penpot` the harness configures the design tool's
 | Claude Code | `CLAUDE.md` → `@AGENTS.md` | ✅ | ✅ | permissions + hooks | 🟢 strong |
 | opencode | `AGENTS.md` | ✅ | ✅ | `permission.bash` + plugins | 🟢 medium-strong |
 | Codex | `AGENTS.md` | ✅ | ✅ | hooks (beta) + approval policy | 🟡 medium |
-| Antigravity | `AGENTS.md` + always-on rule `.agents/rules/sdd-harness.md` | ✅ (+ one `role-*` skill per role) | `invoke_subagent` with the task brief | hooks (`.agents/hooks.json`) + `sdd.js done` requiring a green verification | 🟡 medium → git hooks + CI |
+| Antigravity | `AGENTS.md` + `.agents/rules/sdd-harness.md` + per-component `glob` rules | ✅ (`/sdd-*` + bundled & curated skills) | ✅ (`.agents/agents/<role>.md` with native `tools` & `model`) | `hooks.json` (`deny` + native `ask` + `PreInvocation` / `Stop`) | 🟢 strong |
 
 Run `sdd-harness doctor` to see what is actually enforced in your project.
 
@@ -315,6 +326,7 @@ gates:
   commits: per-story           # the agent proposes the commit when a story closes
   deps: ask
   decisions: summary           # summary (told in the summaries) | interview (asked one question at a time)
+  unplanned: block             # block (prevents component code before plan-approved) | warn (alert only)
 
 orchestration:
   max_parallel: 2              # subagents at once by default, 1–4 (each dev overrides it locally: sdd.js agents N)
@@ -381,7 +393,7 @@ my-project/
 ├─ harness.config.yaml
 ├─ AGENTS.md · CLAUDE.md (@AGENTS.md)
 ├─ .agents/skills/              # canonical skills (+ copies for tools that need them)
-├─ .claude/ · .opencode/ · .codex/ · .agents/workflows/   # only for the tools you enabled
+├─ .claude/ · .agents/{agents,rules,hooks.json,mcp_config.json} · .opencode/ · .codex/   # only for the tools you enabled
 ├─ .harness/
 │  ├─ scripts/                  # guards, in Node
 │  ├─ githooks/                 # universal safety net
@@ -418,7 +430,8 @@ my-project/
 - [x] **MVP** Claude Code: `init` / `sync` / `doctor` / `remove` / `upgrade`, full SDD flow, alerts, two approval stops, git hooks, Spanish messages
 - [x] Light flow (v0.8): approvals by talking, commit per story, tasks and config changes mid-development
 - [x] Multi-repo and workspace topologies, cross-spec dependencies and contract snapshots
-- [ ] opencode, Codex and Antigravity adapters, and degraded mode
+- [x] Full Google Antigravity adapter (App 2.0, `agy` CLI, IDE) and deterministic model-hardening guards
+- [ ] opencode and Codex adapters, and degraded mode
 - [x] Skills registry and verified installer
 - [x] Two-way sync with any tracker: GitHub from the CLI, the rest from the agent through its MCP
 - [x] Cross-platform CI matrix (Windows, macOS, Linux · Node 24 LTS)

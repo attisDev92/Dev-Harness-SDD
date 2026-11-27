@@ -445,6 +445,8 @@ Resueltas:
 - **CI:** solo GitHub Actions; GitLab CI no se cubre.
 - **Versión mínima de Node.js:** la última LTS, hoy Node 24.
 
+- **Antigravity (resuelto en Spec 002, v2.3.0):** soporta subagentes nativos en `.agents/agents/<role>.md` (`tools`, `model`, `skills`), skills con `/` en `.agents/skills/sdd-<cmd>/SKILL.md`, reglas `always_on` y `glob` (24 KB), y hooks en `.agents/hooks.json` (`PreToolUse` con `allow`/`deny`/`ask`, `PostToolUse`, `SessionStart`, `PreInvocation` con `lastUserInput`, `PostInvocation` y `Stop` con `continuationActive`).
+
 Abiertas:
 
-- [NECESITA ACLARACIÓN: capacidades actuales de subagentes y hooks en Antigravity y de los hooks de Codex; se verificarán al retomar esos adaptadores]
+- [NECESITA ACLARACIÓN: capacidades actuales de los hooks de Codex y opencode; se verificarán al retomar esos adaptadores]

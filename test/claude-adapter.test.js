@@ -30,13 +30,15 @@ test('RF-ADP-01 / RF-GEN-04: one subagent per needed role, with its tools and mo
   assert.ok(!fs.existsSync(path.join(front, '.claude/agents/backend-dev.md')));
 });
 
-test('RF-ADP-05 / RF-ORQ-10: models and tiers are configurable per tool and role', async (t) => {
+test('RF-ADP-05 / RF-ORQ-10: models and tiers are configurable per tool, orchestrator and individual role', async (t) => {
   const root = FIXTURES.frontend(t);
   await run(['init', '--yes'], { cwd: root });
-  fs.appendFileSync(path.join(root, 'harness.config.yaml'), 'models:\n  claude-code: {high: claude-opus-5-5, mid: claude-sonnet-5-5, low: claude-haiku-4-5}\nroles:\n  reviewer: {tier: mid}\n');
+  fs.appendFileSync(path.join(root, 'harness.config.yaml'), 'models:\n  claude-code: {orchestrator: claude-opus-5-5-high, high: claude-opus-5-5, debugger: claude-opus-5-5-high, mid: claude-sonnet-5-5, low: claude-haiku-4-5}\nroles:\n  reviewer: {tier: mid}\n');
   assert.equal((await run(['sync', '--yes'], { cwd: root })).code, 0);
+  assert.equal(JSON.parse(read(root, '.claude/settings.local.json')).model, 'claude-opus-5-5-high');
   assert.equal(frontmatter(read(root, '.claude/agents/reviewer.md')).model, 'claude-sonnet-5-5');
   assert.equal(frontmatter(read(root, '.claude/agents/architect.md')).model, 'claude-opus-5-5');
+  assert.equal(frontmatter(read(root, '.claude/agents/debugger.md')).model, 'claude-opus-5-5-high');
 });
 
 test('RF-ADP-01 / RF-ORQ-14: /sdd:* shortcuts that inform or launch work, and the skills', async (t) => {
@@ -102,17 +104,22 @@ test('the generated hook really runs from .harness/scripts (ES modules, any cwd)
   const command = settings.hooks.PreToolUse.at(-1).hooks[0].command;
   assert.equal(command, 'node "$CLAUDE_PROJECT_DIR/.harness/scripts/hook.js" PreToolUse');
   const hookRun = (payload) => spawnSync(process.execPath, [path.join(root, '.harness/scripts/hook.js'), 'PreToolUse'], { input: JSON.stringify({ session_id: 'x', cwd: root, hook_event_name: 'PreToolUse', ...payload }), encoding: 'utf8', cwd: path.join(root, 'src'), env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
-  // Code without a task: an alert as context, never a block.
+  // RF-HRD-01: component code without an approved plan is blocked by default; with an approved plan and no task for that component, it warns without blocking.
   const r = hookRun({ tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/App.tsx'), content: 'x' } });
-  assert.equal(r.status, 0, r.stderr);
-  assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /no hay ninguna tarea pendiente/);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /sin un plan aprobado/);
+  const sdd = spawnSync(process.execPath, [path.join(root, '.harness/scripts/sdd.js'), 'status'], { encoding: 'utf8', cwd: root });
+  assert.equal(sdd.status, 0, sdd.stderr);
+  assert.match(sdd.stdout, /Spec en curso: —/);
+  fs.mkdirSync(path.join(root, 'specs/SPEC-001-ui'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'specs/SPEC-001-ui/spec.md'), '---\nstatus: plan-approved\n---\n# Spec\n');
+  const warn = hookRun({ tool_name: 'Write', tool_input: { file_path: path.join(root, 'src/App.tsx'), content: 'x' } });
+  assert.equal(warn.status, 0, warn.stderr);
+  assert.match(JSON.parse(warn.stdout).hookSpecificOutput.additionalContext, /no hay ninguna tarea pendiente/);
   // The harness itself stays blocked.
   const blocked = hookRun({ tool_name: 'Write', tool_input: { file_path: path.join(root, '.harness/guards.json'), content: '{}' } });
   assert.equal(blocked.status, 2);
   assert.match(blocked.stderr, /pertenece al harness/);
-  const sdd = spawnSync(process.execPath, [path.join(root, '.harness/scripts/sdd.js'), 'status'], { encoding: 'utf8', cwd: root });
-  assert.equal(sdd.status, 0, sdd.stderr);
-  assert.match(sdd.stdout, /Spec en curso: —/);
 });
 
 test('RF-ADP-06: adapters are registered without touching the core', () => {

@@ -7,7 +7,7 @@ export const TOPOLOGIES = ['single', 'monorepo', 'multi-repo', 'workspace'];
 export const DESIGN_SOURCES = ['none', 'tokens-in-code', 'penpot', 'figma'];
 export const TRACKERS = ['linear', 'notion', 'github', 'jira'];
 export const ROLES = ['spec-reviewer', 'architect', 'frontend-dev', 'backend-dev', 'qa-tester', 'reviewer', 'debugger', 'doc-writer'];
-export const TIERS = ['high', 'mid', 'low'];
+export const TIERS = ['orchestrator', 'high', 'mid', 'low'];
 export const COMPONENT_KINDS = ['frontend', 'backend', 'db', 'other'];
 
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -77,6 +77,8 @@ export const schema = obj(
       // summary: pending decisions (clarifications, ADR drafts, alerts) are recorded and told in the
       // summaries; interview: the agent asks the user about them, one question at a time, before going on.
       decisions: oneOf(['summary', 'interview']),
+      // block (default): component code cannot be written before a spec reaches plan-approved; warn: alert only.
+      unplanned: oneOf(['block', 'warn']),
     }),
     // Most subagents working at the same time, whatever their role.
     orchestration: obj({ max_parallel: int({ min: 1, max: 4 }) }),
@@ -87,7 +89,16 @@ export const schema = obj(
     git_hooks: obj({ enabled: bool() }),
     ci: obj({ provider: oneOf(['none', 'github']) }),
     roles: map(obj({ tier: oneOf(TIERS) }), { keys: ROLES }),
-    models: map(obj({ high: str(), mid: str(), low: str() }), { keys: TOOLS }),
+    models: map(
+      obj({
+        orchestrator: str({ minLength: 1 }),
+        high: str({ minLength: 1 }),
+        mid: str({ minLength: 1 }),
+        low: str({ minLength: 1 }),
+        ...Object.fromEntries(ROLES.map((r) => [r, str({ minLength: 1 })])),
+      }),
+      { keys: TOOLS },
+    ),
   },
   ['harness_version', 'tools', 'topology', 'components'],
 );

@@ -56,7 +56,7 @@ En modo local un adaptador no puede escribir en archivos versionados (RF-MOD-02)
 
 ### Payload de los hooks
 
-`src/guards/hook.js` lee el payload de Claude Code. Una herramienta con otro formato necesita su propio script de entrada que normalice el payload y llame a los mismos guardianes (`checkShell`, `checkWrite`, `decide`…). Los guardianes son neutrales.
+`src/guards/hook.js` normaliza los payloads de Claude Code y de Google Antigravity (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `SessionStart`, `UserPromptSubmit`, `Stop`), gestionando tanto subagentes síncronos (`Task`) como asíncronos en segundo plano (`invoke_subagent`). Otra herramienta con formato distinto puede añadir su normalización ahí o usar un script de entrada que delegue en los mismos guardianes (`checkWrite`, `parseDecision`…). Los guardianes son neutrales.
 
 ## Herramientas sin subagentes o sin hooks que bloqueen
 

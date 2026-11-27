@@ -38,17 +38,26 @@ test('RF-DOC-01/05: a healthy project exits 0', async (t) => {
 
 test('RF-DOC-02: real enforcement per tool, rule by rule, never overstated', async (t) => {
   const root = await activated(t, ['--tools', 'claude-code,antigravity']);
-  const env = { PATH: fakePath(t, ['claude', 'antigravity']) };
+  const env = { PATH: fakePath(t, ['claude', 'agy']) };
   const json = JSON.parse((await run(['doctor', '--json'], { cwd: root, env })).stdout);
   const claude = json.tools.find((x) => x.tool === 'claude-code');
   assert.deepEqual([claude.potential, claude.current], ['strong', 'strong']);
   assert.deepEqual(Object.values(claude.rules), Array(6).fill('deterministic'));
+  assert.deepEqual(claude.models, { orchestrator: 'opus', high: 'opus', mid: 'sonnet', low: 'haiku' });
   const anti = json.tools.find((x) => x.tool === 'antigravity');
-  assert.deepEqual([anti.potential, anti.current, anti.adapter], ['strong', 'strong', 'v2.0']);
+  assert.deepEqual([anti.potential, anti.current, anti.adapter], ['strong', 'strong', 'v2.3']);
   assert.deepEqual(Object.values(anti.rules), Array(6).fill('deterministic'));
+  assert.deepEqual(anti.models, {
+    orchestrator: 'gemini-4-neon-high',
+    high: 'gemini-4-carbon-high',
+    mid: 'gemini-4-hydrogen-high',
+    low: 'gemini-4-hydrogen-low',
+  });
   const text = await run(['doctor'], { cwd: root, env });
   assert.match(text.stdout, /claude-code: current strong · potential strong/);
   assert.match(text.stdout, /antigravity: current strong · potential strong/);
+  assert.match(text.stdout, /claude-code: orchestrator opus · high opus · mid sonnet · low haiku/);
+  assert.match(text.stdout, /antigravity: orchestrator gemini-4-neon-high · high gemini-4-carbon-high \(pro\) · mid gemini-4-hydrogen-high \(flash\) · low gemini-4-hydrogen-low \(flash_lite\)/);
   // RF-ADP-04
   assert.match(text.stdout, /Antigravity: keep git commit\/push\/merge\/rebase\/reset and package installs out of the terminal allowlist/);
 });
@@ -79,7 +88,7 @@ test('RF-DOC-03: invocation syntax for each enabled tool', async (t) => {
   const root = await activated(t, ['--tools', 'claude-code,opencode,codex,antigravity']);
   const json = JSON.parse((await run(['doctor', '--json'], { cwd: root })).stdout);
   const inv = Object.fromEntries(json.tools.map((x) => [x.tool, x.invocation.spec]));
-  assert.deepEqual(inv, { 'claude-code': '/sdd:spec', opencode: '/sdd-spec', codex: '$sdd-spec', antigravity: '/sdd:spec' });
+  assert.deepEqual(inv, { 'claude-code': '/sdd:spec', opencode: '/sdd-spec', codex: '$sdd-spec', antigravity: '/sdd-spec' });
 });
 
 test('RF-DOC-04/05: problems come with cause and fix; errors exit 1, warnings do not', async (t) => {

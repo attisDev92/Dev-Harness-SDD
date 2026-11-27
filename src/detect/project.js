@@ -10,7 +10,7 @@ const TOOL_MARKERS = {
   'claude-code': ['CLAUDE.md', 'CLAUDE.local.md', '.claude'],
   opencode: ['opencode.json', 'opencode.jsonc', '.opencode'],
   codex: ['.codex'],
-  antigravity: ['.agents/workflows', '.agent', '.agents/hooks.json'],
+  antigravity: ['.agents/rules', '.agents/agents', '.agents/workflows', '.agent', '.agents/hooks.json', 'GEMINI.md'],
 };
 
 /**

@@ -12,6 +12,7 @@ import { findBlock } from '../../engine/blocks.js';
 import { readManifest } from '../../engine/manifest.js';
 import { getConfig, gitTopLevel, trackedFiles } from '../../engine/git.js';
 import { hashText, toLf } from '../../engine/text.js';
+import { antigravitySubagentTier, resolveTierModels } from '../../generate/models.js';
 import { compareVersions, makeReader } from './common.js';
 
 export const RULES = ['commits', 'deps', 'protected', 'docs', 'verify', 'lanes'];
@@ -21,7 +22,7 @@ export const TOOL_PROFILE = {
   'claude-code': { level: 'strong', bin: 'claude', adapter: 'v0.3', invoke: (c) => `/sdd:${c}` },
   opencode: { level: 'medium-strong', bin: 'opencode', adapter: 'v0.5', invoke: (c) => `/sdd-${c}` },
   codex: { level: 'medium', bin: 'codex', adapter: 'v0.5', invoke: (c) => `$sdd-${c}` },
-  antigravity: { level: 'strong', bin: 'agy', adapter: 'v2.0', invoke: (c) => `/sdd:${c}` },
+  antigravity: { level: 'strong', bin: 'agy', adapter: 'v2.3', invoke: (c) => `/sdd-${c}` },
 };
 const LEVEL_LABEL = {
   en: { strong: 'strong', 'medium-strong': 'medium-strong', medium: 'medium', weak: 'weak', none: 'instruction only' },
@@ -166,6 +167,7 @@ export function runChecks(root, { version, env = process.env }) {
       current: current.level,
       rules: current.rules,
       adapter: profile?.adapter,
+      models: resolveTierModels(config, tool),
       invocation: Object.fromEntries(FLOW.map((c) => [c, profile?.invoke(c) ?? `/sdd:${c}`])),
     };
   });
@@ -225,6 +227,15 @@ export async function doctorCommand(argv, { io, t, tc, lang, version }) {
       if (x.current === 'none' && x.adapter) out(`    ${d.adapterPending(x.adapter)}`);
       out(`    ${RULES.map((r) => `${d.rules[r]}: ${x.rules[r] === 'deterministic' ? d.deterministic : d.instruction}`).join(' · ')}`);
       if (x.tool === 'antigravity') out(`    ${d.antigravityHint}`);
+    }
+    out('');
+    out(`${d.models}:`);
+    for (const x of tools) {
+      const m = x.models;
+      const fmt = (tier) => (x.tool === 'antigravity' && tier !== 'orchestrator'
+        ? `${m[tier]} (${antigravitySubagentTier(m[tier], tier).invokeModel})`
+        : m[tier]);
+      out(`  ${x.tool}: orchestrator ${fmt('orchestrator')} · high ${fmt('high')} · mid ${fmt('mid')} · low ${fmt('low')}`);
     }
     out('');
     out(`${d.invocation}:`);

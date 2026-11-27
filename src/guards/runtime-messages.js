@@ -8,6 +8,17 @@ const es = {
     harnessFile: (v) => `Bloqueado: "${v.match}" pertenece al harness (.harness/ o un archivo generado). Los agentes no lo cambian; si hace falta, cambia harness.config.yaml y la configuración se regenera sola.`,
     contextBlock: (v) => `Bloqueado: el bloque generado de ${v.match} (entre <!-- harness:begin --> y <!-- harness:end -->) lo mantiene el harness. Escribe tus instrucciones fuera del bloque.`,
     docBlocked: (v) => `Bloqueado: "${v.match}" no está en la lista blanca de documentación (gates.docs: whitelist). Permitidos: ${(v.allowed ?? []).join(', ')}. Si el usuario lo pidió, añádelo a docs_whitelist en harness.config.yaml.`,
+    manualSpecStatus: (v) => `Bloqueado: no cambies "status" a mano en ${v.match} (${v.from} → ${v.to}). Pide la aprobación al usuario (${S} stop spec|plan) y regístrala con ${S} approve, o cierra con ${S} validate.`,
+    manualTaskDone: (v) => `Bloqueado: no marques tareas como hechas (${v.task}) a mano en ${v.match}. Ejecuta primero la verificación real (${S} verify --component <id> --tests) y después ${S} done <TID>.`,
+    unplannedCode: (v) => {
+      const prefix = v.decision === 'warn' ? 'Aviso' : 'Bloqueado';
+      const step = !v.spec
+        ? `No hay ninguna spec en curso: carga la skill sdd y crea primero la spec (${S} new-spec <nombre>).`
+        : v.status === 'draft'
+          ? `La spec ${v.spec} sigue en borrador (draft): complétala, revísala y pide la parada al usuario (${S} stop spec).`
+          : `El plan de ${v.spec} aún no está aprobado (estado: ${v.status}): genera plan.md y tasks.md y pide la parada al usuario (${S} stop plan).`;
+      return `${prefix}: no se escribe código del componente "${v.component}" (${v.match}) sin un plan aprobado. ${step}${v.decision === 'warn' ? ' Sigue solo si el usuario lo pidió.' : ''}`;
+    },
     needsApproval: (v) => `Aviso: escribes ${v.match} y la spec todavía no está aprobada. Si el usuario ya dijo que sí, registra la aprobación (${S} approve); si no, pregúntale antes de seguir.`,
     depsEdit: (v) => `Aviso: ${v.match} cambia dependencias o un lockfile. Menciónalo en tu resumen.`,
     protectedZone: (v) => v.zone === 'db'
@@ -18,7 +29,7 @@ const es = {
   },
   stop: {
     unknown: (s) => `Parada desconocida "${s}". Usa spec o plan.`,
-    requested: (stop, id) => `Parada "${stop}" de ${id} registrada. Pregunta al usuario si aprueba (AskUserQuestion con "Aprobar" como primera opción, o en texto). Una respuesta afirmativa ("sí", "continúa", "aprobado", "dale"…) queda registrada sola; si elige "Aprobar" en AskUserQuestion, ejecuta ${S} approve. Cualquier otra respuesta son cambios: aplícalos y vuelve a preguntar.`,
+    requested: (stop, id) => `Parada "${stop}" de ${id} registrada. Pregunta al usuario si aprueba (con la herramienta de preguntas ask_question / AskUserQuestion poniendo "Aprobar" como primera opción, o en texto). Una respuesta afirmativa ("sí", "continúa", "aprobado", "dale"…) queda registrada sola; si elige "Aprobar" en la herramienta de preguntas, ejecuta ${S} approve. Cualquier otra respuesta son cambios: aplícalos y vuelve a preguntar.`,
     approved: (stop, id, max = 2) => `Aprobado: ${stop} de ${id}. ${stop === 'spec' ? 'Siguiente: plan, contratos y tasks.md (subagente architect), y la parada "plan".' : `Siguiente: implementar. Lanza las tareas listas, hasta ${max} a la vez (${S} next).`}`,
     nothingPending: () => 'No hay ninguna parada pendiente. Pide primero la aprobación al usuario.',
     openClarifications: (n, id) => `La spec ${id} tiene ${n} aclaración${n === 1 ? '' : 'es'} pendiente${n === 1 ? '' : 's'} y gates.decisions es "interview": entrevista al usuario (una pregunta cada vez), escribe las respuestas en spec.md y vuelve a pedir la parada.`,
@@ -62,6 +73,11 @@ const es = {
     lanes: (role, files) => `El subagente ${role} cambió archivos fuera de sus rutas: ${files.join(', ')}. Revisa si es intencionado y cuéntaselo al usuario en tu resumen.`,
     configSynced: (out) => `harness.config.yaml cambió y la configuración se regeneró (sdd-harness sync).${out ? `\n${out}` : ''}`,
     configSyncFailed: (err) => `harness.config.yaml cambió, pero no se pudo regenerar la configuración: ${err}. Pide al usuario que ejecute "sdd-harness sync".`,
+    askGit: (cmd) => `sdd-harness: operación de git sensible (${cmd}). Confirma con el usuario antes de ejecutarla.`,
+    askDeps: (cmd) => `sdd-harness: instalación de dependencias (${cmd}). Explica por qué la necesitas y espera confirmación.`,
+    askConfig: () => 'sdd-harness: cambio en harness.config.yaml. Tras confirmar, la configuración se regenerará automáticamente.',
+    selfApproveBlocked: () => `Bloqueado: no ejecutes ${S} approve sin haber preguntado antes al usuario tras ${S} stop. Pregunta al usuario (ask_question o mensaje en el chat) y espera su respuesta.`,
+    readOnlyRole: (role, file) => `Bloqueado: el subagente ${role} es de solo lectura y no puede modificar "${file}".`,
   },
   next: {
     noSpec: () => 'No hay spec en curso. Crea una: node .harness/scripts/sdd.js new-spec <nombre>.',

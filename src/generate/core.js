@@ -13,6 +13,7 @@ import { DEFAULT_DOCS_WHITELIST } from '../guards/project.js';
 import { findBlock } from '../engine/blocks.js';
 import { toLf } from '../engine/text.js';
 import { rootContext, componentContext, neededRoles } from './context.js';
+import { antigravitySubagentTier, roleTier, resolveRoleModel, resolveTierModels } from './models.js';
 import { template, TEMPLATE_LANG } from './templates.js';
 
 export const HEADER = {
@@ -22,7 +23,7 @@ export const HEADER = {
 };
 
 /** Characters each tool reads from a context file before truncating or warning (RF-GEN-14). */
-export const TOOL_CONTEXT_LIMITS = { codex: 32768, 'claude-code': 40000, opencode: 40000, antigravity: 12000 };
+export const TOOL_CONTEXT_LIMITS = { codex: 32768, 'claude-code': 40000, opencode: 40000, antigravity: 24000 };
 
 const GUARD_SOURCES = [
   'args.js', 'checks.js', 'contracts.js', 'decisions.js', 'docs-guard.js', 'files-guard.js', 'flow.js', 'glob.js', 'hook.js', 'project.js',
@@ -55,7 +56,7 @@ export function quoteFrontmatter(text) {
     const m = /^([A-Za-z0-9_-]+):[ \t]+(.+)$/.exec(line);
     if (!m) return line;
     const v = m[2].trim();
-    if (/^(["']).*\1$/.test(v)) return line;
+    if (/^(["']).*\1$/.test(v) || /^(true|false)$/.test(v)) return line;
     return `${m[1]}: ${JSON.stringify(v)}`;
   }).join('\n');
   return `---\n${head}${t.slice(end)}`;
@@ -189,9 +190,16 @@ export function generateCore(config, env) {
  * .git/info/exclude and the context size check.
  * @param {{ excludePath: string | null, read: (p: string) => string | null }} env
  */
-export function finalize(config, env, { entries, notices, agentsPath }) {
+export function finalize(config, env, { entries: rawEntries, notices, agentsPath }) {
   const local = (config.install_mode ?? 'local') === 'local';
   const tools = config.tools ?? [];
+  const seenKeys = new Set();
+  const entries = rawEntries.filter((e) => {
+    const k = e.kind === 'git-config' ? `git-config:${e.repo ?? ''}:${e.key}` : `${e.kind}:${e.path}`;
+    if (seenKeys.has(k)) return false;
+    seenKeys.add(k);
+    return true;
+  });
   const add = (entry) => entries.push({ generator: 'core', ...entry });
 
   const generatedPaths = [...new Set(entries.map((e) => e.path))];
@@ -209,9 +217,21 @@ export function finalize(config, env, { entries, notices, agentsPath }) {
         managed_blocks: contextBlocks,
         retries: { in_scope: config.retries?.in_scope ?? 2, protected: config.retries?.protected ?? 0 },
         components: Object.fromEntries(Object.entries(config.components ?? {}).map(([id, c]) => [id, { path: c.path, kind: c.kind ?? 'other', id_prefix: c.id_prefix, verify: c.verify ?? {} }])),
-        roles: Object.fromEntries(neededRoles(config).map((r) => [r.role, { writes: r.writes }])),
+        roles: Object.fromEntries(neededRoles(config).map((r) => [r.role, { writes: r.writes, tier: roleTier(config, r.role) }])),
+        models: Object.fromEntries(tools.map((tool) => [
+          tool,
+          {
+            ...resolveTierModels(config, tool),
+            roles: Object.fromEntries(neededRoles(config).map(({ role }) => {
+              const tier = roleTier(config, role);
+              const model = resolveRoleModel(config, tool, role, tier);
+              return [role, tool === 'antigravity' ? { tier, model, ...antigravitySubagentTier(model, tier) } : { tier, model }];
+            })),
+          },
+        ])),
         manual_test: config.gates?.manual_test ?? 'story',
         decisions: config.gates?.decisions ?? 'summary',
+        unplanned: config.gates?.unplanned ?? 'block',
         max_parallel: config.orchestration?.max_parallel ?? 2,
         specs_language: config.language?.specs ?? 'en',
         docs_language: config.language?.docs ?? 'en',
